@@ -1,0 +1,8 @@
+node_modules/
+.gtv-data/
+*.db
+*.db-*
+.env
+dist/
+sandbox/
+docker/.env

@@ -1,0 +1,21 @@
+# gtv Operator configuration (mounted into the operator container)
+features:
+  # off | shadow | on — see src/shared/features.ts for the full list
+  detect.l3_semantic: on
+  registration.auto_from_plan: shadow
+policy:
+  critical_paths:
+    - "**/migrations/**"
+    - "package-lock.json"
+    - ".github/workflows/**"
+  modules: {}
+knowledge:
+  doc_globs: ["docs/**/*.md", "*.md", "adr/**/*.md", ".gtv/knowledge/**/*.md"]
+qa:
+  ask_wait_s: 45
+  tier2_timeout_min: 15
+  tier3_timeout_h: 4
+registration:
+  wait_s: 30
+l3:
+  daily_budget: 60

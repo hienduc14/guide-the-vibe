@@ -1,0 +1,42 @@
+{
+  "name": "gtv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Project Operator: coordinate several devs' AI coding agents on one repo",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "gtv": "bin/gtv.mjs"
+  },
+  "scripts": {
+    "server": "node src/server/main.ts",
+    "daemon": "node src/daemon/cli.ts daemon",
+    "gtv": "node src/daemon/cli.ts",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "web:install": "npm --prefix web install",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "selftest:realworld": "node scripts/selftest/realworld.ts",
+    "sandbox": "node scripts/sandbox.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "hono": "^4.13.13",
+    "tree-sitter-go": "^0.25.0",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "web-tree-sitter": "^0.27.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}

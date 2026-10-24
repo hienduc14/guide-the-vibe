@@ -1,0 +1,8 @@
+**/node_modules
+.git
+sandbox
+.gtv-data
+test
+docs
+web/dist
+docker/.env

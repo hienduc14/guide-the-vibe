@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "share": "disabled",
+  "agent": {
+    "operator": {
+      "description": "gtv Project Operator: read-only, answers through gtv tools",
+      "mode": "primary",
+      "temperature": 0.1,
+      "permission": {
+        "edit": "deny",
+        "shell": "deny",
+        "bash": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "task": "deny"
+      },
+      "tools": {
+        "write": false,
+        "edit": false,
+        "patch": false,
+        "bash": false,
+        "webfetch": false,
+        "read": false,
+        "glob": false,
+        "grep": false,
+        "list": false,
+        "task": false,
+        "todowrite": false,
+        "todoread": false,
+        "gtv_*": true
+      }
+    }
+  }
+}

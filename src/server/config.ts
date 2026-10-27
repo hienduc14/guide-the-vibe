@@ -45,7 +45,10 @@ interface FileConfig {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const file: FileConfig = env.GTV_CONFIG && existsSync(env.GTV_CONFIG) ? ((parseYaml(readFileSync(env.GTV_CONFIG, "utf8")) as FileConfig) ?? {}) : {};
   const tokens = new Map<string, string>();
-  for (const pair of (env.GTV_TOKENS ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+  for (const pair of (env.GTV_TOKENS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     const [dev, token] = pair.split(":");
     if (dev && token) tokens.set(token, dev);
   }

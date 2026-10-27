@@ -15,7 +15,11 @@ import { patternsOverlap } from "../src/shared/util.ts";
 const names = async (path: string, src: string) => (await indexFile(path, src))!.symbols.map((s) => `${s.kind}:${s.qualname}`);
 
 test("extracts symbols in TS, Python, Go and Java", async () => {
-  assert.deepEqual(await names("a.ts", "export class A { login(u: string): void {} }\nexport const f = (x: number) => x;"), ["class:A", "method:A.login", "function:f"]);
+  assert.deepEqual(await names("a.ts", "export class A { login(u: string): void {} }\nexport const f = (x: number) => x;"), [
+    "class:A",
+    "method:A.login",
+    "function:f",
+  ]);
   assert.deepEqual(await names("a.py", "class A:\n  def login(self):\n    pass\ndef f():\n  pass\n"), ["class:A", "method:A.login", "function:f"]);
   assert.deepEqual(await names("a.go", "package a\ntype S struct{}\nfunc (s *S) Login() {}\nfunc F() {}\n"), ["struct:S", "method:S.Login", "function:F"]);
   assert.deepEqual(await names("A.java", "public class A { public void login() {} }"), ["class:A", "method:A.login"]);
@@ -23,8 +27,14 @@ test("extracts symbols in TS, Python, Go and Java", async () => {
 });
 
 test("diffSymbols detects signature change, rename, delete and body change", async () => {
-  const before = (await indexFile("u.ts", "export function getUser(id: number) { return db.find(id) }\nexport function a() { return 1 }\nexport function b() { return 2 }\nexport function c(x: number) { return x }"))!.symbols;
-  const after = (await indexFile("u.ts", "export function getUser(id: string) { return db.find(id) }\nexport function aRenamed() { return 1 }\nexport function c(x: number) { return x + 1 }"))!.symbols;
+  const before = (await indexFile(
+    "u.ts",
+    "export function getUser(id: number) { return db.find(id) }\nexport function a() { return 1 }\nexport function b() { return 2 }\nexport function c(x: number) { return x }",
+  ))!.symbols;
+  const after = (await indexFile(
+    "u.ts",
+    "export function getUser(id: string) { return db.find(id) }\nexport function aRenamed() { return 1 }\nexport function c(x: number) { return x + 1 }",
+  ))!.symbols;
   const byName = Object.fromEntries(diffSymbols(before, after).map((c) => [c.name, c.change]));
   assert.equal(byName.getUser, "sig_changed");
   assert.equal(byName.a, "renamed");
@@ -93,7 +103,10 @@ test("graph base + overlay views, callers across workspaces, and workspace chang
     assert.equal(callersInB[0].path, "src/sso/google.ts");
 
     const changesA = await workspaceChanges(repo, snapA!.sha, main);
-    assert.deepEqual(changesA!.changes.filter((c) => c.change === "sig_changed").map((c) => c.name), ["getUser"]);
+    assert.deepEqual(
+      changesA!.changes.filter((c) => c.change === "sig_changed").map((c) => c.name),
+      ["getUser"],
+    );
 
     const merge = await repo.mergeTree(snapA!.sha, snapB!.sha);
     assert.equal(merge.clean, true);

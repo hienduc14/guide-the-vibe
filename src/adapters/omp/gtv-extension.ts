@@ -10,7 +10,12 @@ async function post(path: string, body: unknown, timeoutMs = 3000): Promise<any>
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(DAEMON + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    const res = await fetch(DAEMON + path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
     const text = await res.text();
     return text ? JSON.parse(text) : undefined;
   } catch {
@@ -105,13 +110,48 @@ export default function gtv(pi: any) {
       },
     });
 
-  tool("gtv_register_task", "Register the task you are about to do BEFORE editing files (title, goal, files/symbols you will touch). Returns overlaps with teammates' work and relevant knowledge.", z.object({ title: z.string(), goal: z.string().optional(), resources: z.array(resource) }), "register_task");
-  tool("gtv_update_task", "Update your registered task (add_resources when your scope grows, or status).", z.object({ title: z.string().optional(), goal: z.string().optional(), add_resources: z.array(resource).optional(), status: z.enum(["pr_open", "done", "abandoned"]).optional() }), "update_task");
-  tool("gtv_finish_task", "Mark your registered task finished (done) or abandoned.", z.object({ status: z.enum(["done", "abandoned"]).optional() }), "finish_task");
-  tool("gtv_ask", "Ask the Project Operator: what teammates are doing, who calls/owns code, business rules, past decisions. It may forward to a teammate; the answer then arrives later.", z.object({ question: z.string(), context: z.string().optional(), to_dev: z.string().optional() }), "ask");
-  tool("gtv_reply", "Answer a question a teammate's agent sent you (ticket id). escalate=true if your user must decide.", z.object({ ticket_id: z.string(), answer: z.string(), escalate: z.boolean().optional() }), "reply");
+  tool(
+    "gtv_register_task",
+    "Register the task you are about to do BEFORE editing files (title, goal, files/symbols you will touch). Returns overlaps with teammates' work and relevant knowledge.",
+    z.object({ title: z.string(), goal: z.string().optional(), resources: z.array(resource) }),
+    "register_task",
+  );
+  tool(
+    "gtv_update_task",
+    "Update your registered task (add_resources when your scope grows, or status).",
+    z.object({
+      title: z.string().optional(),
+      goal: z.string().optional(),
+      add_resources: z.array(resource).optional(),
+      status: z.enum(["pr_open", "done", "abandoned"]).optional(),
+    }),
+    "update_task",
+  );
+  tool(
+    "gtv_finish_task",
+    "Mark your registered task finished (done) or abandoned.",
+    z.object({ status: z.enum(["done", "abandoned"]).optional() }),
+    "finish_task",
+  );
+  tool(
+    "gtv_ask",
+    "Ask the Project Operator: what teammates are doing, who calls/owns code, business rules, past decisions. It may forward to a teammate; the answer then arrives later.",
+    z.object({ question: z.string(), context: z.string().optional(), to_dev: z.string().optional() }),
+    "ask",
+  );
+  tool(
+    "gtv_reply",
+    "Answer a question a teammate's agent sent you (ticket id). escalate=true if your user must decide.",
+    z.object({ ticket_id: z.string(), answer: z.string(), escalate: z.boolean().optional() }),
+    "reply",
+  );
   tool("gtv_status", "Who is working on what right now, and open conflicts.", z.object({}), "status");
-  tool("gtv_check", "Check whether teammates are working on these files or symbols.", z.object({ paths: z.array(z.string()).optional(), symbols: z.array(z.string()).optional() }), "check");
+  tool(
+    "gtv_check",
+    "Check whether teammates are working on these files or symbols.",
+    z.object({ paths: z.array(z.string()).optional(), symbols: z.array(z.string()).optional() }),
+    "check",
+  );
   tool("gtv_inbox", "Read pending gtv messages and questions waiting for you.", z.object({}), "inbox");
   tool("gtv_ack", "Acknowledge a conflict after coordinating.", z.object({ conflict_id: z.string() }), "ack");
 }

@@ -85,7 +85,13 @@ function jsDef(node: Node, inContainer: boolean): DefInfo | null {
     case "abstract_class_declaration":
       return { kind: "class", nameNode: node.childForFieldName("name"), body: node.childForFieldName("body"), exported: isExportedJs(node) };
     case "interface_declaration":
-      return { kind: "interface", nameNode: node.childForFieldName("name"), body: node.childForFieldName("body"), wholeIsSig: true, exported: isExportedJs(node) };
+      return {
+        kind: "interface",
+        nameNode: node.childForFieldName("name"),
+        body: node.childForFieldName("body"),
+        wholeIsSig: true,
+        exported: isExportedJs(node),
+      };
     case "type_alias_declaration":
       return { kind: "type", nameNode: node.childForFieldName("name"), body: null, wholeIsSig: true, exported: isExportedJs(node) };
     case "enum_declaration":
@@ -117,7 +123,12 @@ function pyDef(node: Node, inContainer: boolean): DefInfo | null {
   if (node.type === "function_definition") {
     const nameNode = node.childForFieldName("name");
     const name = nameNode?.text ?? "";
-    return { kind: inContainer ? (name === "__init__" ? "constructor" : "method") : "function", nameNode, body: node.childForFieldName("body"), exported: !name.startsWith("_") || /^__\w+__$/.test(name) };
+    return {
+      kind: inContainer ? (name === "__init__" ? "constructor" : "method") : "function",
+      nameNode,
+      body: node.childForFieldName("body"),
+      exported: !name.startsWith("_") || /^__\w+__$/.test(name),
+    };
   }
   if (node.type === "class_definition") {
     const name = node.childForFieldName("name")?.text ?? "";

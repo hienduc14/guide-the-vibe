@@ -33,7 +33,13 @@ type Raw = Record<string, any>;
 
 export function normalize(agent: AgentKind, raw: Raw): NormalizedHook {
   const event = String(raw.hook_event_name ?? raw.event ?? "");
-  const base = { agent, event, agentSessionId: String(raw.session_id ?? raw.sessionId ?? "unknown"), cwd: String(raw.cwd ?? process.cwd()), paths: [] as string[] };
+  const base = {
+    agent,
+    event,
+    agentSessionId: String(raw.session_id ?? raw.sessionId ?? "unknown"),
+    cwd: String(raw.cwd ?? process.cwd()),
+    paths: [] as string[],
+  };
   const tool = raw.tool_name as string | undefined;
   const input = (raw.tool_input ?? {}) as Raw;
   switch (event) {

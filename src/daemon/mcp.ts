@@ -8,7 +8,9 @@ import { daemonUrl } from "./config.ts";
 import type { AgentKind } from "../shared/types.ts";
 
 const RESOURCE = z.object({
-  kind: z.enum(["path", "module", "symbol", "contract"]).describe("path = file or glob (src/auth/**); symbol = Class.method or function; contract = API route / event / schema"),
+  kind: z
+    .enum(["path", "module", "symbol", "contract"])
+    .describe("path = file or glob (src/auth/**); symbol = Class.method or function; contract = API route / event / schema"),
   value: z.string(),
   op: z.enum(["read", "modify", "create", "delete", "rename", "sig_change"]).optional().describe("sig_change/rename/delete = breaking for callers"),
   certainty: z.enum(["committed", "contingent"]).optional(),
@@ -29,7 +31,11 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
 
   const call = async (tool: string, args: Record<string, unknown>) => {
     try {
-      const res = await fetch(`${daemon}/api/${tool}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agent, cwd, args }) });
+      const res = await fetch(`${daemon}/api/${tool}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agent, cwd, args }),
+      });
       const json = (await res.json()) as { text?: string; error?: string };
       return { content: [{ type: "text" as const, text: json.text ?? `gtv error: ${json.error}` }], isError: !res.ok };
     } catch (e) {
@@ -42,7 +48,11 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     {
       description:
         "Register the task you are about to do BEFORE editing files, so teammates' agents and the Project Operator know. Returns overlaps with other developers' work, relevant team knowledge and advice. Re-register when starting a new task.",
-      inputSchema: { title: z.string(), goal: z.string().optional(), resources: z.array(RESOURCE).describe("Files/globs, modules, symbols and contracts you expect to touch") },
+      inputSchema: {
+        title: z.string(),
+        goal: z.string().optional(),
+        resources: z.array(RESOURCE).describe("Files/globs, modules, symbols and contracts you expect to touch"),
+      },
     },
     (args) => call("register_task", args),
   );
@@ -50,11 +60,21 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     "gtv_update_task",
     {
       description: "Update your registered task, e.g. add files/symbols you now need to touch (scope drift) or change status.",
-      inputSchema: { title: z.string().optional(), goal: z.string().optional(), add_resources: z.array(RESOURCE).optional(), resources: z.array(RESOURCE).optional(), status: z.enum(["pr_open", "done", "abandoned"]).optional() },
+      inputSchema: {
+        title: z.string().optional(),
+        goal: z.string().optional(),
+        add_resources: z.array(RESOURCE).optional(),
+        resources: z.array(RESOURCE).optional(),
+        status: z.enum(["pr_open", "done", "abandoned"]).optional(),
+      },
     },
     (args) => call("update_task", args),
   );
-  server.registerTool("gtv_finish_task", { description: "Mark your registered task finished (done) or abandoned.", inputSchema: { status: z.enum(["done", "abandoned"]).optional() } }, (args) => call("finish_task", args));
+  server.registerTool(
+    "gtv_finish_task",
+    { description: "Mark your registered task finished (done) or abandoned.", inputSchema: { status: z.enum(["done", "abandoned"]).optional() } },
+    (args) => call("finish_task", args),
+  );
   server.registerTool(
     "gtv_ask",
     {
@@ -72,14 +92,23 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     },
     (args) => call("reply", args),
   );
-  server.registerTool("gtv_status", { description: "Who is working on what right now: teammates' tasks, files being edited, open conflicts." }, () => call("status", {}));
+  server.registerTool("gtv_status", { description: "Who is working on what right now: teammates' tasks, files being edited, open conflicts." }, () =>
+    call("status", {}),
+  );
   server.registerTool(
     "gtv_check",
-    { description: "Before touching files or symbols, check whether a teammate is working on them.", inputSchema: { paths: z.array(z.string()).optional(), symbols: z.array(z.string()).optional() } },
+    {
+      description: "Before touching files or symbols, check whether a teammate is working on them.",
+      inputSchema: { paths: z.array(z.string()).optional(), symbols: z.array(z.string()).optional() },
+    },
     (args) => call("check", args),
   );
   server.registerTool("gtv_inbox", { description: "Read pending gtv messages and questions waiting for you." }, () => call("inbox", {}));
-  server.registerTool("gtv_ack", { description: "Acknowledge a conflict after you coordinated with the teammate.", inputSchema: { conflict_id: z.string() } }, (args) => call("ack", args));
+  server.registerTool(
+    "gtv_ack",
+    { description: "Acknowledge a conflict after you coordinated with the teammate.", inputSchema: { conflict_id: z.string() } },
+    (args) => call("ack", args),
+  );
 
   await server.connect(new StdioServerTransport());
 }

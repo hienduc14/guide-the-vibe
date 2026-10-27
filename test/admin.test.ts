@@ -17,7 +17,8 @@ class FakeBrain implements Brain {
     return { ok: true, detail: "fake" };
   }
   async run<T>(job: BrainJob): Promise<BrainResult<T>> {
-    if (job.kind === "answer_question") return { output: { route: "answer", answer: `answer for ${job.project}`, confidence: "high", sources: [] } as T, ms: 3, backend: "fake" };
+    if (job.kind === "answer_question")
+      return { output: { route: "answer", answer: `answer for ${job.project}`, confidence: "high", sources: [] } as T, ms: 3, backend: "fake" };
     throw new Error("not scripted");
   }
 }
@@ -44,7 +45,10 @@ test("setup: hub with two projects", async () => {
   assert.equal(r1.status, 200, JSON.stringify(r1.json));
   const r2 = await call("/api/projects", { method: "POST", token: ADMIN, body: { id: "billing", repo_url: b.bare, main_branch: "main" } });
   assert.equal(r2.status, 200);
-  assert.deepEqual(srv.hub.records().map((p) => p.id), ["shop", "billing"]);
+  assert.deepEqual(
+    srv.hub.records().map((p) => p.id),
+    ["shop", "billing"],
+  );
 });
 
 after(async () => {
@@ -59,7 +63,10 @@ test("admin API requires the admin token; dev tokens are issued and checked", as
   assert.match(issued.json.token, /^gtv_/);
   assert.equal((await call("/v1/projects")).status, 401, "open mode ends once developers exist");
   const list = await call<any[]>("/v1/projects", { token: issued.json.token });
-  assert.deepEqual(list.json.map((p) => p.id), ["shop", "billing"]);
+  assert.deepEqual(
+    list.json.map((p) => p.id),
+    ["shop", "billing"],
+  );
   assert.equal((await call("/api/overview", { token: issued.json.token })).status, 401, "a dev token is not an admin token");
 });
 
@@ -73,19 +80,35 @@ test("remote URLs resolve to projects", async () => {
 
 test("projects are isolated: sessions, graph and knowledge per project", async () => {
   const start = (project: string, dev: string) =>
-    call<any>(`/v1/p/${project}/events`, { method: "POST", token: ADMIN, dev, body: { type: "session_start", session: { dev, agent: "codex", workspace_id: `ws_${dev}`, workspace_label: dev, agent_session_id: `s-${dev}` } } });
+    call<any>(`/v1/p/${project}/events`, {
+      method: "POST",
+      token: ADMIN,
+      dev,
+      body: { type: "session_start", session: { dev, agent: "codex", workspace_id: `ws_${dev}`, workspace_label: dev, agent_session_id: `s-${dev}` } },
+    });
   const s = await start("shop", "alice");
   await start("billing", "bob");
   const shop = srv.hub.live("shop")!;
   const billing = srv.hub.live("billing")!;
-  assert.deepEqual(shop.engine.store.sessions().map((x) => x.dev), ["alice"]);
-  assert.deepEqual(billing.engine.store.sessions().map((x) => x.dev), ["bob"]);
+  assert.deepEqual(
+    shop.engine.store.sessions().map((x) => x.dev),
+    ["alice"],
+  );
+  assert.deepEqual(
+    billing.engine.store.sessions().map((x) => x.dev),
+    ["bob"],
+  );
   assert.equal(shop.engine.graph.findSymbols("f", "base").length, 1);
   assert.equal(billing.engine.graph.findSymbols("f", "base").length, 0);
   assert.equal(billing.engine.kb.search("refunds").length, 1);
   assert.equal(shop.engine.kb.search("refunds").length, 0);
 
-  const t = await call<any>("/v1/p/shop/tickets", { method: "POST", token: ADMIN, dev: "alice", body: { session_id: s.json.results[0].session.id, question: "what does f do?" } });
+  const t = await call<any>("/v1/p/shop/tickets", {
+    method: "POST",
+    token: ADMIN,
+    dev: "alice",
+    body: { session_id: s.json.results[0].session.id, question: "what does f do?" },
+  });
   assert.equal(t.json.answer, "answer for shop", "brain jobs carry their project");
 });
 
@@ -99,7 +122,10 @@ test("dashboard endpoints: overview, people, stats with brain metering, layers, 
 
   const st = await call<any>("/api/projects/shop/stats?days=7", { token: ADMIN });
   assert.equal(st.json.brain.totals.jobs, 1);
-  assert.deepEqual(st.json.brain.byKind.map((k: any) => k.kind), ["answer_question"]);
+  assert.deepEqual(
+    st.json.brain.byKind.map((k: any) => k.kind),
+    ["answer_question"],
+  );
   assert.ok(st.json.events.byType.some((e: any) => e.k === "ticket_ask"));
 
   const layers = await call<any[]>("/api/projects/shop/layers", { token: ADMIN });
@@ -124,6 +150,9 @@ test("dashboard endpoints: overview, people, stats with brain metering, layers, 
 
 test("archiving a project stops it", async () => {
   await call("/api/projects/billing", { method: "DELETE", token: ADMIN });
-  assert.deepEqual(srv.hub.records().map((p) => p.id), ["shop"]);
+  assert.deepEqual(
+    srv.hub.records().map((p) => p.id),
+    ["shop"],
+  );
   assert.equal((await call("/v1/p/billing/state", { token: ADMIN })).status, 404);
 });

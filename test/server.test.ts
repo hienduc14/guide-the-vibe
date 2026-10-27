@@ -44,7 +44,10 @@ async function api<T = any>(dev: string, method: string, path: string, body?: un
 }
 
 async function start(dev: string, agent: string, ws: string) {
-  const r = await api(dev, "POST", "/v1/p/default/events", { type: "session_start", session: { dev, agent, workspace_id: ws, workspace_label: `${dev}-wt`, agent_session_id: `${agent}-${ws}` } });
+  const r = await api(dev, "POST", "/v1/p/default/events", {
+    type: "session_start",
+    session: { dev, agent, workspace_id: ws, workspace_label: `${dev}-wt`, agent_session_id: `${agent}-${ws}` },
+  });
   return r.results[0] as { session: { id: string }; briefing: string };
 }
 
@@ -91,12 +94,17 @@ test("session briefing and L0 same-file conflict notify both devs", async () => 
 test("registration returns overlaps, knowledge and L3 advice", async () => {
   const [b] = rt.engine.store.sessions().filter((s) => s.dev === "bob");
   const others = rt.engine.store.activeTasks();
-  brain.queue.judge_registration = [{ overlaps: [], advice: "See ADR 001 before changing sessions.", sources: [{ type: "doc", ref: "repo:docs/adr/001-session.md" }] }];
+  brain.queue.judge_registration = [
+    { overlaps: [], advice: "See ADR 001 before changing sessions.", sources: [{ type: "doc", ref: "repo:docs/adr/001-session.md" }] },
+  ];
   const fb = await api("bob", "POST", "/v1/p/default/tasks", {
     session_id: b.id,
     title: "Switch login sessions to JWT",
     goal: "Tokens expire after 30 minutes",
-    resources: [{ kind: "path", value: "src/auth/**", op: "modify" }, { kind: "symbol", value: "login", op: "sig_change" }],
+    resources: [
+      { kind: "path", value: "src/auth/**", op: "modify" },
+      { kind: "symbol", value: "login", op: "sig_change" },
+    ],
   });
   assert.equal(others.length, 0);
   assert.equal(fb.status, "adjust_suggested"); // alice is already editing src/auth/service.ts
@@ -123,7 +131,9 @@ test("snapshots: L2 detects a signature change used by the other workspace; L1 d
   assert.ok(!open.some((c) => c.layer === "L1"), "the two snapshots merge cleanly");
 
   // Now bob also edits the same line of service.ts differently -> text conflict.
-  writeFiles(b, { "src/auth/service.ts": "export function getUser(id: number, opts?: object) { return { id } }\nexport function login(u: string) { return getUser(1) }\n" });
+  writeFiles(b, {
+    "src/auth/service.ts": "export function getUser(id: number, opts?: object) { return { id } }\nexport function login(u: string) { return getUser(1) }\n",
+  });
   const sb2 = await snapshotWorktree(b, "refs/gtv/bob/ws_b");
   await rt.engine.onSnapshot("ws_b", sb2!.sha);
   open = rt.engine.store.conflicts("open");
@@ -143,8 +153,18 @@ test("feature modes: L2 in shadow mode keeps conflicts out of the registry but l
 
 test("tier 1: operator answers itself; Q&A goes to KB as unverified until confirmed", async () => {
   const [a] = rt.engine.store.sessions().filter((s) => s.dev === "alice");
-  brain.queue.answer_question = [{ route: "answer", answer: "Tokens expire after 30 minutes (ADR 001).", confidence: "high", sources: [{ type: "doc", ref: "repo:docs/adr/001-session.md" }] }];
-  const t = await api<Ticket & { formatted: string }>("alice", "POST", "/v1/p/default/tickets", { session_id: a.id, question: "How long do session tokens live?" });
+  brain.queue.answer_question = [
+    {
+      route: "answer",
+      answer: "Tokens expire after 30 minutes (ADR 001).",
+      confidence: "high",
+      sources: [{ type: "doc", ref: "repo:docs/adr/001-session.md" }],
+    },
+  ];
+  const t = await api<Ticket & { formatted: string }>("alice", "POST", "/v1/p/default/tickets", {
+    session_id: a.id,
+    question: "How long do session tokens live?",
+  });
   assert.equal(t.status, "answered");
   assert.match(t.formatted, /30 minutes/);
   const qa = await api("alice", "GET", `/v1/p/default/kb/qa:${t.id}`);
@@ -157,7 +177,16 @@ test("tier 2 → reply: question forwarded into bob's agent, answer pushed back 
   const [a] = rt.engine.store.sessions().filter((s) => s.dev === "alice");
   drain("alice");
   drain("bob");
-  brain.queue.answer_question = [{ route: "forward", answer: "Bob owns the JWT change.", confidence: "medium", forward_to_dev: "bob", forward_question: "Will the JWT include the email claim?", sources: [] }];
+  brain.queue.answer_question = [
+    {
+      route: "forward",
+      answer: "Bob owns the JWT change.",
+      confidence: "medium",
+      forward_to_dev: "bob",
+      forward_question: "Will the JWT include the email claim?",
+      sources: [],
+    },
+  ];
   const t = await api<Ticket>("alice", "POST", "/v1/p/default/tickets", { session_id: a.id, question: "Does the new token carry the user's email?" });
   assert.equal(t.status, "forwarded");
   const q = inbox("bob").find((m) => m.ref_id === t.id)!;
@@ -184,7 +213,11 @@ test("tier 3: escalation asks bob as a human, timeouts expire", async () => {
 
 test("brain MCP endpoint lists and runs read-only tools", async () => {
   const call = async (body: unknown) => {
-    const res = await srv.app.request("/p/default/mcp", { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify(body) });
+    const res = await srv.app.request("/p/default/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify(body),
+    });
     return (await res.json()) as any;
   };
   const list = await call({ jsonrpc: "2.0", id: 1, method: "tools/list" });

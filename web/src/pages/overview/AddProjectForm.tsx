@@ -22,7 +22,10 @@ export function AddProjectForm({ onDone }: { onDone: () => void }) {
           name: f.name.trim() || undefined,
           repo_url: f.repo_url.trim(),
           main_branch: f.main_branch.trim() || "main",
-          aliases: f.aliases.split(",").map((s) => s.trim()).filter(Boolean),
+          aliases: f.aliases
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
           description: f.description.trim() || undefined,
         }),
       "Đã tạo project",

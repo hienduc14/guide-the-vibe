@@ -34,7 +34,10 @@ export async function startServer(cfg: ServerConfig, opts: { brain?: ProjectScop
         resolve();
       });
     });
-    log("server", `gtv operator on ${cfg.host}:${port} — ${hub.records().length} project(s), brain=${hub.brain.name}${hub.brain.model ? ` (${hub.brain.model})` : ""}`);
+    log(
+      "server",
+      `gtv operator on ${cfg.host}:${port} — ${hub.records().length} project(s), brain=${hub.brain.name}${hub.brain.model ? ` (${hub.brain.model})` : ""}`,
+    );
     if (!cfg.adminToken) log("server", "WARNING: GTV_ADMIN_TOKEN is not set — the dashboard (/api) is open to anyone who can reach this port");
   }
   return {

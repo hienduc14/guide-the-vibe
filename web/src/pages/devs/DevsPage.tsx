@@ -43,7 +43,8 @@ export function DevsPage() {
             <div className="notice error stack tight">
               <b>Server đang ở open dev mode.</b>
               <span>
-                Cấp token cho developer đầu tiên sẽ tắt open mode. Nếu server chưa đặt <code>GTV_ADMIN_TOKEN</code>, dashboard sẽ khoá và cần admin token để vào lại.
+                Cấp token cho developer đầu tiên sẽ tắt open mode. Nếu server chưa đặt <code>GTV_ADMIN_TOKEN</code>, dashboard sẽ khoá và cần admin token để vào
+                lại.
               </span>
               <label className="row small">
                 <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> Tôi hiểu, server đã có GTV_ADMIN_TOKEN

@@ -48,13 +48,15 @@ export const api = {
     state: (id: string) => get<TeamState>(`${a(id)}/state`),
     stats: (id: string, days: number) => get<ProjectStats>(`${a(id)}/stats?days=${days}`),
     layers: (id: string) => get<Layer[]>(`${a(id)}/layers`),
-    activity: (id: string, limit = 60, type?: string) => get<ActivityEvent[]>(`${a(id)}/activity?limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),
+    activity: (id: string, limit = 60, type?: string) =>
+      get<ActivityEvent[]>(`${a(id)}/activity?limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),
     message: (id: string, to_dev: string, body: string) => post(`${a(id)}/messages`, { to_dev, body }),
   },
 
   conflicts: {
     list: (id: string, all: boolean) => get<Conflict[]>(`${p(id)}/conflicts${all ? "?all=1" : ""}`),
-    act: (id: string, conflictId: string, action: "ack" | "dismiss" | "reopen") => post<Conflict>(`${p(id)}/conflicts/${encodeURIComponent(conflictId)}/${action}`),
+    act: (id: string, conflictId: string, action: "ack" | "dismiss" | "reopen") =>
+      post<Conflict>(`${p(id)}/conflicts/${encodeURIComponent(conflictId)}/${action}`),
   },
 
   features: {
@@ -63,7 +65,8 @@ export const api = {
 
   tickets: {
     list: (id: string) => get<Ticket[]>(`${p(id)}/tickets`),
-    reply: (id: string, ticketId: string, answer: string, as?: string) => post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }, { as }),
+    reply: (id: string, ticketId: string, answer: string, as?: string) =>
+      post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }, { as }),
   },
 
   kb: {
@@ -77,7 +80,8 @@ export const api = {
   graph: {
     stats: (id: string) => get<{ base: { files: number; symbols: number; refs: number }; main: string | null }>(`${p(id)}/graph/stats`),
     symbols: (id: string, q: string, view: string) => get<SymbolRow[]>(`${p(id)}/graph/symbols?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
-    callers: (id: string, q: string, view: string) => get<{ symbol: string; callers: CallerHit[] }[]>(`${p(id)}/graph/callers?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
+    callers: (id: string, q: string, view: string) =>
+      get<{ symbol: string; callers: CallerHit[] }[]>(`${p(id)}/graph/callers?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
   },
 
   devs: {

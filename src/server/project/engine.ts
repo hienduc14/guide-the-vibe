@@ -117,7 +117,10 @@ export class Engine {
     for (const c of conflicts) {
       this.store.logEvent("conflict", undefined, c);
       if (c.level === "info") continue; // visible in status, not pushed into agents
-      for (const [ws, dev] of [[c.workspace_a, c.dev_a], [c.workspace_b, c.dev_b]] as const) {
+      for (const [ws, dev] of [
+        [c.workspace_a, c.dev_a],
+        [c.workspace_b, c.dev_b],
+      ] as const) {
         if (ws === "main") continue;
         this.store.addMessage({
           to_dev: dev,
@@ -165,13 +168,20 @@ export class Engine {
     if (others.length) {
       lines.push("Teammates' active tasks:");
       for (const t of others) {
-        const paths = t.resources.filter((r) => r.kind !== "module").map((r) => r.value).slice(0, 4).join(", ");
+        const paths = t.resources
+          .filter((r) => r.kind !== "module")
+          .map((r) => r.value)
+          .slice(0, 4)
+          .join(", ");
         lines.push(`- ${t.dev}: "${t.title}"${paths ? ` (${paths})` : ""}`);
       }
     } else lines.push("No teammate has an active task right now.");
     if (mine.length) lines.push(`Open conflicts involving you: ${mine.map((c) => `${c.id} ${c.level} ${c.subject}`).join("; ")}`);
-    if (waiting.length) lines.push(`Questions waiting for your answer: ${waiting.map((t) => `${t.id}: ${truncate(t.forwarded_question ?? t.question, 120)}`).join(" | ")}`);
-    lines.push("Before editing files, register your task with the gtv_register_task tool (title, goal, paths/symbols you will touch). Ask the Operator with gtv_ask when you need to know what others are doing or how something works.");
+    if (waiting.length)
+      lines.push(`Questions waiting for your answer: ${waiting.map((t) => `${t.id}: ${truncate(t.forwarded_question ?? t.question, 120)}`).join(" | ")}`);
+    lines.push(
+      "Before editing files, register your task with the gtv_register_task tool (title, goal, paths/symbols you will touch). Ask the Operator with gtv_ask when you need to know what others are doing or how something works.",
+    );
     return lines.join("\n");
   }
 
@@ -244,9 +254,17 @@ export class Engine {
     const ws = (id: string) => this.store.workspace(id);
     const overlaps = conflicts.map((c) => {
       const otherWs = c.workspace_a === session.workspace_id ? c.workspace_b : c.workspace_a;
-      return { conflict_id: c.id, layer: c.layer, level: c.level, with: otherWs === "main" ? "main" : `${ws(otherWs)?.dev} (${ws(otherWs)?.label})`, message: c.message };
+      return {
+        conflict_id: c.id,
+        layer: c.layer,
+        level: c.level,
+        with: otherWs === "main" ? "main" : `${ws(otherWs)?.dev} (${ws(otherWs)?.label})`,
+        message: c.message,
+      };
     });
-    const knowledge = isActive(this.mode("knowledge.doc_kb")) ? this.kb.search(`${reg.title} ${reg.goal ?? ""} ${reg.resources.map((r) => r.value).join(" ")}`, { limit: 4 }) : [];
+    const knowledge = isActive(this.mode("knowledge.doc_kb"))
+      ? this.kb.search(`${reg.title} ${reg.goal ?? ""} ${reg.resources.map((r) => r.value).join(" ")}`, { limit: 4 })
+      : [];
 
     let l3: RegistrationFeedback["l3"] = "off";
     let advice: string | undefined;
@@ -262,7 +280,14 @@ export class Engine {
         if (l3Mode === "on") {
           advice = res.advice;
           for (const o of res.overlaps) {
-            const c = this.store.conflicts("open").find((x) => x.layer === "L3" && (x.evidence as { tasks?: string[] }).tasks?.includes(o.task_id) && (x.evidence as { tasks?: string[] }).tasks?.includes(task.id));
+            const c = this.store
+              .conflicts("open")
+              .find(
+                (x) =>
+                  x.layer === "L3" &&
+                  (x.evidence as { tasks?: string[] }).tasks?.includes(o.task_id) &&
+                  (x.evidence as { tasks?: string[] }).tasks?.includes(task.id),
+              );
             if (c) overlaps.push({ conflict_id: c.id, layer: "L3", level: c.level, with: `${c.dev_a === task.dev ? c.dev_b : c.dev_a}`, message: c.message });
           }
         }
@@ -287,7 +312,11 @@ export class Engine {
       const brief = (t: Task) => ({ task_id: t.id, dev: t.dev, workspace: t.workspace_id, title: t.title, goal: t.goal, resources: t.resources });
       const res = await this.brain.run<RegistrationOutput>({
         kind: "judge_registration",
-        prompt: registrationPrompt({ task: brief(task), others: others.map(brief), evidence: evidence.map((c) => ({ layer: c.layer, level: c.level, subject: c.subject, message: c.message })) }),
+        prompt: registrationPrompt({
+          task: brief(task),
+          others: others.map(brief),
+          evidence: evidence.map((c) => ({ layer: c.layer, level: c.level, subject: c.subject, message: c.message })),
+        }),
         schema: REGISTRATION_SCHEMA,
       });
       this.store.logEvent("l3_registration", task.dev, { task: task.id, output: res.output, ms: res.ms });

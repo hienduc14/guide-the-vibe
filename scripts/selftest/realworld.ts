@@ -43,12 +43,20 @@ async function json<T = any>(url: string, init: RequestInit = {}): Promise<T> {
 type Dev = typeof A;
 const hook = async (d: Dev, body: Record<string, unknown>) => {
   const started = Date.now();
-  const res = await fetch(`http://127.0.0.1:${d.port}/hook/${d.agent}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: d.session, cwd: d.dir, ...body }) });
+  const res = await fetch(`http://127.0.0.1:${d.port}/hook/${d.agent}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: d.session, cwd: d.dir, ...body }),
+  });
   const text = await res.text();
   return { out: text ? JSON.parse(text) : undefined, ms: Date.now() - started };
 };
 const tool = async (d: Dev, name: string, args: Record<string, unknown>) => {
-  const res = await fetch(`http://127.0.0.1:${d.port}/api/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agent: d.agent, cwd: d.dir, args }) });
+  const res = await fetch(`http://127.0.0.1:${d.port}/api/${name}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agent: d.agent, cwd: d.dir, args }),
+  });
   return ((await res.json()) as { text?: string; error?: string }).text ?? "ERROR";
 };
 const ctxOf = (r: { out?: any }) => (r.out?.hookSpecificOutput?.additionalContext as string | undefined) ?? "";
@@ -59,8 +67,16 @@ async function edit(d: Dev, rel: string, replacements: [string, string][], appen
   const file = join(d.dir, rel);
   const pre =
     d.agent === "claude"
-      ? await hook(d, { hook_event_name: "PreToolUse", tool_name: "Edit", tool_input: { file_path: file, old_string: replacements[0]?.[0] ?? "", new_string: replacements[0]?.[1] ?? "" } })
-      : await hook(d, { hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { command: `*** Begin Patch\n*** Update File: ${rel}\n*** End Patch\n` } });
+      ? await hook(d, {
+          hook_event_name: "PreToolUse",
+          tool_name: "Edit",
+          tool_input: { file_path: file, old_string: replacements[0]?.[0] ?? "", new_string: replacements[0]?.[1] ?? "" },
+        })
+      : await hook(d, {
+          hook_event_name: "PreToolUse",
+          tool_name: "apply_patch",
+          tool_input: { command: `*** Begin Patch\n*** Update File: ${rel}\n*** End Patch\n` },
+        });
   const raw = readFileSync(file, "utf8");
   const crlf = raw.includes("\r\n"); // keep the file's line endings, or git would see every line as changed
   let text = raw.replace(/\r\n/g, "\n");
@@ -73,7 +89,12 @@ async function edit(d: Dev, rel: string, replacements: [string, string][], appen
   const post =
     d.agent === "claude"
       ? await hook(d, { hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: file }, tool_response: {} })
-      : await hook(d, { hook_event_name: "PostToolUse", tool_name: "apply_patch", tool_input: { command: `*** Begin Patch\n*** Update File: ${rel}\n*** End Patch\n` }, tool_response: {} });
+      : await hook(d, {
+          hook_event_name: "PostToolUse",
+          tool_name: "apply_patch",
+          tool_input: { command: `*** Begin Patch\n*** Update File: ${rel}\n*** End Patch\n` },
+          tool_response: {},
+        });
   return { pre, post };
 }
 
@@ -143,24 +164,47 @@ async function main() {
   // 4. Alice edits (Claude Edit tool): signature change + updates every existing caller + page cap.
   await edit(A, "src/app/routes/profile/profile.utils.ts", [
     ["const profileMapper = (user: any, id: number | undefined): Profile => ({", "const profileMapper = (user: any, viewer?: { id: number }): Profile => ({"],
-    ["following: id\n    ? user?.followedBy.some((followingUser: Partial<User>) => followingUser.id === id)", "following: viewer\n    ? user?.followedBy.some((followingUser: Partial<User>) => followingUser.id === viewer.id)"],
+    [
+      "following: id\n    ? user?.followedBy.some((followingUser: Partial<User>) => followingUser.id === id)",
+      "following: viewer\n    ? user?.followedBy.some((followingUser: Partial<User>) => followingUser.id === viewer.id)",
+    ],
   ]);
   await edit(A, "src/app/routes/profile/profile.service.ts", [["profileMapper(profile, id)", "profileMapper(profile, id ? { id } : undefined)"]]);
   const aArticle = await edit(A, "src/app/routes/article/article.service.ts", [
     ["profileMapper(article.author, id)", "profileMapper(article.author, id ? { id } : undefined)"],
     ["take: Number(query.limit) || 10,", "take: Math.min(Number(query.limit) || 10, 100),"],
   ]);
-  note("alice/claude", "edited profile.utils.ts, profile.service.ts, article.service.ts", `pre-edit decision on article.service.ts: ${decisionOf(aArticle.pre)}; context: ${ctxOf(aArticle.pre).slice(0, 160)}`);
-  check("alice is warned when editing inside bob's registered scope", /scope|bob/.test(ctxOf(aArticle.pre) + ctxOf(aArticle.post)), ctxOf(aArticle.pre).slice(0, 200));
+  note(
+    "alice/claude",
+    "edited profile.utils.ts, profile.service.ts, article.service.ts",
+    `pre-edit decision on article.service.ts: ${decisionOf(aArticle.pre)}; context: ${ctxOf(aArticle.pre).slice(0, 160)}`,
+  );
+  check(
+    "alice is warned when editing inside bob's registered scope",
+    /scope|bob/.test(ctxOf(aArticle.pre) + ctxOf(aArticle.post)),
+    ctxOf(aArticle.pre).slice(0, 200),
+  );
 
   // 5. Bob edits (Codex apply_patch): new caller of the OLD signature, same line as alice, plus an unrelated change.
   const bTag = await edit(B, "src/app/routes/tag/tag.service.ts", [["take: 10,", "take: 20,"]]);
   // (Pending inbox messages ride along with any hook, so only warnings about this file count.)
-  check("unrelated tag.service.ts edit is allowed with no warning about it", decisionOf(bTag.pre) === "allow" && !ctxOf(bTag.pre).includes("tag.service"), ctxOf(bTag.pre).slice(0, 160));
+  check(
+    "unrelated tag.service.ts edit is allowed with no warning about it",
+    decisionOf(bTag.pre) === "allow" && !ctxOf(bTag.pre).includes("tag.service"),
+    ctxOf(bTag.pre).slice(0, 160),
+  );
   const bEdit = Date.now();
-  const bArticle = await edit(B, "src/app/routes/article/article.service.ts", [["take: Number(query.limit) || 10,", "take: Number(query.limit) || 20,"]],
-    `\nexport const getCommentAuthors = async (slug: string, id?: number) => {\n  const comments = await prisma.comment.findMany({\n    where: { article: { slug } },\n    select: { author: { select: { username: true, bio: true, image: true, followedBy: true } } },\n  });\n  return comments.map((comment: any) => profileMapper(comment.author, id));\n};\n`);
-  note("bob/codex", "edited tag.service.ts (independent) and article.service.ts (new getCommentAuthors + page size 20)", `pre-edit: ${decisionOf(bArticle.pre)}; ${ctxOf(bArticle.pre).slice(0, 200)}`);
+  const bArticle = await edit(
+    B,
+    "src/app/routes/article/article.service.ts",
+    [["take: Number(query.limit) || 10,", "take: Number(query.limit) || 20,"]],
+    `\nexport const getCommentAuthors = async (slug: string, id?: number) => {\n  const comments = await prisma.comment.findMany({\n    where: { article: { slug } },\n    select: { author: { select: { username: true, bio: true, image: true, followedBy: true } } },\n  });\n  return comments.map((comment: any) => profileMapper(comment.author, id));\n};\n`,
+  );
+  note(
+    "bob/codex",
+    "edited tag.service.ts (independent) and article.service.ts (new getCommentAuthors + page size 20)",
+    `pre-edit: ${decisionOf(bArticle.pre)}; ${ctxOf(bArticle.pre).slice(0, 200)}`,
+  );
 
   // 6. Wait for WIP snapshots (daemon debounce 20s) → L1 + L2 on the server.
   const l2 = await waitFor("L2 conflict", async () => (await conflicts()).find((c) => c.layer === "L2" && c.subject.includes("profileMapper")), 120_000);
@@ -168,20 +212,47 @@ async function main() {
   const sinceEdit = ((Date.now() - bEdit) / 1000).toFixed(1);
   note("operator", `conflicts after bob's edit (+${sinceEdit}s)`, (await conflicts()).map((c) => `${c.layer}/${c.level}/${c.kind}:${c.subject}`).join(", "));
   check("L2: alice's signature change vs bob's new caller detected", !!l2.value && l2.value.level === "high", l2.value?.message ?? "not found");
-  check("L2 blames only lines bob wrote (1 caller, not the 2 base callers in the same file)", !!l2.value && (l2.value.evidence.callers ?? []).length === 1, JSON.stringify(l2.value?.evidence?.callers ?? []));
-  check("L1: both changed the page-size line → text conflict before any PR", !!l1.value && l1.value.subject === "src/app/routes/article/article.service.ts", l1.value?.message ?? "not found");
+  check(
+    "L2 blames only lines bob wrote (1 caller, not the 2 base callers in the same file)",
+    !!l2.value && (l2.value.evidence.callers ?? []).length === 1,
+    JSON.stringify(l2.value?.evidence?.callers ?? []),
+  );
+  check(
+    "L1: both changed the page-size line → text conflict before any PR",
+    !!l1.value && l1.value.subject === "src/app/routes/article/article.service.ts",
+    l1.value?.message ?? "not found",
+  );
   const all = await conflicts();
   check("no conflict reported for the independent tag.service.ts change", !all.some((c) => c.subject.includes("tag.service")));
   const everything = await conflicts(true);
-  check("no false critical-path alarm (nobody touched migrations/lockfiles/CI)", !everything.some((c) => c.level === "critical"), everything.filter((c) => c.level === "critical").map((c) => c.subject).join(", "));
+  check(
+    "no false critical-path alarm (nobody touched migrations/lockfiles/CI)",
+    !everything.some((c) => c.level === "critical"),
+    everything
+      .filter((c) => c.level === "critical")
+      .map((c) => c.subject)
+      .join(", "),
+  );
 
   // 7. Hooks now act on the conflicts: Claude asks, Codex is stopped once then allowed.
   await sleep(1500); // let SSE carry the new state to the daemons
-  const aAsk = await hook(A, { hook_event_name: "PreToolUse", tool_name: "Edit", tool_input: { file_path: join(A.dir, "src/app/routes/profile/profile.utils.ts"), old_string: "x", new_string: "y" } });
+  const aAsk = await hook(A, {
+    hook_event_name: "PreToolUse",
+    tool_name: "Edit",
+    tool_input: { file_path: join(A.dir, "src/app/routes/profile/profile.utils.ts"), old_string: "x", new_string: "y" },
+  });
   note("alice/claude", "PreToolUse on profile.utils.ts", `${decisionOf(aAsk)} (${aAsk.ms}ms)`);
   check("Claude: editing the conflicted symbol asks the human", decisionOf(aAsk) === "ask", decisionOf(aAsk));
-  const bDeny = await hook(B, { hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { command: "*** Begin Patch\n*** Update File: src/app/routes/article/article.service.ts\n*** End Patch\n" } });
-  const bAgain = await hook(B, { hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { command: "*** Begin Patch\n*** Update File: src/app/routes/article/article.service.ts\n*** End Patch\n" } });
+  const bDeny = await hook(B, {
+    hook_event_name: "PreToolUse",
+    tool_name: "apply_patch",
+    tool_input: { command: "*** Begin Patch\n*** Update File: src/app/routes/article/article.service.ts\n*** End Patch\n" },
+  });
+  const bAgain = await hook(B, {
+    hook_event_name: "PreToolUse",
+    tool_name: "apply_patch",
+    tool_input: { command: "*** Begin Patch\n*** Update File: src/app/routes/article/article.service.ts\n*** End Patch\n" },
+  });
   note("bob/codex", "PreToolUse on article.service.ts twice", `${decisionOf(bDeny)} then ${decisionOf(bAgain)} (${bDeny.ms}ms)`);
   check("Codex: stopped once (no ask support), allowed on retry", decisionOf(bDeny) === "deny" && decisionOf(bAgain) !== "deny");
   const aPost = await hook(A, { hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: join(A.dir, "README.md") }, tool_response: {} });
@@ -195,7 +266,10 @@ async function main() {
   brainNotes.push(`Tier-1 answer: ${qa.replace(/\n/g, " ")}`);
 
   // 9. Relay: bob asks a decision question; the brain should forward it to alice.
-  const relay = await tool(B, "ask", { question: "Alice caps the article page size at 100 and I wanted the default to be 20 instead of 10. Which default page size should we ship? Alice owns that decision." });
+  const relay = await tool(B, "ask", {
+    question:
+      "Alice caps the article page size at 100 and I wanted the default to be 20 instead of 10. Which default page size should we ship? Alice owns that decision.",
+  });
   note("bob/codex", "gtv_ask (decision question, real brain)", relay);
   let ticketId = /Ticket (tk_\w+)/.exec(relay)?.[1];
   const routedByBrain = /forwarded to alice/.test(relay);
@@ -205,17 +279,25 @@ async function main() {
     ticketId = /Ticket (tk_\w+)/.exec(direct)?.[1];
     note("bob/codex", "gtv_ask with to_dev=alice (relay without brain)", direct);
   }
-  const aQ = await waitFor("question in alice's agent", async () => {
-    const r = await hook(A, { hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: join(A.dir, "README.md") }, tool_response: {} });
-    return ticketId && ctxOf(r).includes(ticketId) ? ctxOf(r) : undefined;
-  }, 20_000);
+  const aQ = await waitFor(
+    "question in alice's agent",
+    async () => {
+      const r = await hook(A, { hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: join(A.dir, "README.md") }, tool_response: {} });
+      return ticketId && ctxOf(r).includes(ticketId) ? ctxOf(r) : undefined;
+    },
+    20_000,
+  );
   check("the forwarded question is injected into alice's agent mid-turn", !!aQ.value, (aQ.value ?? "").slice(0, 200));
   const reply = await tool(A, "reply", { ticket_id: ticketId, answer: "Default 20 is fine; keep my cap at 100. I'll take your default in my branch." });
   note("alice/claude", "gtv_reply", reply);
-  const bAns = await waitFor("answer in bob's agent", async () => {
-    const r = await hook(B, { hook_event_name: "PostToolUse", tool_name: "shell", tool_input: { command: "ls" }, tool_response: {} });
-    return ctxOf(r).includes("Default 20") ? ctxOf(r) : undefined;
-  }, 20_000);
+  const bAns = await waitFor(
+    "answer in bob's agent",
+    async () => {
+      const r = await hook(B, { hook_event_name: "PostToolUse", tool_name: "shell", tool_input: { command: "ls" }, tool_response: {} });
+      return ctxOf(r).includes("Default 20") ? ctxOf(r) : undefined;
+    },
+    20_000,
+  );
   check("alice's answer is delivered back into bob's agent", !!bAns.value, (bAns.value ?? "").slice(0, 200));
 
   // 10. Resolution: bob drops his page-size edit (alice will apply it), uses the new signature, acks L2.
@@ -223,7 +305,9 @@ async function main() {
     ["take: Number(query.limit) || 20,", "take: Number(query.limit) || 10,"],
     ["profileMapper(comment.author, id));", "profileMapper(comment.author, id ? { id } : undefined));"],
   ]);
-  await edit(A, "src/app/routes/article/article.service.ts", [["take: Math.min(Number(query.limit) || 10, 100),", "take: Math.min(Number(query.limit) || 20, 100),"]]);
+  await edit(A, "src/app/routes/article/article.service.ts", [
+    ["take: Math.min(Number(query.limit) || 10, 100),", "take: Math.min(Number(query.limit) || 20, 100),"],
+  ]);
   if (l2.value) await tool(B, "ack", { conflict_id: l2.value.id });
   const l1gone = await waitFor("L1 resolved", async () => !(await conflicts()).some((c) => c.layer === "L1" && c.kind === "text") && "resolved", 90_000);
   check("L1 resolves by itself once the overlapping edit is gone", !!l1gone.value, `${(l1gone.ms / 1000).toFixed(1)}s`);
@@ -235,11 +319,15 @@ async function main() {
   await git(A.dir, ["push", "-q", "origin", "HEAD:master"]);
   await fetch(`http://127.0.0.1:${A.port}/snapshot`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cwd: A.dir }) });
   await json(`${SERVER}/api/projects/${PROJECT}/sync`, { method: "POST" });
-  const done = await waitFor("alice task done", async () => {
-    await json(`${SERVER}/api/projects/${PROJECT}/sync`, { method: "POST" });
-    const tasks = await json<any[]>(`${SERVER}/v1/p/${PROJECT}/tasks`);
-    return !tasks.some((t) => t.dev === "alice") && "done";
-  }, 60_000);
+  const done = await waitFor(
+    "alice task done",
+    async () => {
+      await json(`${SERVER}/api/projects/${PROJECT}/sync`, { method: "POST" });
+      const tasks = await json<any[]>(`${SERVER}/v1/p/${PROJECT}/tasks`);
+      return !tasks.some((t) => t.dev === "alice") && "done";
+    },
+    60_000,
+  );
   check("alice's task closes automatically after her work lands on master", !!done.value, `${(done.ms / 1000).toFixed(1)}s`);
   const mainConf = (await conflicts()).filter((c) => c.workspace_b === "main");
   check("bob's WIP merges cleanly with the new master", mainConf.length === 0, mainConf.map((c) => c.message).join(" | "));
@@ -283,7 +371,12 @@ function writeReport(x: { stats: any; layers: any[]; brainJobs: number }) {
     "## Layers after the run",
     "| feature | mode | metrics |",
     "|---|---|---|",
-    ...x.layers.map((l) => `| ${l.key} | ${l.mode} | ${Object.entries(l.metrics).map(([k, v]) => `${k}=${v}`).join(", ")} |`),
+    ...x.layers.map(
+      (l) =>
+        `| ${l.key} | ${l.mode} | ${Object.entries(l.metrics)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ")} |`,
+    ),
     "",
   ];
   mkdirSync(join(ROOT, "docs/reports"), { recursive: true });

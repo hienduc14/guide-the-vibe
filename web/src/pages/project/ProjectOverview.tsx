@@ -37,7 +37,11 @@ function describe(e: ActivityEvent): string {
     case "work_merged":
       return `work đã merge vào main`;
     default:
-      return typeof p === "string" ? p : Object.keys(p ?? {}).slice(0, 4).join(", ");
+      return typeof p === "string"
+        ? p
+        : Object.keys(p ?? {})
+            .slice(0, 4)
+            .join(", ");
   }
 }
 
@@ -52,7 +56,12 @@ export function ProjectOverview() {
       <div className="grid stats">
         <Stat label="Đang làm" value={c.people_active} hint={`${c.sessions_active} phiên agent`} />
         <Stat label="Task" value={c.tasks_active} />
-        <Stat label="Conflict mở" value={c.conflicts_open} alert={c.conflicts_by_level.high + c.conflicts_by_level.critical > 0} hint={`${c.conflicts_by_level.high} high · ${c.conflicts_by_level.critical} critical`} />
+        <Stat
+          label="Conflict mở"
+          value={c.conflicts_open}
+          alert={c.conflicts_by_level.high + c.conflicts_by_level.critical > 0}
+          hint={`${c.conflicts_by_level.high} high · ${c.conflicts_by_level.critical} critical`}
+        />
         <Stat label="Ticket chờ" value={c.tickets_waiting} />
         <Stat label="Code graph" value={detail.graph.symbols} hint={`${detail.graph.files} file · ${detail.graph.refs} tham chiếu`} />
       </div>
@@ -65,7 +74,11 @@ export function ProjectOverview() {
           columns={[
             { key: "dev", title: "Dev", render: (p) => <b>{p.dev}</b> },
             { key: "status", title: "Trạng thái", render: (p) => <StatusBadge status={p.status} /> },
-            { key: "agents", title: "Agent", render: (p) => <div className="row">{p.agents.length ? p.agents.map((a) => <Badge key={a}>{a}</Badge>) : <span className="faint">—</span>}</div> },
+            {
+              key: "agents",
+              title: "Agent",
+              render: (p) => <div className="row">{p.agents.length ? p.agents.map((a) => <Badge key={a}>{a}</Badge>) : <span className="faint">—</span>}</div>,
+            },
             { key: "ws", title: "Workspace", render: (p) => <span className="mono xs">{p.workspaces.join(", ") || "—"}</span> },
             { key: "tasks", title: "Task", render: (p) => (p.tasks.length ? p.tasks.join("; ") : <span className="faint">chưa đăng ký</span>) },
             { key: "editing", title: "Đang sửa", render: (p) => <span className="mono">{p.editing}</span> },

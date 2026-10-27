@@ -85,7 +85,5 @@ export function installCodex(project: string, daemon = daemonUrl()): string[] {
 }
 
 export function ompCommand(daemon = daemonUrl()): string {
-  return process.platform === "win32"
-    ? `$env:GTV_DAEMON_URL="${daemon}"; omp -e "${OMP_EXTENSION}"`
-    : `GTV_DAEMON_URL=${daemon} omp -e "${OMP_EXTENSION}"`;
+  return process.platform === "win32" ? `$env:GTV_DAEMON_URL="${daemon}"; omp -e "${OMP_EXTENSION}"` : `GTV_DAEMON_URL=${daemon} omp -e "${OMP_EXTENSION}"`;
 }

@@ -30,7 +30,15 @@ export function diffSymbols(before: SymbolDef[], after: SymbolDef[]): SymbolChan
     const now = a.get(id);
     if (now) {
       if (now.sig_hash !== old.sig_hash) {
-        out.push({ symbol_id: id, name: old.name, kind: old.kind, change: "sig_changed", old_sig: old.sig, new_sig: now.sig, exported: old.exported || now.exported });
+        out.push({
+          symbol_id: id,
+          name: old.name,
+          kind: old.kind,
+          change: "sig_changed",
+          old_sig: old.sig,
+          new_sig: now.sig,
+          exported: old.exported || now.exported,
+        });
       } else if (now.body_hash !== old.body_hash && !CONTAINERS.has(old.kind)) {
         out.push({ symbol_id: id, name: old.name, kind: old.kind, change: "body_changed", old_sig: old.sig, new_sig: now.sig, exported: old.exported });
       }
@@ -41,7 +49,16 @@ export function diffSymbols(before: SymbolDef[], after: SymbolDef[]): SymbolChan
     const twin = [...addedUnused.values()].find((n) => n.kind === old.kind && n.body_hash === old.body_hash);
     if (twin && !CONTAINERS.has(old.kind)) {
       addedUnused.delete(twin.id);
-      out.push({ symbol_id: id, name: old.name, kind: old.kind, change: "renamed", old_sig: old.sig, new_sig: twin.sig, new_id: twin.id, exported: old.exported });
+      out.push({
+        symbol_id: id,
+        name: old.name,
+        kind: old.kind,
+        change: "renamed",
+        old_sig: old.sig,
+        new_sig: twin.sig,
+        new_id: twin.id,
+        exported: old.exported,
+      });
     } else {
       out.push({ symbol_id: id, name: old.name, kind: old.kind, change: "deleted", old_sig: old.sig, exported: old.exported });
     }

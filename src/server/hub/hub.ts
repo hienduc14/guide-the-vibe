@@ -69,9 +69,7 @@ export class Hub {
   // ---- projects ------------------------------------------------------------------
 
   records(includeArchived = false): ProjectRecord[] {
-    return this.db
-      .all<Record<string, unknown>>(`SELECT * FROM projects ${includeArchived ? "" : "WHERE archived = 0"} ORDER BY created_at`)
-      .map(rowToRecord);
+    return this.db.all<Record<string, unknown>>(`SELECT * FROM projects ${includeArchived ? "" : "WHERE archived = 0"} ORDER BY created_at`).map(rowToRecord);
   }
 
   record(id: string): ProjectRecord | undefined {
@@ -87,7 +85,10 @@ export class Hub {
       repo_url: input.repo_url ?? prev?.repo_url,
       main_branch: input.main_branch ?? prev?.main_branch ?? "main",
       aliases: input.aliases ?? prev?.aliases ?? [],
-      policy: { critical_paths: input.policy?.critical_paths ?? prev?.policy.critical_paths ?? [], modules: input.policy?.modules ?? prev?.policy.modules ?? {} },
+      policy: {
+        critical_paths: input.policy?.critical_paths ?? prev?.policy.critical_paths ?? [],
+        modules: input.policy?.modules ?? prev?.policy.modules ?? {},
+      },
       description: input.description ?? prev?.description,
       archived: prev?.archived ?? false,
       created_at: prev?.created_at ?? now,
@@ -213,9 +214,18 @@ export class Hub {
     const pct = (p: number) => (ms.length ? ms[Math.min(ms.length - 1, Math.floor(p * ms.length))] : null);
     return {
       totals: { jobs: totals.jobs, failed: totals.failed ?? 0, avg_ms: totals.avg_ms ? Math.round(totals.avg_ms) : null, p50_ms: pct(0.5), p95_ms: pct(0.95) },
-      byKind: this.db.all<{ kind: string; jobs: number; failed: number }>(`SELECT kind, COUNT(*) AS jobs, SUM(1 - ok) AS failed FROM brain_jobs WHERE ${where} GROUP BY kind ORDER BY jobs DESC`, ...params),
-      byProject: this.db.all<{ project: string; jobs: number }>(`SELECT project, COUNT(*) AS jobs FROM brain_jobs WHERE ${where} GROUP BY project ORDER BY jobs DESC`, ...params),
-      byDay: this.db.all<{ day: string; jobs: number; failed: number }>(`SELECT substr(ts, 1, 10) AS day, COUNT(*) AS jobs, SUM(1 - ok) AS failed FROM brain_jobs WHERE ${where} GROUP BY day ORDER BY day`, ...params),
+      byKind: this.db.all<{ kind: string; jobs: number; failed: number }>(
+        `SELECT kind, COUNT(*) AS jobs, SUM(1 - ok) AS failed FROM brain_jobs WHERE ${where} GROUP BY kind ORDER BY jobs DESC`,
+        ...params,
+      ),
+      byProject: this.db.all<{ project: string; jobs: number }>(
+        `SELECT project, COUNT(*) AS jobs FROM brain_jobs WHERE ${where} GROUP BY project ORDER BY jobs DESC`,
+        ...params,
+      ),
+      byDay: this.db.all<{ day: string; jobs: number; failed: number }>(
+        `SELECT substr(ts, 1, 10) AS day, COUNT(*) AS jobs, SUM(1 - ok) AS failed FROM brain_jobs WHERE ${where} GROUP BY day ORDER BY day`,
+        ...params,
+      ),
       recent: this.db.all(`SELECT * FROM brain_jobs WHERE ${where} ORDER BY id DESC LIMIT 25`, ...params),
     };
   }

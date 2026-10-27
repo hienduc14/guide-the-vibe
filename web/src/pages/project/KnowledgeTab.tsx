@@ -165,7 +165,20 @@ export function KnowledgeTab() {
           ) : (
             <div className="feed">
               {hits.data.map((h) => (
-                <button key={`${h.id}${h.section}`} type="button" className="feed-item" style={{ gridTemplateColumns: "1fr", textAlign: "left", background: "none", border: 0, borderBottom: "1px solid var(--line)", cursor: "pointer" }} onClick={() => setSelected(h.id)}>
+                <button
+                  key={`${h.id}${h.section}`}
+                  type="button"
+                  className="feed-item"
+                  style={{
+                    gridTemplateColumns: "1fr",
+                    textAlign: "left",
+                    background: "none",
+                    border: 0,
+                    borderBottom: "1px solid var(--line)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setSelected(h.id)}
+                >
                   <span className="row">
                     <b className="small">{h.section}</b>
                     <Badge>{h.type}</Badge>

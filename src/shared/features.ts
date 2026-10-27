@@ -10,9 +10,9 @@ export interface FeatureDef {
 }
 
 export const FEATURES = {
-  "registration": { default: "on", description: "Task registration and overlap feedback" },
+  registration: { default: "on", description: "Task registration and overlap feedback" },
   "registration.auto_from_plan": { default: "shadow", requires: ["brain"], description: "Draft a registration from an agent plan" },
-  "drift_check": { default: "on", description: "Warn when edits leave the registered scope" },
+  drift_check: { default: "on", description: "Warn when edits leave the registered scope" },
   "detect.l0_path": { default: "on", description: "Path / module overlap" },
   "detect.l1_merge": { default: "on", description: "Speculative merge of WIP snapshots (git merge-tree)" },
   "detect.l2_symbol": { default: "on", requires: ["knowledge.code_graph"], description: "tree-sitter symbol changes vs usages" },
@@ -24,7 +24,7 @@ export const FEATURES = {
   "qa.tier3_human": { default: "on", description: "Escalate to the human when agents cannot decide" },
   "policy.ask": { default: "on", description: "Ask/deny on high and critical conflicts" },
   "notify.desktop": { default: "on", description: "Desktop notifications on the dev machine" },
-  "brain": { default: "on", description: "LLM brain (OpenCode / null)" },
+  brain: { default: "on", description: "LLM brain (OpenCode / null)" },
 } satisfies Record<string, FeatureDef>;
 
 export type FeatureKey = keyof typeof FEATURES;

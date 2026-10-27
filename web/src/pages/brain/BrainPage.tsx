@@ -30,7 +30,16 @@ export function BrainPage() {
       <PageHead
         title="Brain"
         subtitle="LLM của Operator: trả lời câu hỏi, đánh giá đăng ký task (L3), trích intent từ plan. Mọi job đều được đếm theo project."
-        actions={<Segmented options={[{ value: "7", label: "7 ngày" }, { value: "30", label: "30 ngày" }]} value={days} onChange={setDays} />}
+        actions={
+          <Segmented
+            options={[
+              { value: "7", label: "7 ngày" },
+              { value: "30", label: "30 ngày" },
+            ]}
+            value={days}
+            onChange={setDays}
+          />
+        }
       />
 
       <div className="split">
@@ -39,7 +48,9 @@ export function BrainPage() {
             <div className="row">
               <span className={`dot${data.health.ok ? " on" : " bad"}`} />
               <b>{data.backend}</b>
-              <span className={`small ${data.health.ok ? "muted" : "danger-text"}`}>{data.health.detail ?? (data.health.ok ? "sẵn sàng" : "không sẵn sàng")}</span>
+              <span className={`small ${data.health.ok ? "muted" : "danger-text"}`}>
+                {data.health.detail ?? (data.health.ok ? "sẵn sàng" : "không sẵn sàng")}
+              </span>
             </div>
             <form
               className="stack tight"
@@ -77,7 +88,14 @@ export function BrainPage() {
 
       <div className="split">
         <Card title="Job theo ngày">
-          <BarChart data={lastDays(s.byDay, n, (r) => r.day, (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }))} />
+          <BarChart
+            data={lastDays(
+              s.byDay,
+              n,
+              (r) => r.day,
+              (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }),
+            )}
+          />
         </Card>
         <Card title="Theo project · theo loại">
           <div className="stack">

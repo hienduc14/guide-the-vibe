@@ -50,15 +50,15 @@ components stay presentational and typed; a page owns its data via `usePoll`.
 Black & white first. The only accent is a muted red (`--accent`) reserved for severity and errors.
 Light theme by default; dark follows `prefers-color-scheme`.
 
-| Token | Use |
-|---|---|
-| `--bg` `--fg` | page background / text and primary buttons |
-| `--muted` `--faint` | secondary text / hints, inactive dots |
-| `--line` `--line-strong` | 1px borders (cards, tables) / control borders |
-| `--subtle` `--hover` | quiet fills: bar tracks, selected rows / hover |
-| `--accent` `--accent-soft` | critical level, errors, "danger" buttons |
-| `--font` `--mono` | system sans / monospace for ids, paths, code |
-| `--text-*` `--s1…s7` `--radius` | type scale, spacing scale, corner radius |
+| Token                           | Use                                            |
+| ------------------------------- | ---------------------------------------------- |
+| `--bg` `--fg`                   | page background / text and primary buttons     |
+| `--muted` `--faint`             | secondary text / hints, inactive dots          |
+| `--line` `--line-strong`        | 1px borders (cards, tables) / control borders  |
+| `--subtle` `--hover`            | quiet fills: bar tracks, selected rows / hover |
+| `--accent` `--accent-soft`      | critical level, errors, "danger" buttons       |
+| `--font` `--mono`               | system sans / monospace for ids, paths, code   |
+| `--text-*` `--s1…s7` `--radius` | type scale, spacing scale, corner radius       |
 
 Severity badges: `info` outline · `warning` bold outline · `high` inverted (black) · `critical` red.
 No shadows, no gradients; layout collapses to a single column with a slide-in sidebar under 860px.

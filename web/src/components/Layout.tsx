@@ -33,7 +33,7 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         <div className="nav-title label-caps">Projects</div>
         {data?.projects.map((p) => {
           const active = isLoaded(p) && p.counts.people_active > 0;
-          const hot = isLoaded(p) && (p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical > 0);
+          const hot = isLoaded(p) && p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical > 0;
           return (
             <NavLink key={p.id} to={`/p/${p.id}`} className={link}>
               <span className={`dot${hot ? " bad" : active ? " on" : ""}`} />
@@ -41,7 +41,11 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
             </NavLink>
           );
         })}
-        {data && data.projects.length === 0 && <span className="xs faint" style={{ padding: "0 8px" }}>Chưa có project</span>}
+        {data && data.projects.length === 0 && (
+          <span className="xs faint" style={{ padding: "0 8px" }}>
+            Chưa có project
+          </span>
+        )}
       </nav>
 
       <div className="spacer" />

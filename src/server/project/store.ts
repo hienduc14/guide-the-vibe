@@ -182,7 +182,10 @@ export class Store extends EventEmitter {
   }
 
   sessionTask(sessionId: string): Task | undefined {
-    const r = this.db.get<Record<string, unknown>>(`SELECT * FROM tasks WHERE session_id = ? AND status IN ('registered','active','pr_open') ORDER BY created_at DESC LIMIT 1`, sessionId);
+    const r = this.db.get<Record<string, unknown>>(
+      `SELECT * FROM tasks WHERE session_id = ? AND status IN ('registered','active','pr_open') ORDER BY created_at DESC LIMIT 1`,
+      sessionId,
+    );
     return r ? rowToTask(r) : undefined;
   }
 
@@ -195,9 +198,23 @@ export class Store extends EventEmitter {
       const path = normPath(raw);
       const prev = this.db.get<{ count: number }>(`SELECT count FROM footprints WHERE workspace_id = ? AND path = ?`, session.workspace_id, path);
       if (prev) {
-        this.db.run(`UPDATE footprints SET last_at = ?, count = count + 1, session_id = ? WHERE workspace_id = ? AND path = ?`, now, session.id, session.workspace_id, path);
+        this.db.run(
+          `UPDATE footprints SET last_at = ?, count = count + 1, session_id = ? WHERE workspace_id = ? AND path = ?`,
+          now,
+          session.id,
+          session.workspace_id,
+          path,
+        );
       } else {
-        this.db.upsert("footprints", { workspace_id: session.workspace_id, session_id: session.id, dev: session.dev, path, first_at: now, last_at: now, count: 1 });
+        this.db.upsert("footprints", {
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          dev: session.dev,
+          path,
+          first_at: now,
+          last_at: now,
+          count: 1,
+        });
         fresh.push(path);
       }
     }
@@ -218,7 +235,9 @@ export class Store extends EventEmitter {
 
   conflicts(status: "open" | "all" = "open"): Conflict[] {
     const rows = this.db.all<Record<string, unknown>>(
-      status === "open" ? `SELECT * FROM conflicts WHERE status IN ('open','acked') ORDER BY updated_at DESC` : `SELECT * FROM conflicts ORDER BY updated_at DESC`,
+      status === "open"
+        ? `SELECT * FROM conflicts WHERE status IN ('open','acked') ORDER BY updated_at DESC`
+        : `SELECT * FROM conflicts ORDER BY updated_at DESC`,
     );
     return rows.map(rowToConflict);
   }
@@ -234,7 +253,11 @@ export class Store extends EventEmitter {
    */
   syncConflicts(layer: string, found: Omit<Conflict, "id" | "status" | "created_at" | "updated_at">[], inScope: (c: Conflict) => boolean): Conflict[] {
     const now = nowIso();
-    const existing = new Map(this.conflicts("all").filter((c) => c.layer === layer && inScope(c)).map((c) => [c.key, c]));
+    const existing = new Map(
+      this.conflicts("all")
+        .filter((c) => c.layer === layer && inScope(c))
+        .map((c) => [c.key, c]),
+    );
     const notify: Conflict[] = [];
     for (const f of found) {
       const prev = existing.get(f.key);

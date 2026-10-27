@@ -92,11 +92,19 @@ export class CodeGraph {
   replaceFile(layer: string, idx: FileIndex): void {
     this.db.tx(() => {
       this.removeFile(layer, idx.path);
-      this.db.run(`INSERT INTO g_files (layer, path, lang, content_hash, has_errors) VALUES (?,?,?,?,?)`, layer, idx.path, idx.lang, idx.content_hash, idx.has_errors ? 1 : 0);
+      this.db.run(
+        `INSERT INTO g_files (layer, path, lang, content_hash, has_errors) VALUES (?,?,?,?,?)`,
+        layer,
+        idx.path,
+        idx.lang,
+        idx.content_hash,
+        idx.has_errors ? 1 : 0,
+      );
       const sym = this.db.raw.prepare(
         `INSERT OR REPLACE INTO g_symbols (layer,id,path,name,qualname,kind,start_line,end_line,sig,sig_hash,body_hash,exported) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       );
-      for (const s of idx.symbols) sym.run(layer, s.id, s.file, s.name, s.qualname, s.kind, s.start_line, s.end_line, s.sig, s.sig_hash, s.body_hash, s.exported ? 1 : 0);
+      for (const s of idx.symbols)
+        sym.run(layer, s.id, s.file, s.name, s.qualname, s.kind, s.start_line, s.end_line, s.sig, s.sig_hash, s.body_hash, s.exported ? 1 : 0);
       const ref = this.db.raw.prepare(`INSERT INTO g_refs (layer,path,name,line,kind,recv,from_symbol) VALUES (?,?,?,?,?,?,?)`);
       for (const r of idx.refs) ref.run(layer, r.file, r.name, r.line, r.kind, r.recv ?? null, r.from_symbol ?? null);
       const imp = this.db.raw.prepare(`INSERT INTO g_imports (layer,path,source,names) VALUES (?,?,?,?)`);
@@ -124,13 +132,17 @@ export class CodeGraph {
   }
 
   fileHashes(layer: string): Map<string, string> {
-    return new Map(this.db.all<{ path: string; content_hash: string }>(`SELECT path, content_hash FROM g_files WHERE layer = ?`, layer).map((r) => [r.path, r.content_hash]));
+    return new Map(
+      this.db.all<{ path: string; content_hash: string }>(`SELECT path, content_hash FROM g_files WHERE layer = ?`, layer).map((r) => [r.path, r.content_hash]),
+    );
   }
 
   // ---- reads ----------------------------------------------------------------
 
   overlayPaths(layer: string): string[] {
-    return this.db.all<{ path: string }>(`SELECT path FROM g_files WHERE layer = ? UNION SELECT path FROM g_tombstones WHERE layer = ?`, layer, layer).map((r) => r.path);
+    return this.db
+      .all<{ path: string }>(`SELECT path FROM g_files WHERE layer = ? UNION SELECT path FROM g_tombstones WHERE layer = ?`, layer, layer)
+      .map((r) => r.path);
   }
 
   symbolsByName(name: string, view: string, limit = 20): SymbolRow[] {
@@ -220,7 +232,7 @@ export class CodeGraph {
   }
 
   stats(layer: string): { files: number; symbols: number; refs: number } {
-    const c = (t: string) => (this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t} WHERE layer = ?`, layer)?.n ?? 0);
+    const c = (t: string) => this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t} WHERE layer = ?`, layer)?.n ?? 0;
     return { files: c("g_files"), symbols: c("g_symbols"), refs: c("g_refs") };
   }
 }

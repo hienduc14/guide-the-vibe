@@ -79,10 +79,18 @@ export function agentRoutes(): Hono<ProjectEnv> {
 
   app.patch("/tasks/:id", async (c) => {
     const { engine } = c.get("rt");
-    const body = (await c.req.json()) as { title?: string; goal?: string; resources?: TaskResource[]; add_resources?: TaskResource[]; status?: "done" | "abandoned" | "pr_open" };
+    const body = (await c.req.json()) as {
+      title?: string;
+      goal?: string;
+      resources?: TaskResource[];
+      add_resources?: TaskResource[];
+      status?: "done" | "abandoned" | "pr_open";
+    };
     const t = engine.store.task(c.req.param("id"));
     if (!t || (t.dev !== c.get("dev") && !c.get("admin"))) throw new Error("unknown task");
-    const resources = body.resources ?? (body.add_resources ? [...t.resources, ...body.add_resources.map((r) => ({ ...r, value: r.kind === "path" ? normPath(r.value) : r.value }))] : undefined);
+    const resources =
+      body.resources ??
+      (body.add_resources ? [...t.resources, ...body.add_resources.map((r) => ({ ...r, value: r.kind === "path" ? normPath(r.value) : r.value }))] : undefined);
     const next = engine.store.updateTask(t.id, { title: body.title, goal: body.goal, resources, status: body.status } as never);
     if (body.status === "done" || body.status === "abandoned") engine.tasksClosed([t.id]);
     else engine.runL0();
@@ -101,16 +109,31 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const out: { kind: string; with: string; detail: string }[] = [];
     for (const raw of body.paths ?? []) {
       const p = normPath(raw);
-      for (const f of state.footprints) if (f.workspace_id !== session.workspace_id && f.path === p) out.push({ kind: "editing", with: f.dev, detail: `${f.dev} is editing ${p}` });
-      for (const t of others) for (const r of t.resources) if (r.kind === "path" && globMatch(r.value, p)) out.push({ kind: "scope", with: t.dev, detail: `${p} is in the scope of ${t.dev}'s task "${t.title}"` });
+      for (const f of state.footprints)
+        if (f.workspace_id !== session.workspace_id && f.path === p) out.push({ kind: "editing", with: f.dev, detail: `${f.dev} is editing ${p}` });
+      for (const t of others)
+        for (const r of t.resources)
+          if (r.kind === "path" && globMatch(r.value, p))
+            out.push({ kind: "scope", with: t.dev, detail: `${p} is in the scope of ${t.dev}'s task "${t.title}"` });
     }
     for (const s of body.symbols ?? []) {
       const name = s.split(".").pop()!;
-      for (const t of others) for (const r of t.resources) if (r.kind === "symbol" && r.value.split(".").pop() === name) out.push({ kind: "symbol", with: t.dev, detail: `${t.dev}'s task "${t.title}" declares ${r.op ?? "work on"} ${r.value}` });
+      for (const t of others)
+        for (const r of t.resources)
+          if (r.kind === "symbol" && r.value.split(".").pop() === name)
+            out.push({ kind: "symbol", with: t.dev, detail: `${t.dev}'s task "${t.title}" declares ${r.op ?? "work on"} ${r.value}` });
       for (const w of state.workspaces) {
         if (w.id === session.workspace_id) continue;
-        for (const ch of engine.db.all<{ symbol_id: string; change: string; new_sig: string | null }>(`SELECT symbol_id, change, new_sig FROM symbol_changes WHERE workspace_id = ? AND name = ?`, w.id, name)) {
-          out.push({ kind: "wip_change", with: w.dev, detail: `${w.dev} has already ${ch.change.replace("_", " ")} ${ch.symbol_id}${ch.new_sig ? ` → ${ch.new_sig}` : ""} in their WIP` });
+        for (const ch of engine.db.all<{ symbol_id: string; change: string; new_sig: string | null }>(
+          `SELECT symbol_id, change, new_sig FROM symbol_changes WHERE workspace_id = ? AND name = ?`,
+          w.id,
+          name,
+        )) {
+          out.push({
+            kind: "wip_change",
+            with: w.dev,
+            detail: `${w.dev} has already ${ch.change.replace("_", " ")} ${ch.symbol_id}${ch.new_sig ? ` → ${ch.new_sig}` : ""} in their WIP`,
+          });
         }
       }
     }
@@ -172,7 +195,17 @@ export function agentRoutes(): Hono<ProjectEnv> {
   app.post("/kb", async (c) => {
     const body = (await c.req.json()) as { title: string; body: string; type?: string; supersedes?: string };
     if (!body.title?.trim() || !body.body?.trim()) throw new Error("title and body are required");
-    return c.json(c.get("rt").engine.kb.upsert({ id: newId("manual"), type: body.type ?? "doc", title: body.title, body: body.body, status: "active", source: "manual", supersedes: body.supersedes }));
+    return c.json(
+      c.get("rt").engine.kb.upsert({
+        id: newId("manual"),
+        type: body.type ?? "doc",
+        title: body.title,
+        body: body.body,
+        status: "active",
+        source: "manual",
+        supersedes: body.supersedes,
+      }),
+    );
   });
 
   app.get("/kb/:id", (c) => c.json(c.get("rt").engine.kb.get(c.req.param("id")) ?? { error: "not found" }));

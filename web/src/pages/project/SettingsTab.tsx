@@ -9,13 +9,20 @@ import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 
 /** "name: glob, glob" per line ⇄ { name: [glob, glob] } */
-const modulesToText = (m: Record<string, string[]>) => Object.entries(m).map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n");
+const modulesToText = (m: Record<string, string[]>) =>
+  Object.entries(m)
+    .map(([k, v]) => `${k}: ${v.join(", ")}`)
+    .join("\n");
 function textToModules(text: string): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const line of text.split("\n")) {
     const i = line.indexOf(":");
     if (i <= 0) continue;
-    const globs = line.slice(i + 1).split(",").map((s) => s.trim()).filter(Boolean);
+    const globs = line
+      .slice(i + 1)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (globs.length) out[line.slice(0, i).trim()] = globs;
   }
   return out;
@@ -46,8 +53,17 @@ export function SettingsTab() {
           name: f.name.trim(),
           description: f.description.trim(),
           main_branch: f.main_branch.trim(),
-          aliases: f.aliases.split(",").map((s) => s.trim()).filter(Boolean),
-          policy: { critical_paths: f.critical.split("\n").map((s) => s.trim()).filter(Boolean), modules: textToModules(f.modules) },
+          aliases: f.aliases
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          policy: {
+            critical_paths: f.critical
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            modules: textToModules(f.modules),
+          },
         }),
       "Đã lưu cài đặt",
     );
@@ -77,10 +93,22 @@ export function SettingsTab() {
           </div>
           <div className="form-grid">
             <Field label="Critical paths" hint="mỗi dòng một glob — hai người cùng chạm → conflict CRITICAL">
-              <textarea className="textarea" rows={5} value={f.critical} onChange={(e) => setF({ ...f, critical: e.target.value })} placeholder={"**/migrations/**\npackage-lock.json"} />
+              <textarea
+                className="textarea"
+                rows={5}
+                value={f.critical}
+                onChange={(e) => setF({ ...f, critical: e.target.value })}
+                placeholder={"**/migrations/**\npackage-lock.json"}
+              />
             </Field>
             <Field label="Modules" hint="mỗi dòng “tên: glob, glob” — dùng cho L0 cùng module">
-              <textarea className="textarea" rows={5} value={f.modules} onChange={(e) => setF({ ...f, modules: e.target.value })} placeholder={"auth: src/app/routes/auth/**\narticles: src/app/routes/article/**"} />
+              <textarea
+                className="textarea"
+                rows={5}
+                value={f.modules}
+                onChange={(e) => setF({ ...f, modules: e.target.value })}
+                placeholder={"auth: src/app/routes/auth/**\narticles: src/app/routes/article/**"}
+              />
             </Field>
           </div>
           <div className="row">
@@ -111,7 +139,14 @@ export function SettingsTab() {
               </datalist>
             </Field>
             <Field label="Nội dung">
-              <textarea className="textarea" style={{ fontFamily: "var(--font)" }} required value={note.body} onChange={(e) => setNote({ ...note, body: e.target.value })} placeholder="Ví dụ: đừng đổi chữ ký AuthService.login trước thứ Sáu" />
+              <textarea
+                className="textarea"
+                style={{ fontFamily: "var(--font)" }}
+                required
+                value={note.body}
+                onChange={(e) => setNote({ ...note, body: e.target.value })}
+                placeholder="Ví dụ: đừng đổi chữ ký AuthService.login trước thứ Sáu"
+              />
             </Field>
             <div>
               <button className="btn" type="submit">

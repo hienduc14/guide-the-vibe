@@ -36,7 +36,9 @@ const JS_REFS = `
 (call_expression function: (member_expression object: (_) @recv property: (property_identifier) @name)) @call
 (new_expression constructor: (identifier) @name) @call
 `;
-const TS_REFS = JS_REFS + `
+const TS_REFS =
+  JS_REFS +
+  `
 (type_identifier) @type
 `;
 

@@ -75,7 +75,14 @@ export class Workspaces {
         this.topByCwd.delete(cwd); // retry later: the project may be created meanwhile
         return undefined;
       }
-      info = { id: `ws_${shortHash(`${this.dev}|${top.toLowerCase()}`, 10)}`, top, label: basename(top), project, branch: await currentBranch(top), branchAt: Date.now() };
+      info = {
+        id: `ws_${shortHash(`${this.dev}|${top.toLowerCase()}`, 10)}`,
+        top,
+        label: basename(top),
+        project,
+        branch: await currentBranch(top),
+        branchAt: Date.now(),
+      };
       this.byTop.set(top, info);
     } else if (Date.now() - info.branchAt > 15_000) {
       info.branch = await currentBranch(top);

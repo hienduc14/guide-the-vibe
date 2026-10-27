@@ -1,0 +1,8 @@
+# Same line endings on every OS: LF in the repo and in working copies.
+# (Windows checkouts with CRLF break bash scripts and make git diffs noisy.)
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.wasm binary

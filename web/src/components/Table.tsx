@@ -40,7 +40,11 @@ export function Table<T>({
           {rows.map((r) => {
             const k = rowKey(r);
             return (
-              <tr key={k} className={`${onRowClick ? "clickable" : ""}${selected === k ? " selected" : ""}`} onClick={onRowClick ? () => onRowClick(r) : undefined}>
+              <tr
+                key={k}
+                className={`${onRowClick ? "clickable" : ""}${selected === k ? " selected" : ""}`}
+                onClick={onRowClick ? () => onRowClick(r) : undefined}
+              >
                 {columns.map((c) => (
                   <td key={c.key}>{c.render(r)}</td>
                 ))}

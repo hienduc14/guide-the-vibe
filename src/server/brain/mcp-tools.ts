@@ -42,7 +42,10 @@ export function buildBrainMcp(engine: Engine): McpServer {
 
   server.registerTool(
     "read_file",
-    { description: "Read a file from main or from a workspace's WIP snapshot.", inputSchema: { path: z.string(), view: VIEW, start_line: z.number().int().optional(), end_line: z.number().int().optional() } },
+    {
+      description: "Read a file from main or from a workspace's WIP snapshot.",
+      inputSchema: { path: z.string(), view: VIEW, start_line: z.number().int().optional(), end_line: z.number().int().optional() },
+    },
     async ({ path, view, start_line, end_line }) => {
       const sha = await shaFor(view);
       if (!sha || !repo) return text("No snapshot for that view.");
@@ -51,7 +54,12 @@ export function buildBrainMcp(engine: Engine): McpServer {
       const lines = content.split("\n");
       const from = Math.max(1, start_line ?? 1);
       const to = Math.min(lines.length, end_line ?? from + 399);
-      return text(lines.slice(from - 1, to).map((l, i) => `${from + i}: ${l}`).join("\n"));
+      return text(
+        lines
+          .slice(from - 1, to)
+          .map((l, i) => `${from + i}: ${l}`)
+          .join("\n"),
+      );
     },
   );
 
@@ -68,7 +76,10 @@ export function buildBrainMcp(engine: Engine): McpServer {
 
   server.registerTool(
     "wip_diff",
-    { description: "What a workspace changed relative to where it branched from main (unified diff, truncated).", inputSchema: { workspace: z.string(), path: z.string().optional() } },
+    {
+      description: "What a workspace changed relative to where it branched from main (unified diff, truncated).",
+      inputSchema: { workspace: z.string(), path: z.string().optional() },
+    },
     async ({ workspace, path }) => {
       const ws = store.workspace(workspace);
       if (!ws?.snapshot_sha || !ws.snapshot_base || !repo) return text("No WIP snapshot for that workspace.");
@@ -83,7 +94,12 @@ export function buildBrainMcp(engine: Engine): McpServer {
   server.registerTool(
     "find_symbol",
     { description: "Find functions/classes/methods by name, Qualified.name or id (path#qualname).", inputSchema: { query: z.string(), view: VIEW } },
-    async ({ query, view }) => text(graph.findSymbols(query, view ?? BASE).map((s) => ({ id: s.id, kind: s.kind, sig: s.sig, lines: `${s.start_line}-${s.end_line}`, exported: !!s.exported, layer: s.layer }))),
+    async ({ query, view }) =>
+      text(
+        graph
+          .findSymbols(query, view ?? BASE)
+          .map((s) => ({ id: s.id, kind: s.kind, sig: s.sig, lines: `${s.start_line}-${s.end_line}`, exported: !!s.exported, layer: s.layer })),
+      ),
   );
 
   server.registerTool(
@@ -93,13 +109,21 @@ export function buildBrainMcp(engine: Engine): McpServer {
       const v = view ?? BASE;
       const targets = graph.findSymbols(symbol, v, 3);
       if (!targets.length) return text(`Symbol ${symbol} not found in view ${v}.`);
-      return text(targets.map((t) => ({ symbol: t.id, callers: graph.whoCalls(t, v).map((h) => ({ at: `${h.path}:${h.line}`, in: h.from_symbol, confidence: h.confidence, layer: h.layer })) })));
+      return text(
+        targets.map((t) => ({
+          symbol: t.id,
+          callers: graph.whoCalls(t, v).map((h) => ({ at: `${h.path}:${h.line}`, in: h.from_symbol, confidence: h.confidence, layer: h.layer })),
+        })),
+      );
     },
   );
 
   server.registerTool(
     "impact",
-    { description: "Transitive callers of a symbol (what may break if it changes).", inputSchema: { symbol: z.string(), view: VIEW, depth: z.number().int().min(1).max(4).optional() } },
+    {
+      description: "Transitive callers of a symbol (what may break if it changes).",
+      inputSchema: { symbol: z.string(), view: VIEW, depth: z.number().int().min(1).max(4).optional() },
+    },
     async ({ symbol, view, depth }) => {
       const v = view ?? BASE;
       const [t] = graph.findSymbols(symbol, v, 1);
@@ -111,7 +135,8 @@ export function buildBrainMcp(engine: Engine): McpServer {
   server.registerTool(
     "file_symbols",
     { description: "Outline of a file: its symbols and signatures.", inputSchema: { path: z.string(), view: VIEW } },
-    async ({ path, view }) => text(graph.fileSymbols(path, view ?? BASE).map((s) => ({ id: s.id, kind: s.kind, sig: s.sig, lines: `${s.start_line}-${s.end_line}` }))),
+    async ({ path, view }) =>
+      text(graph.fileSymbols(path, view ?? BASE).map((s) => ({ id: s.id, kind: s.kind, sig: s.sig, lines: `${s.start_line}-${s.end_line}` }))),
   );
 
   server.registerTool(
@@ -132,14 +157,15 @@ export function buildBrainMcp(engine: Engine): McpServer {
 
   server.registerTool(
     "kb_search",
-    { description: "Search team knowledge: business docs, ADRs (decisions) and past Q&A. Q&A marked unverified is not confirmed by a human.", inputSchema: { query: z.string(), type: z.enum(["doc", "adr", "qa", "req"]).optional() } },
+    {
+      description: "Search team knowledge: business docs, ADRs (decisions) and past Q&A. Q&A marked unverified is not confirmed by a human.",
+      inputSchema: { query: z.string(), type: z.enum(["doc", "adr", "qa", "req"]).optional() },
+    },
     async ({ query, type }) => text(kb.search(query, { limit: 8, types: type ? [type] : undefined })),
   );
 
-  server.registerTool(
-    "kb_get",
-    { description: "Read a knowledge document by id.", inputSchema: { id: z.string() } },
-    async ({ id }) => text(kb.get(id) ?? `No document ${id}.`),
+  server.registerTool("kb_get", { description: "Read a knowledge document by id.", inputSchema: { id: z.string() } }, async ({ id }) =>
+    text(kb.get(id) ?? `No document ${id}.`),
   );
 
   server.registerTool(

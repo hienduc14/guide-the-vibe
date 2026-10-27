@@ -84,28 +84,44 @@ export function detectL0(input: L0Input): FoundConflict[] {
           strong = true;
         }
       }
-      for (const [x, y] of [[a, b], [b, a]] as const) {
+      for (const [x, y] of [
+        [a, b],
+        [b, a],
+      ] as const) {
         for (const p of x.edited) {
           const scope = y.scopes.find((g) => globMatch(g, p));
           if (scope && !y.edited.has(p)) {
-            add(x, y, "edit_in_scope", "warning", p, `${who(x)} is editing ${p}, which is inside the registered scope "${scope}" of ${who(y)}.`, { path: p, scope });
+            add(x, y, "edit_in_scope", "warning", p, `${who(x)} is editing ${p}, which is inside the registered scope "${scope}" of ${who(y)}.`, {
+              path: p,
+              scope,
+            });
             strong = true;
           }
         }
       }
       for (const ga of a.scopes) {
         for (const gb of b.scopes) {
-          if (patternsOverlap(ga, gb)) add(a, b, "scope_overlap", "info", `${ga} ~ ${gb}`, `Registered scopes overlap: ${who(a)} "${ga}" and ${who(b)} "${gb}".`, { a: ga, b: gb });
+          if (patternsOverlap(ga, gb))
+            add(a, b, "scope_overlap", "info", `${ga} ~ ${gb}`, `Registered scopes overlap: ${who(a)} "${ga}" and ${who(b)} "${gb}".`, { a: ga, b: gb });
         }
       }
-      for (const [x, y] of [[a, b], [b, a]] as const) {
+      for (const [x, y] of [
+        [a, b],
+        [b, a],
+      ] as const) {
         for (const s of x.symbols) {
           const other = y.symbols.find((o) => o.value === s.value || o.value.split(".").pop() === s.value.split(".").pop());
           if (!other) continue;
           const breaking = BREAKING_OPS.has(s.op ?? "") || BREAKING_OPS.has(other.op ?? "");
-          add(x, y, "same_symbol_declared", breaking ? "high" : "warning", `symbol:${s.value}`,
+          add(
+            x,
+            y,
+            "same_symbol_declared",
+            breaking ? "high" : "warning",
+            `symbol:${s.value}`,
             `${who(x)} and ${who(y)} both declared work on ${s.value}${breaking ? " and at least one plans a breaking change (signature/rename/delete)" : ""}.`,
-            { symbol: s.value, ops: [s.op, other.op] });
+            { symbol: s.value, ops: [s.op, other.op] },
+          );
           strong = true;
         }
         // A planned breaking change against code the other side is writing right now.
@@ -113,16 +129,28 @@ export function detectL0(input: L0Input): FoundConflict[] {
           if (!BREAKING_OPS.has(s.op ?? "") || !input.usageOf) continue;
           const hits = input.usageOf(s.value, y.ws.id);
           if (hits.length === 0) continue;
-          add(x, y, "planned_breaking_change", hits.some((h) => h.confidence !== "name") ? "high" : "warning", `planned:${s.value}`,
-            `${who(x)} plans to ${s.op?.replace("_", " ")} ${s.value}, which ${who(y)} is using in ${hits.slice(0, 3).map((h) => `${h.path}:${h.line}`).join(", ")}.`,
-            { symbol: s.value, op: s.op, usages: hits.slice(0, 8) });
+          add(
+            x,
+            y,
+            "planned_breaking_change",
+            hits.some((h) => h.confidence !== "name") ? "high" : "warning",
+            `planned:${s.value}`,
+            `${who(x)} plans to ${s.op?.replace("_", " ")} ${s.value}, which ${who(y)} is using in ${hits
+              .slice(0, 3)
+              .map((h) => `${h.path}:${h.line}`)
+              .join(", ")}.`,
+            { symbol: s.value, op: s.op, usages: hits.slice(0, 8) },
+          );
           strong = true;
         }
         for (const c of x.contracts) {
           const other = y.contracts.find((o) => o.value === c.value);
           if (!other) continue;
           const modifies = [c.op, other.op].some((op) => op && op !== "read");
-          add(x, y, "same_contract", modifies ? "high" : "info", `contract:${c.value}`, `${who(x)} and ${who(y)} both touch contract ${c.value}.`, { contract: c.value, ops: [c.op, other.op] });
+          add(x, y, "same_contract", modifies ? "high" : "info", `contract:${c.value}`, `${who(x)} and ${who(y)} both touch contract ${c.value}.`, {
+            contract: c.value,
+            ops: [c.op, other.op],
+          });
           strong = true;
         }
       }
@@ -130,7 +158,15 @@ export function detectL0(input: L0Input): FoundConflict[] {
         const ta = [...a.edited, ...a.scopes].filter((p) => patternsOverlap(g, p));
         const tb = [...b.edited, ...b.scopes].filter((p) => patternsOverlap(g, p));
         if (ta.length && tb.length) {
-          add(a, b, "critical_path", "critical", `critical:${g}`, `Both ${who(a)} and ${who(b)} touch the critical area "${g}" (${ta[0]} / ${tb[0]}). Coordinate before continuing.`, { glob: g, a: ta, b: tb });
+          add(
+            a,
+            b,
+            "critical_path",
+            "critical",
+            `critical:${g}`,
+            `Both ${who(a)} and ${who(b)} touch the critical area "${g}" (${ta[0]} / ${tb[0]}). Coordinate before continuing.`,
+            { glob: g, a: ta, b: tb },
+          );
           strong = true;
         }
       }

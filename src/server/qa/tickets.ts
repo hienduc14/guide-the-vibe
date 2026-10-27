@@ -182,7 +182,14 @@ export class TicketService {
   private notifyAsker(t: Ticket, body: string): void {
     if (!this.detached.has(t.id)) return;
     const s = this.store.session(t.from_session);
-    this.store.addMessage({ to_dev: t.from_dev, to_session: s?.status === "ended" ? undefined : t.from_session, to_workspace: s?.workspace_id, kind: "ticket_answer", ref_id: t.id, body });
+    this.store.addMessage({
+      to_dev: t.from_dev,
+      to_session: s?.status === "ended" ? undefined : t.from_session,
+      to_workspace: s?.workspace_id,
+      kind: "ticket_answer",
+      ref_id: t.id,
+      body,
+    });
   }
 
   /** The synchronous ask() response has been sent; from now on push updates. */

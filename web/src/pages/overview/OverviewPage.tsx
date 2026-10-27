@@ -31,7 +31,13 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
           <h3 className="truncate">{p.name}</h3>
           <div className="xs muted mono truncate">{p.repo_url}</div>
         </div>
-        {p.last_sync && !p.last_sync.ok ? <Badge tone="danger">sync lỗi</Badge> : <Badge mono>{p.main_branch} · {shortSha(p.main_sha)}</Badge>}
+        {p.last_sync && !p.last_sync.ok ? (
+          <Badge tone="danger">sync lỗi</Badge>
+        ) : (
+          <Badge mono>
+            {p.main_branch} · {shortSha(p.main_sha)}
+          </Badge>
+        )}
       </div>
       <div className="card-body stack">
         <div className="kv">
@@ -108,9 +114,18 @@ export function OverviewPage() {
       <div className="grid stats">
         <Stat label="Projects" value={data.projects.length} />
         <Stat label="Đang làm" value={people.size} hint={`${sum((p) => p.counts.sessions_active)} phiên agent`} />
-        <Stat label="Conflict mở" value={sum((p) => p.counts.conflicts_open)} alert={sum((p) => p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical) > 0} />
+        <Stat
+          label="Conflict mở"
+          value={sum((p) => p.counts.conflicts_open)}
+          alert={sum((p) => p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical) > 0}
+        />
         <Stat label="Ticket chờ" value={sum((p) => p.counts.tickets_waiting)} />
-        <Stat label="Brain · 7 ngày" value={bs.totals.jobs} hint={bs.totals.failed ? `${bs.totals.failed} lỗi` : `p50 ${ms(bs.totals.p50_ms)}`} alert={bs.totals.failed > 0} />
+        <Stat
+          label="Brain · 7 ngày"
+          value={bs.totals.jobs}
+          hint={bs.totals.failed ? `${bs.totals.failed} lỗi` : `p50 ${ms(bs.totals.p50_ms)}`}
+          alert={bs.totals.failed > 0}
+        />
       </div>
 
       <div className="split">
@@ -130,11 +145,21 @@ export function OverviewPage() {
               </span>
             </div>
             {!data.brain.ok && <span className="small danger-text">{data.brain.detail ?? "Brain không sẵn sàng"}</span>}
-            <HBars data={bs.byKind.map((k) => ({ label: k.kind, value: k.jobs, hint: k.failed ? `${k.failed} lỗi` : undefined }))} empty="Chưa có job nào trong 7 ngày" />
+            <HBars
+              data={bs.byKind.map((k) => ({ label: k.kind, value: k.jobs, hint: k.failed ? `${k.failed} lỗi` : undefined }))}
+              empty="Chưa có job nào trong 7 ngày"
+            />
           </div>
         </Card>
         <Card title="Job Brain theo ngày">
-          <BarChart data={lastDays(bs.byDay, 7, (r) => r.day, (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }))} />
+          <BarChart
+            data={lastDays(
+              bs.byDay,
+              7,
+              (r) => r.day,
+              (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }),
+            )}
+          />
         </Card>
       </div>
 

@@ -21,7 +21,12 @@ async function daemon<T = any>(method: string, path: string, body?: unknown, tim
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch((flag("daemon") ?? daemonUrl()) + path, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl.signal });
+    const res = await fetch((flag("daemon") ?? daemonUrl()) + path, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctrl.signal,
+    });
     const ct = res.headers.get("content-type") ?? "";
     return (ct.includes("json") ? await res.json() : await res.text()) as T;
   } finally {
@@ -105,7 +110,12 @@ async function main(): Promise<void> {
       const agent = rest[0] ?? "claude";
       try {
         const input = JSON.parse((await readStdin()) || "{}");
-        const res = await daemon<{ text: string | null }>("GET", `/wait?agent=${agent}&session=${encodeURIComponent(input.session_id ?? "")}&timeout=${30 * 60_000}`, undefined, 31 * 60_000);
+        const res = await daemon<{ text: string | null }>(
+          "GET",
+          `/wait?agent=${agent}&session=${encodeURIComponent(input.session_id ?? "")}&timeout=${30 * 60_000}`,
+          undefined,
+          31 * 60_000,
+        );
         if (res?.text) {
           process.stderr.write(res.text);
           process.exit(2); // asyncRewake: wake the agent with stderr as a system reminder
@@ -146,8 +156,10 @@ async function main(): Promise<void> {
       const { installClaude, installCodex, ompCommand } = await import("./install.ts");
       const dir = rest[1] && !rest[1].startsWith("--") ? rest[1] : process.cwd();
       const d = flag("daemon");
-      if (rest[0] === "claude") console.log("Wrote:\n  " + installClaude(dir, d).join("\n  ") + "\nRestart Claude Code in this project and approve the gtv MCP server.");
-      else if (rest[0] === "codex") console.log("Wrote:\n  " + installCodex(dir, d).join("\n  ") + "\nIn Codex, trust the project and review the hooks with /hooks.");
+      if (rest[0] === "claude")
+        console.log("Wrote:\n  " + installClaude(dir, d).join("\n  ") + "\nRestart Claude Code in this project and approve the gtv MCP server.");
+      else if (rest[0] === "codex")
+        console.log("Wrote:\n  " + installCodex(dir, d).join("\n  ") + "\nIn Codex, trust the project and review the hooks with /hooks.");
       else if (rest[0] === "omp") console.log(`Start omp with the gtv extension:\n  ${ompCommand(d)}`);
       else console.log("usage: gtv install claude|codex|omp [project-dir]");
       return;
@@ -181,7 +193,9 @@ async function main(): Promise<void> {
     }
     case "kb": {
       const [sub, ...args] = rest;
-      if (sub === "search") for (const h of await server<any[]>("GET", await inProject(`/kb?q=${encodeURIComponent(args.join(" "))}`))) console.log(`${h.id} [${h.type}/${h.status}] ${h.section}\n  ${h.snippet}`);
+      if (sub === "search")
+        for (const h of await server<any[]>("GET", await inProject(`/kb?q=${encodeURIComponent(args.join(" "))}`)))
+          console.log(`${h.id} [${h.type}/${h.status}] ${h.section}\n  ${h.snippet}`);
       else if (sub === "confirm" || sub === "reject") console.log(await server("POST", await inProject(`/kb/${args[0]}/${sub}`), {}));
       else if (sub === "add") {
         const { readFileSync } = await import("node:fs");

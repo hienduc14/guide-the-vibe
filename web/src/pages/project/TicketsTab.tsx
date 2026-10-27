@@ -81,7 +81,13 @@ function Detail({ t, onReplied }: { t: Ticket; onReplied: () => void }) {
           >
             <hr className="sep" />
             <Field label="Trả lời với tư cách người">
-              <textarea className="textarea" style={{ fontFamily: "var(--font)" }} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Câu trả lời sẽ được chèn vào agent của người hỏi" />
+              <textarea
+                className="textarea"
+                style={{ fontFamily: "var(--font)" }}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Câu trả lời sẽ được chèn vào agent của người hỏi"
+              />
             </Field>
             <div className="row">
               <input className="input" style={{ maxWidth: 180 }} value={as} onChange={(e) => setAs(e.target.value)} aria-label="Tên người trả lời" />
@@ -132,7 +138,11 @@ export function TicketsTab() {
             onRowClick={(t) => setSelected(t.id)}
             empty="Chưa có ticket"
             columns={[
-              { key: "q", title: "Câu hỏi", render: (t) => <span className="small">{t.question.length > 90 ? t.question.slice(0, 90) + "…" : t.question}</span> },
+              {
+                key: "q",
+                title: "Câu hỏi",
+                render: (t) => <span className="small">{t.question.length > 90 ? t.question.slice(0, 90) + "…" : t.question}</span>,
+              },
               { key: "from", title: "Từ", render: (t) => t.from_dev },
               { key: "tier", title: "Bậc", render: (t) => <span className="mono">{t.tier}</span> },
               { key: "st", title: "Trạng thái", render: (t) => <StatusBadge status={t.status} /> },

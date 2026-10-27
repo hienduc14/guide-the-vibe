@@ -31,7 +31,14 @@ export function GraphTab() {
         <Stat label="File" value={stats.data?.base.files ?? "—"} />
         <Stat label="Symbol" value={stats.data?.base.symbols ?? "—"} />
         <Stat label="Tham chiếu" value={stats.data?.base.refs ?? "—"} />
-        <Stat label="main" value={<span className="mono" style={{ fontSize: "var(--text-lg)" }}>{shortSha(stats.data?.main)}</span>} />
+        <Stat
+          label="main"
+          value={
+            <span className="mono" style={{ fontSize: "var(--text-lg)" }}>
+              {shortSha(stats.data?.main)}
+            </span>
+          }
+        />
       </div>
 
       <Card title="Tra cứu symbol">
@@ -51,7 +58,13 @@ export function GraphTab() {
               </option>
             ))}
           </select>
-          <input className="input mono" style={{ flex: 1, minWidth: 200 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="getUser · AuthService.login · src/auth/service.ts#getUser" />
+          <input
+            className="input mono"
+            style={{ flex: 1, minWidth: 200 }}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="getUser · AuthService.login · src/auth/service.ts#getUser"
+          />
           <button className="btn primary" type="submit" disabled={!q.trim()}>
             Tìm
           </button>
@@ -85,7 +98,15 @@ export function GraphTab() {
                     ),
                   },
                   { key: "k", title: "Loại", render: (s) => <Badge>{s.kind}</Badge> },
-                  { key: "at", title: "Vị trí", render: (s) => <span className="xs mono muted">{s.path}:{s.start_line}</span> },
+                  {
+                    key: "at",
+                    title: "Vị trí",
+                    render: (s) => (
+                      <span className="xs mono muted">
+                        {s.path}:{s.start_line}
+                      </span>
+                    ),
+                  },
                   { key: "l", title: "Lớp", render: (s) => <span className="xs mono">{s.layer}</span> },
                 ]}
               />
@@ -102,7 +123,15 @@ export function GraphTab() {
                 rowKey={(h) => `${h.layer}:${h.path}:${h.line}`}
                 empty="Không có nơi gọi"
                 columns={[
-                  { key: "at", title: "Vị trí", render: (h) => <span className="mono xs">{h.path}:{h.line}</span> },
+                  {
+                    key: "at",
+                    title: "Vị trí",
+                    render: (h) => (
+                      <span className="mono xs">
+                        {h.path}:{h.line}
+                      </span>
+                    ),
+                  },
                   { key: "in", title: "Trong", render: (h) => <span className="mono xs muted">{h.from_symbol?.split("#")[1] ?? "—"}</span> },
                   { key: "c", title: "Độ tin cậy", render: (h) => <Badge tone={CONF_TONE[h.confidence]}>{h.confidence}</Badge> },
                   { key: "l", title: "Lớp", render: (h) => <span className="xs mono">{h.layer}</span> },

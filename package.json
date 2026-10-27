@@ -20,7 +20,10 @@
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "selftest:realworld": "node scripts/selftest/realworld.ts",
-    "sandbox": "node scripts/sandbox.ts"
+    "sandbox": "node scripts/sandbox.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run format:check && npm test"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
@@ -37,6 +40,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "prettier": "3.9.10",
     "typescript": "^7.0.2"
   }
 }

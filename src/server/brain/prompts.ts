@@ -33,7 +33,11 @@ const SOURCES = {
 export const ANSWER_SCHEMA = {
   type: "object",
   properties: {
-    route: { type: "string", enum: ["answer", "forward", "human"], description: "answer = you answered; forward = a teammate's agent must decide; human = only a human can answer" },
+    route: {
+      type: "string",
+      enum: ["answer", "forward", "human"],
+      description: "answer = you answered; forward = a teammate's agent must decide; human = only a human can answer",
+    },
     answer: { type: "string", description: "Your answer, or for forward/human a short note on what you found so far" },
     confidence: { type: "string", enum: ["high", "medium", "low"] },
     forward_to_dev: { type: "string", description: "Developer name to forward to (route=forward or human)" },
@@ -53,7 +57,14 @@ export interface AnswerOutput {
   sources: { type: string; ref: string; note?: string }[];
 }
 
-export function answerPrompt(input: { asker: string; askerWorkspace: string; askerTask?: string; question: string; context?: string; teammates: string[] }): string {
+export function answerPrompt(input: {
+  asker: string;
+  askerWorkspace: string;
+  askerTask?: string;
+  question: string;
+  context?: string;
+  teammates: string[];
+}): string {
   return `A developer's coding agent asks you a question mid-task.
 
 Asker: ${input.asker} (workspace ${input.askerWorkspace})${input.askerTask ? `\nAsker's registered task: ${input.askerTask}` : ""}

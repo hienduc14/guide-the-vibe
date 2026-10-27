@@ -86,7 +86,10 @@ export function headingTitle(body: string): string | undefined {
 
 function ftsQuery(q: string): string {
   const tokens = q.toLowerCase().match(/[\p{L}\p{N}_]{2,}/gu) ?? [];
-  return [...new Set(tokens)].slice(0, 16).map((t) => `"${t.replace(/"/g, "")}"`).join(" OR ");
+  return [...new Set(tokens)]
+    .slice(0, 16)
+    .map((t) => `"${t.replace(/"/g, "")}"`)
+    .join(" OR ");
 }
 
 export class KnowledgeBase {
@@ -132,7 +135,10 @@ export class KnowledgeBase {
       where.push("status = ?");
       params.push(filter.status);
     }
-    return this.db.all(`SELECT id, type, title, status, source, path, ticket_id, supersedes, created_at, updated_at FROM kb_docs ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY updated_at DESC LIMIT 500`, ...params);
+    return this.db.all(
+      `SELECT id, type, title, status, source, path, ticket_id, supersedes, created_at, updated_at FROM kb_docs ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY updated_at DESC LIMIT 500`,
+      ...params,
+    );
   }
 
   setStatus(id: string, status: DocStatus): KbDoc | undefined {

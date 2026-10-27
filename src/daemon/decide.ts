@@ -68,13 +68,17 @@ export function decidePreEdit(state: TeamState | undefined, s: LocalSession, pat
     const key = `scope:${p}`;
     if (owners.length && !s.seen.has(key)) {
       s.seen.add(key);
-      notes.push(`[gtv] ${p} is inside the registered scope of ${owners.map((t) => `${t.dev} ("${t.title}")`).join(", ")}. Keep changes there minimal or coordinate with gtv_ask.`);
+      notes.push(
+        `[gtv] ${p} is inside the registered scope of ${owners.map((t) => `${t.dev} ("${t.title}")`).join(", ")}. Keep changes there minimal or coordinate with gtv_ask.`,
+      );
     }
   }
 
   if (!state.tasks.some((t) => t.session_id === s.id) && !s.seen.has("nudge_register") && state.features["registration"] !== "off") {
     s.seen.add("nudge_register");
-    notes.push("[gtv] You have not registered a task yet. Call gtv_register_task (title, goal, paths/symbols you will touch) so teammates' agents know what you are doing.");
+    notes.push(
+      "[gtv] You have not registered a task yet. Call gtv_register_task (title, goal, paths/symbols you will touch) so teammates' agents know what you are doing.",
+    );
   }
 
   return { decision, reason, context: notes.join("\n") || undefined };
@@ -90,10 +94,17 @@ export function messagesFor(inbox: Message[], s: LocalSession): Message[] {
   });
 }
 
-export function statusline(state: TeamState | undefined, s: { dev: string; workspace_id?: string } | undefined, inboxCount: number, connected: boolean): string {
+export function statusline(
+  state: TeamState | undefined,
+  s: { dev: string; workspace_id?: string } | undefined,
+  inboxCount: number,
+  connected: boolean,
+): string {
   if (!connected || !state) return "gtv ○ offline";
   const teammates = new Set(state.sessions.filter((x) => x.dev !== s?.dev && x.status === "active").map((x) => x.dev));
-  const mine = state.conflicts.filter((c) => c.status === "open" && s?.workspace_id && (c.workspace_a === s.workspace_id || c.workspace_b === s.workspace_id) && c.level !== "info");
+  const mine = state.conflicts.filter(
+    (c) => c.status === "open" && s?.workspace_id && (c.workspace_a === s.workspace_id || c.workspace_b === s.workspace_id) && c.level !== "info",
+  );
   const worst = mine.reduce((m, c) => (LEVEL_RANK[c.level] > LEVEL_RANK[m] ? c.level : m), "info" as Conflict["level"]);
   const parts = [`gtv ● ${teammates.size} teammate${teammates.size === 1 ? "" : "s"} active`];
   if (mine.length) parts.push(`⚠ ${mine.length} conflict${mine.length > 1 ? "s" : ""} (${worst})`);

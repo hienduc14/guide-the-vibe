@@ -24,9 +24,21 @@ export function summarize(rt: ProjectRuntime) {
   const sessions = store.sessions(true);
   const byLevel: Record<Level, number> = { info: 0, warning: 0, high: 0, critical: 0 };
   for (const c of state.conflicts) byLevel[c.level]++;
-  const people = new Map<string, { dev: string; status: string; agents: Set<string>; workspaces: Set<string>; last_seen: string; tasks: string[]; editing: number; conflicts: number }>();
+  const people = new Map<
+    string,
+    { dev: string; status: string; agents: Set<string>; workspaces: Set<string>; last_seen: string; tasks: string[]; editing: number; conflicts: number }
+  >();
   for (const s of sessions) {
-    const p = people.get(s.dev) ?? { dev: s.dev, status: "ended", agents: new Set(), workspaces: new Set(), last_seen: s.last_seen, tasks: [], editing: 0, conflicts: 0 };
+    const p = people.get(s.dev) ?? {
+      dev: s.dev,
+      status: "ended",
+      agents: new Set(),
+      workspaces: new Set(),
+      last_seen: s.last_seen,
+      tasks: [],
+      editing: 0,
+      conflicts: 0,
+    };
     if (s.status !== "ended") p.agents.add(s.agent);
     const ws = store.workspace(s.workspace_id);
     if (ws && s.status !== "ended") p.workspaces.add(ws.label);
@@ -98,7 +110,11 @@ function layers(rt: ProjectRuntime) {
       // ignore malformed rows
     }
   }
-  const errors = new Map(db.all<{ f: string; n: number }>(`SELECT json_extract(payload, '$.feature') AS f, COUNT(*) AS n FROM event_log WHERE type = 'feature_error' GROUP BY f`).map((r) => [r.f, r.n]));
+  const errors = new Map(
+    db
+      .all<{ f: string; n: number }>(`SELECT json_extract(payload, '$.feature') AS f, COUNT(*) AS n FROM event_log WHERE type = 'feature_error' GROUP BY f`)
+      .map((r) => [r.f, r.n]),
+  );
   const overrides = new Map(db.all<{ feature: string; mode: string }>(`SELECT feature, mode FROM feature_overrides`).map((r) => [r.feature, r.mode]));
   return FEATURE_KEYS.map((key) => {
     const def = FEATURES[key] as { default: string; requires?: string[]; description: string };
@@ -158,7 +174,9 @@ export function adminRoutes(hub: Hub): Hono<Env> {
 
   // ---- projects -----------------------------------------------------------------------
 
-  app.get("/projects", (c) => c.json(hub.records().map((r) => (hub.live(r.id) ? summarize(hub.live(r.id)!) : { id: r.id, name: r.name, error: "not loaded" }))));
+  app.get("/projects", (c) =>
+    c.json(hub.records().map((r) => (hub.live(r.id) ? summarize(hub.live(r.id)!) : { id: r.id, name: r.name, error: "not loaded" }))),
+  );
 
   app.post("/projects", async (c) => {
     const body = await c.req.json();
@@ -168,7 +186,11 @@ export function adminRoutes(hub: Hub): Hono<Env> {
 
   app.get("/projects/:id", async (c) => {
     const p = await rt(c.req.param("id"));
-    return c.json({ ...summarize(p), record: { ...p.record, repo_url: p.record.repo_url.replace(/\/\/[^@/]+@/, "//***@") }, graph: p.engine.graph.stats(BASE) });
+    return c.json({
+      ...summarize(p),
+      record: { ...p.record, repo_url: p.record.repo_url.replace(/\/\/[^@/]+@/, "//***@") },
+      graph: p.engine.graph.stats(BASE),
+    });
   });
 
   app.patch("/projects/:id", async (c) => c.json(await hub.updateProject(c.req.param("id"), await c.req.json())));
@@ -225,7 +247,13 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   app.get("/brain", async (c) => {
     const b = hub.brain;
     const models = b instanceof OpenCodeBrain ? await b.models().catch(() => []) : [];
-    return c.json({ backend: b.name, model: b.model ?? null, health: await b.health(), models, stats: hub.brainStats({ days: Number(c.req.query("days") ?? 7) }) });
+    return c.json({
+      backend: b.name,
+      model: b.model ?? null,
+      health: await b.health(),
+      models,
+      stats: hub.brainStats({ days: Number(c.req.query("days") ?? 7) }),
+    });
   });
 
   app.put("/brain", async (c) => {

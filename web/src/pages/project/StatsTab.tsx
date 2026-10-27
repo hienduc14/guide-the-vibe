@@ -26,7 +26,14 @@ export function StatsTab() {
     <div className="stack">
       <div className="row between">
         <h2>Brain</h2>
-        <Segmented options={[{ value: "7", label: "7 ngày" }, { value: "30", label: "30 ngày" }]} value={days} onChange={setDays} />
+        <Segmented
+          options={[
+            { value: "7", label: "7 ngày" },
+            { value: "30", label: "30 ngày" },
+          ]}
+          value={days}
+          onChange={setDays}
+        />
       </div>
       <div className="grid stats">
         <Stat label="Job" value={b.totals.jobs} />
@@ -36,7 +43,14 @@ export function StatsTab() {
       </div>
       <div className="split">
         <Card title="Job theo ngày">
-          <BarChart data={lastDays(b.byDay, n, (r) => r.day, (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }))} />
+          <BarChart
+            data={lastDays(
+              b.byDay,
+              n,
+              (r) => r.day,
+              (r) => ({ value: r?.jobs ?? 0, alt: r?.failed ?? 0 }),
+            )}
+          />
         </Card>
         <Card title="Theo loại việc">
           <HBars data={b.byKind.map((k) => ({ label: k.kind, value: k.jobs, hint: k.failed ? `${k.failed} lỗi` : undefined }))} empty="Chưa có job" />
@@ -49,7 +63,14 @@ export function StatsTab() {
       <h2>Conflict</h2>
       <div className="split">
         <Card title="Theo ngày">
-          <BarChart data={lastDays(data.conflicts.byDay, n, (r) => r.k, (r) => ({ value: r?.n ?? 0 }))} />
+          <BarChart
+            data={lastDays(
+              data.conflicts.byDay,
+              n,
+              (r) => r.k,
+              (r) => ({ value: r?.n ?? 0 }),
+            )}
+          />
         </Card>
         <Card title="Theo layer / mức / trạng thái">
           <div className="stack">
@@ -76,7 +97,14 @@ export function StatsTab() {
       <h2>Sự kiện</h2>
       <div className="split">
         <Card title="Theo ngày">
-          <BarChart data={lastDays(data.events.byDay, n, (r) => r.k, (r) => ({ value: r?.n ?? 0 }))} />
+          <BarChart
+            data={lastDays(
+              data.events.byDay,
+              n,
+              (r) => r.k,
+              (r) => ({ value: r?.n ?? 0 }),
+            )}
+          />
         </Card>
         <Card title="Theo loại">
           <HBars data={toBars(data.events.byType.slice(0, 14))} />

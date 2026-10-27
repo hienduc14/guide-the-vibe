@@ -38,7 +38,12 @@ export class ProjectRuntime {
     const dir = cfg.dataDir === ":memory:" ? undefined : join(cfg.dataDir, "projects", record.id);
     this.db = new Db(dir ? join(dir, "gtv.db") : ":memory:", PROJECT_SCHEMA);
     this.repo = new Repo(join(dir ?? join(".gtv-data", "projects", record.id), "mirror.git"), record.repo_url, record.main_branch);
-    this.engine = new Engine({ db: this.db, repo: this.repo, brain, cfg: { featureDefaults: cfg.features, registrationWaitMs: cfg.registrationWaitMs, l3DailyBudget: cfg.l3DailyBudget } });
+    this.engine = new Engine({
+      db: this.db,
+      repo: this.repo,
+      brain,
+      cfg: { featureDefaults: cfg.features, registrationWaitMs: cfg.registrationWaitMs, l3DailyBudget: cfg.l3DailyBudget },
+    });
     if (cfg.docGlobs) this.engine.kb.globs = cfg.docGlobs;
     this.tickets = new TicketService(this.engine, { askWaitMs: cfg.askWaitMs, tier2TimeoutMs: cfg.tier2TimeoutMs, tier3TimeoutMs: cfg.tier3TimeoutMs });
     this.applyRecord(record, cfg.policy);

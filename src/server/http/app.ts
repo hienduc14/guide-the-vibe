@@ -20,7 +20,13 @@ export function buildApp(hub: Hub): Hono {
   const app = new Hono();
   app.onError((err, c) => c.json({ error: err.message }, /unknown project/.test(err.message) ? 404 : 400));
 
-  app.get("/health", async (c) => c.json({ ok: true, brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()) }, projects: hub.records().map((p) => p.id) }));
+  app.get("/health", async (c) =>
+    c.json({
+      ok: true,
+      brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()) },
+      projects: hub.records().map((p) => p.id),
+    }),
+  );
 
   // Brain tools, one MCP endpoint per project.
   app.all("/p/:project/mcp", async (c) => {
@@ -41,7 +47,9 @@ export function buildApp(hub: Hub): Hono {
     }
     return devAuth(hub)(c, next);
   });
-  dev.get("/projects", (c) => c.json(hub.records().map((p) => ({ id: p.id, name: p.name, repo_url: p.repo_url.replace(/\/\/[^@/]+@/, "//***@"), main_branch: p.main_branch }))));
+  dev.get("/projects", (c) =>
+    c.json(hub.records().map((p) => ({ id: p.id, name: p.name, repo_url: p.repo_url.replace(/\/\/[^@/]+@/, "//***@"), main_branch: p.main_branch }))),
+  );
   dev.get("/resolve", (c) => {
     const p = hub.resolve(c.req.query("remote") ?? "");
     return p ? c.json({ id: p.id, name: p.name }) : c.json({ error: "no project matches this remote" }, 404);

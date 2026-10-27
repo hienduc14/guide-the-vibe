@@ -87,7 +87,14 @@ export class OpenCodeBrain implements ProjectScopedBackend {
         method: "POST",
         body: JSON.stringify({
           name: mcpServerName(project),
-          config: { type: "remote", url: `${this.opts.operatorUrl.replace(/\/$/, "")}/p/${project}/mcp`, enabled: true, oauth: false, timeout: 10_000, headers },
+          config: {
+            type: "remote",
+            url: `${this.opts.operatorUrl.replace(/\/$/, "")}/p/${project}/mcp`,
+            enabled: true,
+            oauth: false,
+            timeout: 10_000,
+            headers,
+          },
         }),
       });
     } catch (e) {
@@ -104,7 +111,9 @@ export class OpenCodeBrain implements ProjectScopedBackend {
       const started = Date.now();
       let sessionId: string | undefined;
       try {
-        const session = (await this.call("/session", { method: "POST", body: JSON.stringify({ title: `gtv ${job.project ?? ""} ${job.kind}` }) })) as { id: string };
+        const session = (await this.call("/session", { method: "POST", body: JSON.stringify({ title: `gtv ${job.project ?? ""} ${job.kind}` }) })) as {
+          id: string;
+        };
         sessionId = session.id;
         const body: Record<string, unknown> = {
           parts: [{ type: "text", text: job.prompt }],
@@ -126,7 +135,11 @@ export class OpenCodeBrain implements ProjectScopedBackend {
         if (res.info?.error) throw new Error(`opencode error ${res.info.error.name}: ${res.info.error.data?.message ?? ""}`);
         let output = res.info?.structured as T | undefined;
         if (output === undefined) {
-          const text = res.parts?.filter((p) => p.type === "text").map((p) => p.text).join("\n") ?? "";
+          const text =
+            res.parts
+              ?.filter((p) => p.type === "text")
+              .map((p) => p.text)
+              .join("\n") ?? "";
           const m = /\{[\s\S]*\}/.exec(text);
           if (!m) throw new Error("brain returned no structured output");
           output = JSON.parse(m[0]) as T;

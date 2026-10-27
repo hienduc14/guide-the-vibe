@@ -4,8 +4,6 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-
-
 export type Row = Record<string, SQLInputValue>;
 
 export class Db {

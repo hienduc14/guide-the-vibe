@@ -20,7 +20,12 @@ export class ServerClient {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(this.cfg.server + path, { method, headers: this.headers(), body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl.signal });
+      const res = await fetch(this.cfg.server + path, {
+        method,
+        headers: this.headers(),
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: ctrl.signal,
+      });
       const text = await res.text();
       const json = text ? JSON.parse(text) : undefined;
       if (!res.ok) throw new Error(json?.error ?? `${res.status} ${res.statusText}`);

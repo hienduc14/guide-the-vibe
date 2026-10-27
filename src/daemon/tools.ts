@@ -46,14 +46,24 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       return `Task ${t.id} marked ${args.status ?? "done"}.`;
     }
     case "ask": {
-      const t = await client.call<Ticket & { formatted?: string }>("POST", `${p}/tickets`, { session_id: session.id, question: args.question, context: args.context, to_dev: args.to_dev }, 120_000);
+      const t = await client.call<Ticket & { formatted?: string }>(
+        "POST",
+        `${p}/tickets`,
+        { session_id: session.id, question: args.question, context: args.context, to_dev: args.to_dev },
+        120_000,
+      );
       if (t.status === "answered" || t.status === "closed") return t.formatted ?? t.answer ?? "(no answer)";
-      if (t.status === "forwarded") return `Ticket ${t.id}: forwarded to ${t.to_dev}${t.answer ? ` (Operator note: ${t.answer})` : ""}. Continue with work that does not depend on the answer; it will be delivered to you automatically.`;
+      if (t.status === "forwarded")
+        return `Ticket ${t.id}: forwarded to ${t.to_dev}${t.answer ? ` (Operator note: ${t.answer})` : ""}. Continue with work that does not depend on the answer; it will be delivered to you automatically.`;
       if (t.status === "waiting_human") return `Ticket ${t.id}: waiting for a human decision from ${t.to_dev}. It will be delivered to you.`;
       return `Ticket ${t.id} is still being analysed by the Operator; the answer will be delivered to you automatically.`;
     }
     case "reply": {
-      const t = await client.call<Ticket>("POST", `${p}/tickets/${args.ticket_id}/reply`, { answer: args.answer ?? "", escalate: !!args.escalate, session_id: session.id });
+      const t = await client.call<Ticket>("POST", `${p}/tickets/${args.ticket_id}/reply`, {
+        answer: args.answer ?? "",
+        escalate: !!args.escalate,
+        session_id: session.id,
+      });
       return args.escalate ? `Escalated ${t.id} to your user. Ask them and they can answer with: gtv answer ${t.id} "<answer>"` : `Answer sent for ${t.id}.`;
     }
     case "status":
@@ -66,7 +76,8 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       const text = ctx.drain();
       const forMe = await client.call<Ticket[]>("GET", `${p}/tickets?scope=for_me`);
       const lines = [text ?? "No new messages."];
-      if (forMe.length) lines.push("Questions waiting for you/your user:", ...forMe.map((t) => `- ${t.id} from ${t.from_dev}: ${t.forwarded_question ?? t.question}`));
+      if (forMe.length)
+        lines.push("Questions waiting for you/your user:", ...forMe.map((t) => `- ${t.id} from ${t.from_dev}: ${t.forwarded_question ?? t.question}`));
       return lines.join("\n");
     }
     case "ack": {
@@ -89,7 +100,8 @@ export function describeStatus(st: TeamState | undefined, server: string, dev: s
   const editing = st.footprints.filter((f) => f.workspace_id !== ws?.id).slice(0, 15);
   if (editing.length) lines.push("Teammates are editing:", ...editing.map((f) => `- ${f.dev}: ${f.path}`));
   const conflicts = st.conflicts.filter((c) => !ws || c.workspace_a === ws.id || c.workspace_b === ws.id);
-  if (conflicts.length) lines.push("Open conflicts:", ...conflicts.map((c) => `- ${c.id} [${c.level} ${c.layer}${c.status === "acked" ? ", acked" : ""}] ${c.message}`));
+  if (conflicts.length)
+    lines.push("Open conflicts:", ...conflicts.map((c) => `- ${c.id} [${c.level} ${c.layer}${c.status === "acked" ? ", acked" : ""}] ${c.message}`));
   const snaps = st.workspaces.filter((w) => w.id !== ws?.id && w.snapshot_sha).map((w) => `${w.dev}:${w.label}`);
   if (snaps.length) lines.push(`WIP snapshots from: ${snaps.join(", ")}`);
   return lines.join("\n");

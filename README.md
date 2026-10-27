@@ -3,15 +3,16 @@
 2–3 developer, mỗi người dùng một AI coding agent riêng (Claude Code, Codex, omp…) trên cùng một repo.
 gtv đặt một **Project Operator** trên server; agent của mọi người nói chuyện với nó:
 
-1. **Đăng ký task** trước khi sửa → Operator báo chồng lấn với việc của người khác *trước khi viết code*.
+1. **Đăng ký task** trước khi sửa → Operator báo chồng lấn với việc của người khác _trước khi viết code_.
 2. **Phát hiện conflict nhiều lớp** trong lúc code — mỗi lớp bật/tắt được (`off | shadow | on`):
 
-   | Lớp | Bắt được | Cách làm |
-   |---|---|---|
-   | L0 | trùng file, scope đã đăng ký, symbol/contract khai báo, vùng critical | so registry |
-   | L1 | conflict text trước khi có PR | `git merge-tree` trên WIP snapshot (`refs/gtv/<dev>/<workspace>`) |
-   | L2 | "A đổi chữ ký `getUser`, code mới của B đang gọi nó" | tree-sitter symbol diff + code graph |
-   | L3 | chồng lấn ý định giữa các task | Brain (LLM) |
+   | Lớp | Bắt được                                                              | Cách làm                                                          |
+   | --- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+   | L0  | trùng file, scope đã đăng ký, symbol/contract khai báo, vùng critical | so registry                                                       |
+   | L1  | conflict text trước khi có PR                                         | `git merge-tree` trên WIP snapshot (`refs/gtv/<dev>/<workspace>`) |
+   | L2  | "A đổi chữ ký `getUser`, code mới của B đang gọi nó"                  | tree-sitter symbol diff + code graph                              |
+   | L3  | chồng lấn ý định giữa các task                                        | Brain (LLM)                                                       |
+
 3. **Hỏi Operator giữa lúc code** (`gtv_ask`): trả lời từ code graph, docs/ADR và WIP của đồng đội; câu cần người khác quyết định được **chuyển vào agent của họ** và câu trả lời quay lại tự động.
 
 Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain (OpenCode + gói ChatGPT) dùng chung.
@@ -76,25 +77,33 @@ Chi tiết tích hợp từng agent: [docs/agents.md](docs/agents.md).
 
 ## Tài liệu
 
-| | |
-|---|---|
-| [docs/README.md](docs/README.md) | Mục lục tài liệu |
-| [docs/architecture.md](docs/architecture.md) | Thành phần, luồng dữ liệu, lưu trữ, bảo mật |
-| [docs/project-structure.md](docs/project-structure.md) | Cấu trúc thư mục và chia vùng việc cho developer |
-| [docs/features.md](docs/features.md) | Từng feature/layer: cách hoạt động, chế độ, giới hạn |
-| [docs/api.md](docs/api.md) | API server, daemon, MCP |
-| [docs/agents.md](docs/agents.md) | Claude Code, Codex, omp |
-| [docs/operations.md](docs/operations.md) | Docker, biến môi trường, token, Brain, sự cố |
-| [docs/development.md](docs/development.md) | Quy ước code, cách thêm tính năng |
-| [docs/testing.md](docs/testing.md) | Test tự động và self-test trên repo thật |
-| [SPEC.md](SPEC.md) | Đặc tả (lý do thiết kế, đánh giá) |
-| [web/README.md](web/README.md) | Dashboard |
+|                                                        |                                                      |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| [docs/README.md](docs/README.md)                       | Mục lục tài liệu                                     |
+| [docs/architecture.md](docs/architecture.md)           | Thành phần, luồng dữ liệu, lưu trữ, bảo mật          |
+| [docs/project-structure.md](docs/project-structure.md) | Cấu trúc thư mục và chia vùng việc cho developer     |
+| [docs/features.md](docs/features.md)                   | Từng feature/layer: cách hoạt động, chế độ, giới hạn |
+| [docs/api.md](docs/api.md)                             | API server, daemon, MCP                              |
+| [docs/agents.md](docs/agents.md)                       | Claude Code, Codex, omp                              |
+| [docs/operations.md](docs/operations.md)               | Docker, biến môi trường, token, Brain, sự cố         |
+| [docs/development.md](docs/development.md)             | Quy ước code, cách thêm tính năng                    |
+| [docs/testing.md](docs/testing.md)                     | Test tự động và self-test trên repo thật             |
+| [SPEC.md](SPEC.md)                                     | Đặc tả (lý do thiết kế, đánh giá)                    |
+| [web/README.md](web/README.md)                         | Dashboard                                            |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                     | Quy trình làm việc nhóm, branch/PR, quy ước          |
 
 ## Lệnh hay dùng
 
 ```bash
+npm run check            # typecheck + format:check + toàn bộ test — chạy trước khi push
 npm test                 # toàn bộ test (code intel, server, admin, end-to-end)
-npm run typecheck
+npm run format           # Prettier
 npm run web:build        # build dashboard vào web/dist
 node bin/gtv.mjs         # in trợ giúp CLI
 ```
+
+## Trạng thái
+
+Prototype cho đồ án: các luồng chính đã chạy thật (xem [báo cáo self-test](docs/reports/selftest-realworld.md)).
+Chưa có: gắn với GitHub (comment PR, cửa chặn pre-push), embedding cho KB, adapter Cursor/Grok, chạy thật với Claude Code/Codex ngoài kịch bản giả lập.
+Lộ trình và lý do thiết kế: [SPEC.md](SPEC.md).

@@ -36,7 +36,13 @@ export function ProjectLayout() {
         subtitle={
           <span className="mono wrap-anywhere">
             {data.repo_url} · {data.main_branch}@{shortSha(data.main_sha)}
-            {data.last_sync && <span className={data.last_sync.ok ? "" : "danger-text"}> · sync {ago(data.last_sync.at)}{data.last_sync.ok ? "" : ` lỗi: ${data.last_sync.error}`}</span>}
+            {data.last_sync && (
+              <span className={data.last_sync.ok ? "" : "danger-text"}>
+                {" "}
+                · sync {ago(data.last_sync.at)}
+                {data.last_sync.ok ? "" : ` lỗi: ${data.last_sync.error}`}
+              </span>
+            )}
           </span>
         }
         actions={<Badge mono>{id}</Badge>}

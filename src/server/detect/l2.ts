@@ -12,7 +12,17 @@ export function saveSymbolChanges(db: Db, workspaceId: string, changes: SymbolCh
     db.run(`DELETE FROM symbol_changes WHERE workspace_id = ?`, workspaceId);
     for (const c of changes) {
       if (c.change === "added") continue;
-      db.upsert("symbol_changes", { workspace_id: workspaceId, symbol_id: c.symbol_id, name: c.name, kind: c.kind, change: c.change, old_sig: c.old_sig, new_sig: c.new_sig, new_id: c.new_id, exported: c.exported });
+      db.upsert("symbol_changes", {
+        workspace_id: workspaceId,
+        symbol_id: c.symbol_id,
+        name: c.name,
+        kind: c.kind,
+        change: c.change,
+        old_sig: c.old_sig,
+        new_sig: c.new_sig,
+        new_id: c.new_id,
+        exported: c.exported,
+      });
     }
   });
 }
@@ -41,7 +51,20 @@ export function loadSymbolChanges(db: Db, workspaceId: string): SymbolChange[] {
 
 function asTarget(c: SymbolChange): SymbolRow {
   const path = c.symbol_id.split("#")[0];
-  return { layer: "base", id: c.symbol_id, path, name: c.name, qualname: c.symbol_id.split("#")[1] ?? c.name, kind: c.kind, start_line: 0, end_line: 0, sig: c.old_sig ?? "", sig_hash: "", body_hash: "", exported: c.exported ? 1 : 0 };
+  return {
+    layer: "base",
+    id: c.symbol_id,
+    path,
+    name: c.name,
+    qualname: c.symbol_id.split("#")[1] ?? c.name,
+    kind: c.kind,
+    start_line: 0,
+    end_line: 0,
+    sig: c.old_sig ?? "",
+    sig_hash: "",
+    body_hash: "",
+    exported: c.exported ? 1 : 0,
+  };
 }
 
 function verb(c: SymbolChange): string {
@@ -58,7 +81,10 @@ export function detectL2Pair(db: Db, graph: CodeGraph, a: Workspace, b: Workspac
     [b.id, loadSymbolChanges(db, b.id)],
   ]);
 
-  for (const [from, to] of [[a, b], [b, a]] as const) {
+  for (const [from, to] of [
+    [a, b],
+    [b, a],
+  ] as const) {
     for (const c of changes.get(from.id)!) {
       if (!BREAKING.has(c.change)) continue;
       // Usages written or modified by the other workspace (its overlay), judged in its own view.

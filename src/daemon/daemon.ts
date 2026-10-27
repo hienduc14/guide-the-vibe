@@ -55,7 +55,10 @@ export class Daemon {
 
   async start(): Promise<void> {
     const ping = async () => {
-      const ok = await this.client.call("GET", "/health", undefined, 3000).then(() => true, () => false);
+      const ok = await this.client.call("GET", "/health", undefined, 3000).then(
+        () => true,
+        () => false,
+      );
       if (ok !== this.serverReachable) log("daemon", ok ? `server ${this.cfg.server} reachable` : `server ${this.cfg.server} unreachable`);
       this.serverReachable = ok;
     };
@@ -131,10 +134,26 @@ export class Daemon {
     this.link(ws.project);
     const res = await this.client.call<{ results: { session: Session; briefing: string }[] }>("POST", `/v1/p/${ws.project}/events`, {
       type: "session_start",
-      session: { dev: this.cfg.dev, agent, agent_session_id: agentSessionId, workspace_id: ws.id, workspace_label: `${ws.label}${ws.branch ? `@${ws.branch}` : ""}`, cwd, branch: ws.branch },
+      session: {
+        dev: this.cfg.dev,
+        agent,
+        agent_session_id: agentSessionId,
+        workspace_id: ws.id,
+        workspace_label: `${ws.label}${ws.branch ? `@${ws.branch}` : ""}`,
+        cwd,
+        branch: ws.branch,
+      },
     } satisfies GtvEvent);
     const s = res.results[0].session;
-    const session = { id: s.id, dev: s.dev, agent, workspace_id: ws.id, project: ws.project, capabilities: AGENT_CAPABILITIES[agent] ?? AGENT_CAPABILITIES.other, seen: new Set<string>() };
+    const session = {
+      id: s.id,
+      dev: s.dev,
+      agent,
+      workspace_id: ws.id,
+      project: ws.project,
+      capabilities: AGENT_CAPABILITIES[agent] ?? AGENT_CAPABILITIES.other,
+      seen: new Set<string>(),
+    };
     this.sessions.set(key, session);
     return { session, briefing: res.results[0].briefing };
   }
@@ -156,7 +175,10 @@ export class Daemon {
   }
 
   private drain(s: LocalSession & { project: string }): string | undefined {
-    const msgs = messagesFor([...this.inbox.values()].filter((m) => m.project === s.project), s);
+    const msgs = messagesFor(
+      [...this.inbox.values()].filter((m) => m.project === s.project),
+      s,
+    );
     if (!msgs.length) return undefined;
     for (const m of msgs) this.inbox.delete(m.id);
     this.client.call("POST", `/v1/p/${s.project}/messages/ack`, { ids: msgs.map((m) => m.id) }).catch(() => undefined);
@@ -301,13 +323,18 @@ export class Daemon {
       const cwd = c.req.query("cwd");
       const ws = cwd ? await this.workspaces.get(cwd) : undefined;
       if (!ws) return c.text(this.serverReachable ? "gtv · repo not linked" : "gtv ○ offline");
-      const pending = [...this.inbox.values()].filter((m) => m.project === ws.project && (m.to_workspace === ws.id || (!m.to_workspace && !m.to_session))).length + this.humanInbox.size;
+      const pending =
+        [...this.inbox.values()].filter((m) => m.project === ws.project && (m.to_workspace === ws.id || (!m.to_workspace && !m.to_session))).length +
+        this.humanInbox.size;
       return c.text(statusline(this.stateOf(ws.project), { dev: this.cfg.dev, workspace_id: ws.id }, pending, this.connectedTo(ws.project)));
     });
     app.get("/status", async (c) => {
       const cwd = c.req.query("cwd");
       const ws = cwd ? await this.workspaces.get(cwd) : undefined;
-      if (!ws) return c.text(`gtv daemon for ${this.cfg.dev}: ${cwd ?? "?"} is not linked to a project. Linked projects: ${[...this.projects.keys()].join(", ") || "none"}`);
+      if (!ws)
+        return c.text(
+          `gtv daemon for ${this.cfg.dev}: ${cwd ?? "?"} is not linked to a project. Linked projects: ${[...this.projects.keys()].join(", ") || "none"}`,
+        );
       this.link(ws.project);
       return c.text(describeStatus(this.stateOf(ws.project), this.cfg.server, this.cfg.dev, ws));
     });

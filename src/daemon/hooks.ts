@@ -1,7 +1,8 @@
 // Adapters: translate each agent's native hook payload into one normalized shape, and our decision back
 // into that agent's native output format.
 
-import { isAbsolute, relative } from "node:path";
+import { realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { AgentKind, HookDecision } from "../shared/types.ts";
 import { normPath } from "../shared/util.ts";
 
@@ -79,12 +80,23 @@ export function normalize(agent: AgentKind, raw: Raw): NormalizedHook {
   return { ...base, kind: "other" };
 }
 
+/** Canonical form of a path that may not exist yet: symlinks and Windows 8.3 short names (RUNNER~1) resolved. */
+function canonical(p: string): string {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    const parent = dirname(p);
+    return parent === p ? p : join(canonical(parent), basename(p));
+  }
+}
+
 /** Repo-relative, forward-slash paths; drops paths outside the repo. */
 export function toRepoPaths(paths: string[], cwd: string, top: string): string[] {
   const out: string[] = [];
+  const root = canonical(top); // git reports the long, symlink-free path; the agent's cwd may not be
   for (const p of paths) {
-    const abs = isAbsolute(p) ? p : `${cwd}/${p}`;
-    const rel = normPath(relative(top, abs));
+    const abs = canonical(isAbsolute(p) ? p : join(cwd, p));
+    const rel = normPath(relative(root, abs));
     if (!rel || rel.startsWith("..") || isAbsolute(rel)) continue;
     out.push(rel);
   }

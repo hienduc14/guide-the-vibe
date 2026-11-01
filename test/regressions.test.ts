@@ -10,7 +10,9 @@ import { Engine } from "../src/server/project/engine.ts";
 import { KnowledgeBase } from "../src/server/knowledge/kb.ts";
 import { NullBrain } from "../src/server/brain/types.ts";
 import { git, patternsOverlap } from "../src/shared/util.ts";
-import { commitAndPush, makeOrigin } from "./helpers.ts";
+import { toRepoPaths } from "../src/daemon/hooks.ts";
+import { mkdirSync, symlinkSync } from "node:fs";
+import { commitAndPush, makeOrigin, tempDir } from "./helpers.ts";
 
 process.env.GTV_QUIET = "1";
 
@@ -72,4 +74,14 @@ test("pulling a newer main without local edits does not close the puller's task"
   } finally {
     origin.cleanup();
   }
+});
+
+test("hook paths map into the repo when the agent's cwd is another spelling of it (symlink, Windows 8.3 name)", () => {
+  const real = join(tempDir(), "repo");
+  mkdirSync(join(real, "src"), { recursive: true });
+  const alias = join(tempDir(), "alias");
+  symlinkSync(real, alias, "junction");
+  // git reports the real path; the agent runs in the alias. New files (not on disk yet) map too.
+  assert.deepEqual(toRepoPaths(["src/new.ts", join(alias, "src", "a.ts")], alias, real), ["src/new.ts", "src/a.ts"]);
+  assert.deepEqual(toRepoPaths(["../outside.ts"], alias, real), []);
 });

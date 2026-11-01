@@ -158,7 +158,8 @@ export class HermesBrain implements ProjectScopedBackend {
         return { output, ms: Date.now() - started, backend: this.name };
       } catch (e) {
         if ((e as Error).name === "AbortError") throw new BrainUnavailable(`brain timed out after ${Date.now() - started}ms`);
-        if ((e as { cause?: { code?: string } }).cause?.code === "ECONNREFUSED") throw new BrainUnavailable("hermes gateway not reachable");
+        // fetch's network failures (refused, reset, DNS…) are TypeErrors with a cause; Windows reports a closed port as ECONNRESET
+        if (e instanceof TypeError && e.cause) throw new BrainUnavailable(`hermes gateway not reachable: ${(e.cause as Error).message}`);
         throw e;
       } finally {
         this.call(`/api/sessions/${encodeURIComponent(session)}`, { method: "DELETE" }).catch((e) =>

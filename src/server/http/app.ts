@@ -2,11 +2,11 @@
 //   /health                    liveness + brain status
 //   /v1/projects, /v1/resolve  project discovery for daemons
 //   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard with admin token)
-//   /p/:project/mcp            read-only MCP tools for the brain
+//   /p/:project/mcp, /mcp      read-only MCP tools for the brain (per project / all projects)
 //   /api/*                     dashboard API
 //   /*                         dashboard (web/dist)
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -28,12 +28,16 @@ export function buildApp(hub: Hub): Hono {
     }),
   );
 
-  // Brain tools, one MCP endpoint per project.
+  // Brain tools: one MCP endpoint per project (OpenCode), or one for all projects with a `project` argument (Hermes).
+  const brainAuthorized = (c: Context) => !hub.cfg.brainToken || c.req.header("authorization") === `Bearer ${hub.cfg.brainToken}`;
   app.all("/p/:project/mcp", async (c) => {
-    const token = hub.cfg.brainToken;
-    if (token && c.req.header("authorization") !== `Bearer ${token}`) return c.json({ error: "unauthorized" }, 401);
+    if (!brainAuthorized(c)) return c.json({ error: "unauthorized" }, 401);
     const rt = await hub.runtime(c.req.param("project"));
-    return handleBrainMcp(rt.engine, c.req.raw);
+    return handleBrainMcp(async () => rt.engine, c.req.raw);
+  });
+  app.all("/mcp", async (c) => {
+    if (!brainAuthorized(c)) return c.json({ error: "unauthorized" }, 401);
+    return handleBrainMcp(async (project) => (await hub.runtime(project ?? "")).engine, c.req.raw, true);
   });
 
   // Developers (and the dashboard with the admin token).

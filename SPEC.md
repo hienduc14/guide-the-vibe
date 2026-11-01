@@ -771,3 +771,30 @@ Bug do self-test tìm ra và đã sửa:
 | Conflict L3 không đóng khi task xong | Conflict mở mãi | `tasksClosed()` |
 | Cảnh báo "sửa trong scope người khác" chỉ đến sau khi server chạy L0 | Agent sửa xong mới biết | Daemon cảnh báo ngay ở pre-edit từ cache |
 | Dashboard tự khóa khi cấp token dev đầu tiên (không có admin token) | Mất quyền vào dashboard | `/api` mở khi chưa đặt `GTV_ADMIN_TOKEN`, cảnh báo lúc khởi động |
+
+---
+
+## 23. v0.6 — Brain chuyển sang Hermes Agent, sửa lỗi sau review (01/11/2026)
+
+### 23.1 Quyết định
+| # | Quyết định | Lý do |
+|---|---|---|
+| D23 | Brain mặc định = **Hermes Agent** (`nousresearch/hermes-agent:v0.22.2`, `hermes gateway run`, API server tương thích OpenAI) + đăng nhập ChatGPT (provider `openai-codex`). OpenCode giữ lại làm backend thay thế (`BRAIN_BACKEND=opencode`). | Yêu cầu nhóm |
+| D24 | Hermes có cấu hình MCP tĩnh, không chọn tool theo request ⇒ thêm endpoint **`/mcp` dùng chung mọi project**, mỗi tool có tham số `project`; prompt mỗi job nêu đúng project. | Hermes không có `tools` theo request như OpenCode |
+| D25 | Hermes bỏ qua `response_format` ⇒ schema nằm trong prompt, gtv tự kiểm JSON và nhắc lại một lần. Lỗi có thể đến dạng HTTP 200 ⇒ chỉ `finish_reason: stop` + JSON hợp lệ là thành công. Mỗi job một session, xóa sau khi xong. | Đọc mã nguồn Hermes v0.22 |
+| D26 | Compose bắt buộc `GTV_ADMIN_TOKEN`, `GTV_BRAIN_TOKEN`, `HERMES_API_KEY`. | Cổng 7390 mở ra ngoài; `/mcp` đọc được code |
+
+### 23.2 Lỗi đã sửa (mỗi lỗi có test hồi quy, test fail trên code cũ)
+| Lỗi | Hậu quả | Sửa |
+|---|---|---|
+| `git grep` nhận pattern bắt đầu bằng `-` như option | Brain (hoặc prompt injection) truyền được option cho git, vd `--open-files-in-pager=<lệnh>` | `-e <pattern>` (`repo.ts`) |
+| `onSnapshot` không bắt lỗi | `git fetch` lỗi (mạng, hết hạn token) ⇒ unhandled rejection ⇒ **server chết** | `.catch` + log (`engine.ts`) |
+| `/events` không kiểm tra quyền sở hữu | Dev B kết thúc session, ghi footprint, chiếm workspace, gửi snapshot thay dev A | kiểm tra session/workspace như các route khác (`agent-routes.ts`) |
+| Daemon nhận request từ trình duyệt | Trang web bất kỳ (hoặc DNS rebinding) gọi được daemon: ép push snapshot, trả lời ticket thay dev | từ chối `Origin` và `Host` lạ (`daemon.ts`) |
+| `git pull` main mới (chưa sửa gì) bị coi là "đã merge" | Task của người pull bị đóng `done`, mất bảo vệ scope | chỉ đóng khi workspace đã có footprint (`engine.ts`) |
+| Snapshot che mất lần đổi main của `pollRepo` | Docs/ADR mới không được index, việc đã merge không đóng | so với `polledMain` riêng (`engine.ts`) |
+| ADR bị thay thế "sống lại" khi main đổi | Brain trích quyết định cũ | áp lại `supersedes` mỗi lần sync (`kb.ts`) |
+| Thư mục trần (`src/payments`) không trùng glob con (`src/payments/**`) | Không báo critical/scope overlap lúc đăng ký | `patternsOverlap` xét tiền tố thư mục (`util.ts`) |
+
+### 23.3 Chưa kiểm chứng
+- Chưa chạy Hermes thật (cần Docker + đăng nhập ChatGPT): adapter được kiểm bằng gateway giả lập theo đúng định dạng response trong mã nguồn Hermes v0.22. Cần chạy lại self-test RealWorld với Hermes.

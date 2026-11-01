@@ -14,12 +14,12 @@ src/
     detect/                 L0, L1, L2 (L3 nằm trong project/engine.ts)
     qa/                     ticket hỏi đáp 3 bậc
     knowledge/              KB docs/ADR/Q&A (FTS5)
-    brain/                  OpenCode/Null brain, metering, prompt + schema, MCP tool cho Brain
+    brain/                  Hermes/OpenCode/Null brain, metering, prompt + schema, MCP tool cho Brain
     http/                   app, auth, agent-routes (/v1/p/:id), admin-routes (/api)
   daemon/                   daemon trên máy dev, hooks, decide, workspace, tools, snapshot, MCP stdio, install, CLI
   adapters/                 omp extension, SKILL.md dùng chung
 web/                        dashboard (Vite + React), xem web/README.md
-docker/                     Dockerfile (operator + dashboard), Dockerfile.brain, compose, gtv.config.yml, opencode.json
+docker/                     Dockerfile (operator + dashboard), Dockerfile.brain (Hermes), hermes/config.yaml, compose, gtv.config.yml; Dockerfile.opencode + opencode/ (backend thay thế)
 scripts/                    sandbox.ts, selftest/realworld.ts
 test/                       node:test — codeintel, server, admin, e2e
 examples/sample-repo/       repo mẫu "mini-shop" cho sandbox
@@ -79,14 +79,14 @@ docs/                       tài liệu (docs/reports: báo cáo sinh tự độ
 
 ### C — Q&A & Brain · `src/server/qa/`, `src/server/brain/`
 
-|                |                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Trách nhiệm    | Ticket 3 bậc, timeout/leo thang; backend Brain; prompt + JSON schema; MCP tool chỉ-đọc cho Brain; metering           |
-| File chính     | `qa/tickets.ts`, `brain/types.ts`, `brain/opencode.ts`, `brain/metered.ts`, `brain/prompts.ts`, `brain/mcp-tools.ts` |
-| Cung cấp       | `TicketService.ask/reply/tick`, interface `Brain`, `ProjectScopedBackend`, `buildBrainMcp`                           |
-| Test           | `test/server.test.ts` (FakeBrain, 3 bậc, MCP), `test/admin.test.ts` (metering), self-test (Brain thật, vài lượt)     |
-| Việc điển hình | backend mới (Codex app-server, Claude Agent SDK), tool mới cho Brain, chỉnh prompt                                   |
-| Làm độc lập    | dùng `FakeBrain` trong test; **không chạy vòng lặp gọi LLM thật**                                                    |
+|                |                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Trách nhiệm    | Ticket 3 bậc, timeout/leo thang; backend Brain; prompt + JSON schema; MCP tool chỉ-đọc cho Brain; metering                              |
+| File chính     | `qa/tickets.ts`, `brain/types.ts`, `brain/hermes.ts`, `brain/opencode.ts`, `brain/metered.ts`, `brain/prompts.ts`, `brain/mcp-tools.ts` |
+| Cung cấp       | `TicketService.ask/reply/tick`, interface `Brain`, `ProjectScopedBackend`, `buildBrainMcp`                                              |
+| Test           | `test/server.test.ts` (FakeBrain, 3 bậc, MCP), `test/admin.test.ts` (metering), self-test (Brain thật, vài lượt)                        |
+| Việc điển hình | backend mới (Codex app-server, Claude Agent SDK), tool mới cho Brain, chỉnh prompt                                                      |
+| Làm độc lập    | dùng `FakeBrain` trong test; **không chạy vòng lặp gọi LLM thật**                                                                       |
 
 ### D — Knowledge · `src/server/knowledge/`
 

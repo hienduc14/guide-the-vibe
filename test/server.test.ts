@@ -239,3 +239,22 @@ test("events: a developer cannot act on another developer's workspace or session
   );
   assert.equal(rt.engine.store.workspace(a.workspace_id)?.dev, "alice");
 });
+
+test("shared brain MCP endpoint takes a project argument", async () => {
+  const call = async (body: unknown) => {
+    const res = await srv.app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify(body),
+    });
+    return (await res.json()) as any;
+  };
+  const list = await call({ jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const whoCalls = list.result.tools.find((t: any) => t.name === "who_calls");
+  assert.ok(whoCalls.inputSchema.required.includes("project"));
+  const tool = (id: number, name: string, args: unknown) => call({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
+  const res = await tool(2, "who_calls", { project: "default", symbol: "getUser", view: "ws_b" });
+  assert.match(res.result.content[0].text, /src\/sso\/google\.ts/);
+  const unknown = await tool(3, "team_status", { project: "nope" });
+  assert.match(unknown.result.content[0].text, /unknown project nope/);
+});

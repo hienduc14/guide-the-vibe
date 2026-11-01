@@ -14,7 +14,7 @@ export interface ServerConfig {
   defaultProject: string;
   /** Protects /api (dashboard). Unset + no developers = open dev mode. */
   adminToken?: string;
-  /** How the brain (OpenCode) reaches this server, e.g. http://operator:7390 inside docker. */
+  /** How the OpenCode brain reaches this server, e.g. http://operator:7390 inside docker (Hermes has it in its own config). */
   internalUrl: string;
   /** Built dashboard (web/dist). */
   webDir: string;
@@ -22,7 +22,18 @@ export interface ServerConfig {
   tokens: Map<string, string>;
   authOpen: boolean;
   brainToken?: string;
-  brain: { backend: "opencode" | "null"; url: string; password?: string; model?: string; agent?: string; concurrency: number; timeoutMs: number };
+  brain: {
+    backend: "hermes" | "opencode" | "null";
+    url: string;
+    /** Hermes: API_SERVER_KEY of the gateway. */
+    apiKey?: string;
+    /** OpenCode: server password and agent. */
+    password?: string;
+    agent?: string;
+    model?: string;
+    concurrency: number;
+    timeoutMs: number;
+  };
   features: Partial<Record<string, FeatureMode>>;
   policy: Policy;
   docGlobs?: string[];
@@ -67,8 +78,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     authOpen: env.GTV_AUTH === "open",
     brainToken: env.GTV_BRAIN_TOKEN || undefined,
     brain: {
-      backend: env.BRAIN_BACKEND === "opencode" ? "opencode" : "null",
-      url: env.OPENCODE_URL ?? "http://127.0.0.1:4096",
+      backend: env.BRAIN_BACKEND === "hermes" || env.BRAIN_BACKEND === "opencode" ? env.BRAIN_BACKEND : "null",
+      url: env.BRAIN_BACKEND === "opencode" ? (env.OPENCODE_URL ?? "http://127.0.0.1:4096") : (env.HERMES_URL ?? "http://127.0.0.1:8642"),
+      apiKey: env.HERMES_API_KEY || undefined,
       password: env.OPENCODE_SERVER_PASSWORD || undefined,
       model: env.BRAIN_MODEL || undefined,
       agent: env.BRAIN_AGENT ?? "operator",

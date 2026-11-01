@@ -60,7 +60,7 @@ export class Hub {
       this.saveRecord({ id: this.cfg.defaultProject, repo_url: this.cfg.repoUrl, main_branch: this.cfg.mainBranch, name: this.cfg.defaultProject });
     }
     const model = this.setting("brain.model");
-    if (model && "setModel" in this.brain) (this.brain as { setModel(m: string): void }).setModel(model);
+    if (model) this.brain.setModel?.(model);
     for (const r of this.records()) {
       await this.runtime(r.id).catch((e) => log("hub", `project ${r.id} failed to open: ${(e as Error).message}`));
     }

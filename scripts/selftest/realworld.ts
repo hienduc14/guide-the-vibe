@@ -336,10 +336,11 @@ async function main() {
   const stats = await json<any>(`${SERVER}/api/projects/${PROJECT}/stats?days=1`);
   const layers = await json<any[]>(`${SERVER}/api/projects/${PROJECT}/layers`);
   const brainJobs = stats.brain.totals.jobs - brainBefore;
-  writeReport({ stats, layers, brainJobs });
+  const health = await json<any>(`${SERVER}/health`);
+  writeReport({ stats, layers, brainJobs, brain: [health.brain.backend, health.brain.model].filter(Boolean).join(" ") });
 }
 
-function writeReport(x: { stats: any; layers: any[]; brainJobs: number }) {
+function writeReport(x: { stats: any; layers: any[]; brainJobs: number; brain: string }) {
   const passed = checks.filter((c) => c.ok).length;
   const lines = [
     "# Self-test: RealWorld (Node/Express) — 2 developers editing in parallel",
@@ -348,7 +349,7 @@ function writeReport(x: { stats: any; layers: any[]; brainJobs: number }) {
     "",
     "Repo: `gothinkster/node-express-realworld-example-app` (TypeScript, 67 files) mirrored as a local bare repo.",
     "Agents are simulated by sending the exact hook payloads of Claude Code (alice) and Codex (bob) to the real daemons;",
-    "files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (OpenCode + ChatGPT `gpt-6-luna`) are real.",
+    "files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (`" + x.brain + "`, ChatGPT plan) are real.",
     "",
     "## Scenario",
     "- **alice** (Claude Code): `profileMapper(user, id)` → `profileMapper(user, viewer?: { id })` (breaking), updates the 5 existing callers, caps article page size at 100.",

@@ -1,4 +1,4 @@
-# Development stack: Operator server + OpenCode brain.
+# Development stack: Operator server + Hermes Agent brain.
 #   docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 services:
   operator:
@@ -8,16 +8,17 @@ services:
       # Optional: bootstrap a project "default" from one repo; otherwise create projects in the dashboard.
       GTV_REPO_URL: ${GTV_REPO_URL:-}
       GTV_MAIN_BRANCH: ${GTV_MAIN_BRANCH:-main}
-      GTV_ADMIN_TOKEN: ${GTV_ADMIN_TOKEN:-}
+      # Port 7390 is published: without these the dashboard API and the brain's MCP tools (which read the code) are open.
+      GTV_ADMIN_TOKEN: ${GTV_ADMIN_TOKEN:?set GTV_ADMIN_TOKEN in docker/.env}
+      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:?set GTV_BRAIN_TOKEN in docker/.env}
       GTV_INTERNAL_URL: http://operator:7390
       GTV_TOKENS: ${GTV_TOKENS:-}
       GTV_POLL_MS: ${GTV_POLL_MS:-15000}
       GTV_CONFIG: /config/gtv.config.yml
-      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:-}
-      BRAIN_BACKEND: ${BRAIN_BACKEND:-opencode}
+      BRAIN_BACKEND: ${BRAIN_BACKEND:-hermes}
       BRAIN_MODEL: ${BRAIN_MODEL:-}
-      OPENCODE_URL: http://brain:4096
-      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-}
+      HERMES_URL: http://brain:8642
+      HERMES_API_KEY: ${HERMES_API_KEY:?set HERMES_API_KEY in docker/.env (openssl rand -hex 32)}
     volumes:
       - gtv-data:/data
       - ./gtv.config.yml:/config/gtv.config.yml:ro
@@ -27,12 +28,14 @@ services:
   brain:
     build: { context: .., dockerfile: docker/Dockerfile.brain }
     environment:
-      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-}
-      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:-}
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_KEY: ${HERMES_API_KEY:?set HERMES_API_KEY in docker/.env (openssl rand -hex 32)}
+      # Sent by Hermes to the Operator's /mcp (docker/hermes/config.yaml)
+      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:?set GTV_BRAIN_TOKEN in docker/.env}
     volumes:
-      - opencode-data:/root/.local/share/opencode
-    ports: ["127.0.0.1:4096:4096"]
+      - hermes-data:/opt/data # config.yaml, .env, auth.json (ChatGPT login), sessions
+    ports: ["127.0.0.1:8642:8642"]
     restart: unless-stopped
 volumes:
   gtv-data: {}
-  opencode-data: {}
+  hermes-data: {}

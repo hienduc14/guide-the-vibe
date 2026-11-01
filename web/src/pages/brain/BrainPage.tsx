@@ -61,7 +61,13 @@ export function BrainPage() {
               }}
             >
               <Field label="Model" hint="provider/model — tài khoản ChatGPT chỉ dùng được các model Codex cho phép">
-                <input className="input mono" list="gtv-models" value={model} onChange={(e) => setModel(e.target.value)} placeholder="openai/gpt-6-luna" />
+                <input
+                  className="input mono"
+                  list="gtv-models"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="openai-codex/gpt-6-luna"
+                />
                 <datalist id="gtv-models">
                   {data.models.map((m) => (
                     <option key={m} value={m} />

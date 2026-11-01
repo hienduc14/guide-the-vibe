@@ -8,7 +8,6 @@ import type { AuthVars } from "./auth.ts";
 import { openMode } from "./auth.ts";
 import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
-import { OpenCodeBrain } from "../brain/opencode.ts";
 import type { Level } from "../../shared/types.ts";
 
 type Env = { Variables: AuthVars };
@@ -246,7 +245,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
 
   app.get("/brain", async (c) => {
     const b = hub.brain;
-    const models = b instanceof OpenCodeBrain ? await b.models().catch(() => []) : [];
+    const models = (await b.models?.().catch(() => [])) ?? [];
     return c.json({
       backend: b.name,
       model: b.model ?? null,
@@ -258,7 +257,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
 
   app.put("/brain", async (c) => {
     const { model } = (await c.req.json()) as { model: string | null };
-    if (!(hub.brain instanceof OpenCodeBrain)) throw new Error("the active brain backend has no model setting");
+    if (!hub.brain.setModel) throw new Error("the active brain backend has no model setting");
     hub.brain.setModel(model ?? undefined);
     hub.setSetting("brain.model", model);
     return c.json({ model: hub.brain.model ?? null });

@@ -5,12 +5,12 @@ Kiểu dữ liệu chung: `src/shared/types.ts`. Dashboard sao chép ở `web/sr
 
 ## Xác thực
 
-| Vùng              | Header                                    | Ghi chú                                                                                       |
-| ----------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `/v1/*`           | `Authorization: Bearer <dev token>`       | Admin token cũng được (dev = `X-Gtv-Dev` hoặc `admin`). Chế độ mở: header `X-Gtv-Dev: <tên>`. |
-| `/api/*`          | `Authorization: Bearer <GTV_ADMIN_TOKEN>` | Không đặt admin token ⇒ mở. Token cũng nhận qua `?token=`.                                    |
-| `/p/:project/mcp` | `Authorization: Bearer <GTV_BRAIN_TOKEN>` | Chỉ khi `GTV_BRAIN_TOKEN` được đặt.                                                           |
-| `GET /health`     | —                                         | `{ ok, brain: {backend, model, ok, detail}, projects: [id] }`                                 |
+| Vùng                      | Header                                    | Ghi chú                                                                                       |
+| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `/v1/*`                   | `Authorization: Bearer <dev token>`       | Admin token cũng được (dev = `X-Gtv-Dev` hoặc `admin`). Chế độ mở: header `X-Gtv-Dev: <tên>`. |
+| `/api/*`                  | `Authorization: Bearer <GTV_ADMIN_TOKEN>` | Không đặt admin token ⇒ mở. Token cũng nhận qua `?token=`.                                    |
+| `/mcp`, `/p/:project/mcp` | `Authorization: Bearer <GTV_BRAIN_TOKEN>` | Chỉ khi `GTV_BRAIN_TOKEN` được đặt.                                                           |
+| `GET /health`             | —                                         | `{ ok, brain: {backend, model, ok, detail}, projects: [id] }`                                 |
 
 Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](operations.md#token)).
 
@@ -25,14 +25,14 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 
 ### Event, state, stream
 
-| Method | Path                 | Body / trả về                                                                                                                |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/events`            | 1 `GtvEvent` hoặc `{ events: GtvEvent[] }` → `{ results: [...] }`                                                            |
-| GET    | `/state`             | `TeamState` (workspaces, sessions, tasks, footprints, conflicts, features, policy)                                           |
-| GET    | `/stream`            | SSE: `state` (TeamState, debounce 150 ms), `message` (Message cho dev này), `ping` (15 s). Khi mở: gửi state + tin chưa giao |
-| GET    | `/messages`          | Tin chưa giao của dev                                                                                                        |
-| POST   | `/messages/ack`      | `{ ids: [] }` đánh dấu đã giao                                                                                               |
-| GET    | `/events/log?limit=` | `event_log` mới nhất                                                                                                         |
+| Method | Path                 | Body / trả về                                                                                                                          |
+| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/events`            | 1 `GtvEvent` hoặc `{ events: GtvEvent[] }` → `{ results: [...] }`. Chỉ cho session/workspace của chính dev gửi (admin: mọi workspace). |
+| GET    | `/state`             | `TeamState` (workspaces, sessions, tasks, footprints, conflicts, features, policy)                                                     |
+| GET    | `/stream`            | SSE: `state` (TeamState, debounce 150 ms), `message` (Message cho dev này), `ping` (15 s). Khi mở: gửi state + tin chưa giao           |
+| GET    | `/messages`          | Tin chưa giao của dev                                                                                                                  |
+| POST   | `/messages/ack`      | `{ ids: [] }` đánh dấu đã giao                                                                                                         |
+| GET    | `/events/log?limit=` | `event_log` mới nhất                                                                                                                   |
 
 `GtvEvent`:
 
@@ -113,9 +113,13 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 
 Summary của project: `{ id, name, repo_url, main_branch, main_sha, last_sync, counts: { people_active, sessions_active, tasks_active, conflicts_open, conflicts_by_level, tickets_waiting, kb_unverified }, people: [{ dev, status, agents, workspaces, last_seen, tasks, editing, conflicts }] }`.
 
-## MCP cho Brain — `/p/:project/mcp`
+## MCP cho Brain — `/mcp` và `/p/:project/mcp`
 
-Streamable HTTP, stateless, JSON. OpenCode đăng ký mỗi project thành server `gtv_<project>` (ký tự khác chữ/số → `_`).
+Streamable HTTP, stateless, JSON. Hai endpoint cùng một bộ tool:
+
+- `/mcp`: mọi project; **mọi tool có thêm tham số bắt buộc `project`** (project lạ → kết quả là thông báo lỗi). Hermes dùng endpoint này qua server MCP `gtv` (tên tool trong Hermes: `mcp__gtv__<tool>`).
+- `/p/:project/mcp`: một project. OpenCode đăng ký mỗi project thành server `gtv_<project>` (ký tự khác chữ/số → `_`).
+
 `view` = `"base"` (main, mặc định) hoặc workspace id.
 
 | Tool           | Tham số                                                 |

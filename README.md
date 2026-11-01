@@ -15,7 +15,7 @@ gtv đặt một **Project Operator** trên server; agent của mọi người n
 
 3. **Hỏi Operator giữa lúc code** (`gtv_ask`): trả lời từ code graph, docs/ADR và WIP của đồng đội; câu cần người khác quyết định được **chuyển vào agent của họ** và câu trả lời quay lại tự động.
 
-Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain (OpenCode + gói ChatGPT) dùng chung.
+Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain ([Hermes Agent](https://hermes-agent.nousresearch.com/docs/) + gói ChatGPT) dùng chung.
 
 ## Kiến trúc trong 30 giây
 
@@ -27,13 +27,13 @@ Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain 
  │            │                  │           │  project runtime × N:                     │
  │            ▼                  │           │    registry · L0–L3 · Q&A · KB · graph    │
  │ gtv daemon (127.0.0.1:7391)   │           │  /api (dashboard) · /v1/p/:id (agents)    │
- │   quyết định local, inbox,    │           │  /p/:id/mcp (tool chỉ-đọc cho Brain)      │
+ │   quyết định local, inbox,    │           │  /mcp (tool chỉ-đọc cho Brain)            │
  │   WIP snapshot ──git push──┐  │           │  dashboard web (/)                        │
  └────────────────────────────┼──┘           └──────────────┬─────────────────────┬──────┘
                               ▼                     git fetch│                     │ HTTP
                        ┌────────────┐                        │              ┌──────▼───────┐
                        │ GitHub /   │◄───────────────────────┘              │ Brain:       │
-                       │ bare repo  │                                       │ OpenCode +   │
+                       │ bare repo  │                                       │ Hermes Agent │
                        └────────────┘                                       │ ChatGPT login│
                                                                             └──────────────┘
 ```
@@ -46,18 +46,18 @@ Cần: Node ≥ 24, git ≥ 2.40, Docker Desktop.
 npm ci
 npm run web:install
 node scripts/sandbox.ts                 # sandbox/origin.git (mini-shop) + clone alice / bob / carol
-cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN, GTV_BRAIN_TOKEN, OPENCODE_SERVER_PASSWORD
+cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN, GTV_BRAIN_TOKEN, HERMES_API_KEY (openssl rand -hex 32)
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Đăng nhập Brain bằng gói ChatGPT (một lần, lưu trong volume `opencode-data`), rồi chọn model:
+Đăng nhập Brain (Hermes) bằng gói ChatGPT (một lần, lưu trong volume `hermes-data`; lệnh in URL + mã để nhập trên trình duyệt):
 
 ```bash
-docker compose -f docker/compose.yml --env-file docker/.env exec brain opencode auth login -p openai -m "ChatGPT Pro/Plus (headless)"
+docker compose -f docker/compose.yml --env-file docker/.env exec brain hermes auth add openai-codex --no-browser
 ```
 
 Mở dashboard: **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`). Ở đó: tạo project (repo URL), cấp token cho dev,
-chọn model Brain (`gpt-6-luna` đã chạy được; xem [docs/operations.md](docs/operations.md)).
+chọn model Brain (mặc định `openai-codex/gpt-6-luna`; xem [docs/operations.md](docs/operations.md#brain-hermes-agent--gói-chatgpt)).
 
 Hoặc bằng CLI (trong Git Bash phải tắt chuyển đường dẫn MSYS, nếu không `/repos/...` thành `C:/Program Files/Git/repos/...`):
 

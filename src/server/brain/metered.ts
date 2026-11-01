@@ -9,6 +9,9 @@ export interface ProjectScopedBackend extends Brain {
   /** Optional: make the project's tools available to the backend before a job runs. */
   prepareProject?(project: string): Promise<void>;
   readonly model?: string;
+  /** Optional: model choice from the dashboard ("provider/model"). */
+  setModel?(model: string | undefined): void;
+  models?(): Promise<string[]>;
 }
 
 export class MeteredBrain implements Brain {

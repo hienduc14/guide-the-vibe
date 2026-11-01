@@ -1,9 +1,7 @@
-# Operator brain: OpenCode server (log in once with a ChatGPT plan, see README)
-FROM node:24-trixie-slim
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl \
- && rm -rf /var/lib/apt/lists/*
-RUN npm install -g opencode-ai@1.19.4
-COPY docker/opencode/opencode.json /root/.config/opencode/opencode.json
-WORKDIR /workspace
-EXPOSE 4096
-CMD ["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]
+# Operator brain: Hermes Agent gateway with its OpenAI-compatible API server (log in once with a ChatGPT
+# plan, see docs/operations.md). The image seeds $HERMES_HOME/config.yaml from cli-config.yaml.example on
+# first boot (docker/stage2-hook.sh in hermes-agent), so our config goes there.
+FROM nousresearch/hermes-agent:v0.22.2
+COPY docker/hermes/config.yaml /opt/hermes/cli-config.yaml.example
+EXPOSE 8642
+CMD ["gateway", "run"]

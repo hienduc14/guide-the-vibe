@@ -23,7 +23,7 @@ npm --prefix web run build                 # kiểm tra kiểu + build dashboard
 `scripts/selftest/realworld.ts` — repo `gothinkster/node-express-realworld-example-app`, 2 dev sửa nhẹ song song.
 Agent được giả lập bằng **đúng payload hook** của Claude Code (alice) và Codex (bob) gửi tới **daemon thật**; file được sửa thật trong 2 clone, snapshot đẩy thật, Operator (docker) và Brain là thật — **khoảng 3 job Brain mỗi lần chạy**.
 
-Chuẩn bị: stack docker chạy và Brain đã đăng nhập ([operations.md](operations.md#brain-hermes-agent--gói-chatgpt)), rồi trong Git Bash:
+Chuẩn bị: stack docker chạy và Brain đã đăng nhập ([operations.md](operations.md#brain-hermes-agent)), rồi trong Git Bash:
 
 ```bash
 bash scripts/selftest/prepare.sh

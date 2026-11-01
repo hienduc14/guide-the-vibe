@@ -84,23 +84,26 @@ l3: { daily_budget: 60 }
   - `/v1/*` mở (tin `X-Gtv-Dev`) khi `GTV_AUTH=open`, hoặc **chưa có admin token và chưa có dev nào**. Có dev đầu tiên ⇒ phải dùng token.
   - `/api/*` mở khi `GTV_AUTH=open` hoặc **không đặt `GTV_ADMIN_TOKEN`** (server log cảnh báo).
 
-## Brain (Hermes Agent + gói ChatGPT)
+## Brain (Hermes Agent)
 
 Brain là [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) (Nous Research) chạy `hermes gateway run` với API server tương thích OpenAI. gtv gửi mỗi job một lượt chat; Hermes tự gọi tool chỉ-đọc của Operator qua MCP rồi trả JSON.
 
-1. Đăng nhập gói ChatGPT (một lần, lưu trong volume `hermes-data`): in ra URL + mã thiết bị để nhập trên trình duyệt.
-   ```bash
-   docker compose -f docker/compose.yml --env-file docker/.env exec brain hermes auth add openai-codex --no-browser
-   ```
-   Có thể phải bật đăng nhập bằng mã thiết bị trong cài đặt bảo mật ChatGPT.
-2. Chọn model: dashboard **Brain** (danh sách lấy từ `GET /api/model/options` của Hermes, chỉ provider đã đăng nhập) hoặc `BRAIN_MODEL=openai-codex/<model>`. Để trống thì dùng `model` trong `docker/hermes/config.yaml` (`gpt-6-luna`).
+1. Chọn LLM cho Hermes — **provider nào cũng được**, gtv không phụ thuộc:
+   - gói ChatGPT (mặc định trong `docker/hermes/config.yaml`): đăng nhập một lần, lưu trong volume `hermes-data` (in ra URL + mã thiết bị):
+     ```bash
+     docker compose -f docker/compose.yml --env-file docker/.env exec brain hermes auth add openai-codex --no-browser
+     ```
+   - endpoint tương thích OpenAI có sẵn (CLIProxyAPI, vLLM, LiteLLM…): sửa khối `model` thành `provider: custom`, `base_url`, `api_key` (ví dụ trong file config);
+   - provider khác của Hermes (OpenRouter, Anthropic API key, Nous Portal…): xem [tài liệu provider của Hermes](https://hermes-agent.nousresearch.com/docs/integrations/providers).
+2. Chọn model: dashboard **Brain** (danh sách lấy từ `GET /api/model/options` của Hermes, chỉ provider đã đăng nhập, dạng `provider/model`, vd `openai-codex/gpt-6-luna`, `custom/gemini-3-flash`) hoặc `BRAIN_MODEL`. Để trống thì dùng `model` trong `docker/hermes/config.yaml`.
 3. Cấu hình Hermes: `docker/hermes/config.yaml` — chỉ bật server MCP `gtv` (`http://operator:7390/mcp`, header `Bearer ${GTV_BRAIN_TOKEN}`), tắt mọi toolset ghi file/shell/web/delegate, `max_turns: 30`. File này chỉ được **chép vào volume ở lần chạy đầu**; sửa xong thì xóa bản trong volume rồi khởi động lại:
    ```bash
    docker compose -f docker/compose.yml --env-file docker/.env exec brain rm /opt/data/config.yaml
    docker compose -f docker/compose.yml --env-file docker/.env up -d --build brain
    ```
 4. Kiểm tra: `curl -s http://127.0.0.1:8642/health`; danh sách tool Hermes thấy: `curl -s -H "Authorization: Bearer $HERMES_API_KEY" http://127.0.0.1:8642/v1/toolsets` (chỉ nên có `mcp-gtv`).
-5. Không dùng gói Claude Pro/Max làm Brain cho server dùng chung (điều khoản Anthropic) — xem SPEC §7.2.1.
+5. Lưu ý điều khoản của gói subscription khi dùng cho server cả nhóm — xem SPEC §7.2.1.
+6. Model bị rate limit: Hermes tự thử lại (có thể chờ tới vài phút) trong khi gtv cắt sau `BRAIN_TIMEOUT_MS` (180 s) và trả "Operator could not answer" — đổi sang model khác trên dashboard.
 
 Cách gtv gọi Hermes (`src/server/brain/hermes.ts`): mỗi job một session riêng (`X-Hermes-Session-Id`), xóa sau khi xong; Hermes bỏ qua `response_format` nên schema nằm trong prompt và gtv tự kiểm JSON (sai thì nhắc lại một lần); lỗi có thể đến dưới dạng HTTP 200 (`finish_reason` ≠ `stop`) nên chỉ `stop` + JSON hợp lệ mới tính là thành công.
 

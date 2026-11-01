@@ -15,7 +15,7 @@ gtv đặt một **Project Operator** trên server; agent của mọi người n
 
 3. **Hỏi Operator giữa lúc code** (`gtv_ask`): trả lời từ code graph, docs/ADR và WIP của đồng đội; câu cần người khác quyết định được **chuyển vào agent của họ** và câu trả lời quay lại tự động.
 
-Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain ([Hermes Agent](https://hermes-agent.nousresearch.com/docs/) + gói ChatGPT) dùng chung.
+Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain ([Hermes Agent](https://hermes-agent.nousresearch.com/docs/), LLM tùy chọn) dùng chung.
 
 ## Kiến trúc trong 30 giây
 
@@ -50,14 +50,14 @@ cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN, GTV_BRAIN_TOKE
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Đăng nhập Brain (Hermes) bằng gói ChatGPT (một lần, lưu trong volume `hermes-data`; lệnh in URL + mã để nhập trên trình duyệt):
+Cho Brain (Hermes) một LLM — provider nào cũng được. Mặc định là gói ChatGPT (một lần, lưu trong volume `hermes-data`; lệnh in URL + mã để nhập trên trình duyệt); dùng endpoint tương thích OpenAI có sẵn thì sửa `docker/hermes/config.yaml`:
 
 ```bash
 docker compose -f docker/compose.yml --env-file docker/.env exec brain hermes auth add openai-codex --no-browser
 ```
 
 Mở dashboard: **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`). Ở đó: tạo project (repo URL), cấp token cho dev,
-chọn model Brain (mặc định `openai-codex/gpt-6-luna`; xem [docs/operations.md](docs/operations.md#brain-hermes-agent--gói-chatgpt)).
+chọn model Brain (dạng `provider/model`; xem [docs/operations.md](docs/operations.md#brain-hermes-agent)).
 
 Hoặc bằng CLI (trong Git Bash phải tắt chuyển đường dẫn MSYS, nếu không `/repos/...` thành `C:/Program Files/Git/repos/...`):
 

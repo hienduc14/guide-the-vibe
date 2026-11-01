@@ -1,9 +1,14 @@
 # Hermes Agent config for the gtv Operator brain. Seeded into the brain volume ($HERMES_HOME=/opt/data)
 # on first boot only; after editing, delete /opt/data/config.yaml in the volume and restart (docs/operations.md).
 
-# Default model when gtv sends none. gtv sends provider/model from BRAIN_MODEL or the dashboard.
+_config_version: 50 # Hermes config schema (v0.22); without it Hermes treats this file as too old to migrate
+
+# Default model when gtv sends none (gtv sends provider/model from BRAIN_MODEL or the dashboard).
+# Any Hermes provider works, e.g. a ChatGPT plan (log in: hermes auth add openai-codex --no-browser) or any
+# OpenAI-compatible endpoint (CLIProxyAPI, vLLM, LiteLLM…):
+#   model: { provider: custom, default: <model>, base_url: http://host:port/v1, api_key: "${LLM_API_KEY}" }
 model:
-  provider: openai-codex # ChatGPT plan, logged in with: hermes auth add openai-codex --no-browser
+  provider: openai-codex
   default: gpt-6-luna
 
 # Read-only brain: the api_server platform gets only the gtv MCP tools (mcp__gtv__*), nothing that can

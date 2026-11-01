@@ -779,7 +779,7 @@ Bug do self-test tìm ra và đã sửa:
 ### 23.1 Quyết định
 | # | Quyết định | Lý do |
 |---|---|---|
-| D23 | Brain mặc định = **Hermes Agent** (`nousresearch/hermes-agent:v0.22.2`, `hermes gateway run`, API server tương thích OpenAI) + đăng nhập ChatGPT (provider `openai-codex`). OpenCode giữ lại làm backend thay thế (`BRAIN_BACKEND=opencode`). | Yêu cầu nhóm |
+| D23 | Brain mặc định = **Hermes Agent** (`nousresearch/hermes-agent:v0.22.2`, `hermes gateway run`, API server tương thích OpenAI). **LLM phía sau tùy chọn** (gói ChatGPT `openai-codex`, endpoint tương thích OpenAI như CLIProxyAPI, OpenRouter…) — không phải việc của gtv. OpenCode giữ lại làm backend thay thế (`BRAIN_BACKEND=opencode`). | Yêu cầu nhóm |
 | D24 | Hermes có cấu hình MCP tĩnh, không chọn tool theo request ⇒ thêm endpoint **`/mcp` dùng chung mọi project**, mỗi tool có tham số `project`; prompt mỗi job nêu đúng project. | Hermes không có `tools` theo request như OpenCode |
 | D25 | Hermes bỏ qua `response_format` ⇒ schema nằm trong prompt, gtv tự kiểm JSON và nhắc lại một lần. Lỗi có thể đến dạng HTTP 200 ⇒ chỉ `finish_reason: stop` + JSON hợp lệ là thành công. Mỗi job một session, xóa sau khi xong. | Đọc mã nguồn Hermes v0.22 |
 | D26 | Compose bắt buộc `GTV_ADMIN_TOKEN`, `GTV_BRAIN_TOKEN`, `HERMES_API_KEY`. | Cổng 7390 mở ra ngoài; `/mcp` đọc được code |
@@ -796,5 +796,9 @@ Bug do self-test tìm ra và đã sửa:
 | ADR bị thay thế "sống lại" khi main đổi | Brain trích quyết định cũ | áp lại `supersedes` mỗi lần sync (`kb.ts`) |
 | Thư mục trần (`src/payments`) không trùng glob con (`src/payments/**`) | Không báo critical/scope overlap lúc đăng ký | `patternsOverlap` xét tiền tố thư mục (`util.ts`) |
 
-### 23.3 Chưa kiểm chứng
-- Chưa chạy Hermes thật (cần Docker + đăng nhập ChatGPT): adapter được kiểm bằng gateway giả lập theo đúng định dạng response trong mã nguồn Hermes v0.22. Cần chạy lại self-test RealWorld với Hermes.
+### 23.3 Chạy thật với Hermes (01/11/2026)
+Hermes Agent v0.22.0 (cài sẵn, `HERMES_HOME` riêng, không Docker) + LLM qua CLIProxyAPI (`provider: custom`) + gtv server local trên repo mẫu mini-shop:
+- Hermes kết nối `/mcp` bằng `Bearer GTV_BRAIN_TOKEN`, đăng ký đúng 13 tool `mcp__gtv__*`; toolset built-in đều tắt.
+- Câu hỏi bậc 1 "Which functions call getUser, and does refund() respect the refund policy in the docs?" (`custom/gemini-3-flash`, chọn qua `PUT /api/brain`): trả lời sau **12 s**, `confidence: high`, đúng (caller `placeOrder`; `refund()` thiếu hạn 14/30 ngày, duyệt > 5.000.000 VND), 3 nguồn. Hermes gọi `team_status`, `who_calls`, `grep`, `kb_search`, `read_file` ×2. Session của job bị xóa sau đó.
+- Model bị rate limit (`claude-sonnet-5-5`, 429 cooldown): Hermes tự thử lại sau 600 s; gtv cắt sau 180 s, ticket đóng "Operator could not answer" — fail-open đúng thiết kế. Session của run đó còn lại trong Hermes tới khi run kết thúc.
+- Chưa chạy: image Docker `v0.22.2`, self-test RealWorld với Hermes.

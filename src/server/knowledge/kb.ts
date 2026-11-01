@@ -178,6 +178,7 @@ export class KnowledgeBase {
     const files = (await repo.listFiles(mainSha)).filter((p) => this.globs.some((g) => globMatch(g, p)));
     const contents = await repo.readFiles(mainSha, files);
     const present = new Set<string>();
+    const superseded: string[] = [];
     for (const p of files) {
       const text = contents.get(p);
       if (text === undefined) continue;
@@ -187,11 +188,13 @@ export class KnowledgeBase {
       const title = String(meta.title ?? headingTitle(body) ?? p);
       const type = String(meta.type ?? (/(^|\/)adr\//i.test(p) ? "adr" : "doc"));
       const status = (["active", "superseded"].includes(String(meta.status)) ? meta.status : "active") as DocStatus;
+      if (meta.supersedes) superseded.push(`repo:${meta.supersedes}`);
       const prev = this.get(id);
       if (prev && prev.body === body && prev.title === title && prev.status === status) continue;
       this.upsert({ id, type, title, body, status, source: "repo", path: p, supersedes: meta.supersedes ? `repo:${meta.supersedes}` : undefined });
     }
     for (const d of this.list()) if (d.source === "repo" && !present.has(d.id)) this.remove(d.id);
+    for (const s of superseded) this.db.run(`UPDATE kb_docs SET status = 'superseded' WHERE id = ?`, s);
     this.lastSha = mainSha;
     return files.length;
   }

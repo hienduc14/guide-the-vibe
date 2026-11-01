@@ -175,7 +175,8 @@ export class Repo {
   }
 
   async grep(sha: string, pattern: string, limit = 60): Promise<string[]> {
-    const r = await git(this.dir, ["grep", "-n", "-I", "-E", "--max-count=20", pattern, sha, "--"], { allowFail: true });
+    // -e: the pattern comes from the brain, so a leading "-" must not be read as an option (e.g. --open-files-in-pager=<cmd>)
+    const r = await git(this.dir, ["grep", "-n", "-I", "-E", "--max-count=20", "-e", pattern, sha, "--"], { allowFail: true });
     return r.stdout
       .split("\n")
       .filter(Boolean)

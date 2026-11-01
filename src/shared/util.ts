@@ -66,11 +66,10 @@ export function patternsOverlap(a: string, b: string): boolean {
   const literalA = !/[*?]/.test(pa);
   const literalB = !/[*?]/.test(pb);
   if (literalA && literalB) return globMatch(pa, pb) || globMatch(pb, pa);
-  if (literalA) return globMatch(pb, pa);
-  if (literalB) return globMatch(pa, pb);
-  // Both globs. With static prefixes on both sides compare the prefixes; otherwise (e.g. "**/migrations/**")
-  // test a concrete example path of each glob against the other. Misses some exotic overlaps, never invents one.
   const prefix = (s: string) => s.slice(0, s.search(/[*?]/));
+  const under = (dir: string, g: string) => prefix(g).startsWith(dir.replace(/\/$/, "") + "/"); // bare directory covers the glob
+  if (literalA) return globMatch(pb, pa) || under(pa, pb);
+  if (literalB) return globMatch(pa, pb) || under(pb, pa);
   const xa = prefix(pa);
   const xb = prefix(pb);
   if (xa && xb) return xa.startsWith(xb) || xb.startsWith(xa);

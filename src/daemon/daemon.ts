@@ -300,6 +300,11 @@ export class Daemon {
 
   private routes(): Hono {
     const app = new Hono();
+    app.use("*", async (c, next) => {
+      // Local, non-browser callers only: a foreign Host means DNS rebinding, an Origin header means a web page.
+      if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(c.req.header("host") ?? "") || c.req.header("origin")) return c.body(null, 403);
+      await next();
+    });
     app.onError((err, c) => c.json({ error: err.message }, 500));
     app.post("/hook/:agent", async (c) => {
       const agent = c.req.param("agent") as AgentKind;

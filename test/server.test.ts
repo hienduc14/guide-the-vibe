@@ -226,3 +226,16 @@ test("brain MCP endpoint lists and runs read-only tools", async () => {
   const res = await call({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "who_calls", arguments: { symbol: "getUser", view: "ws_b" } } });
   assert.match(res.result.content[0].text, /src\/sso\/google\.ts/);
 });
+
+test("events: a developer cannot act on another developer's workspace or session", async () => {
+  const [a] = rt.engine.store.sessions().filter((s) => s.dev === "alice");
+  await assert.rejects(api("bob", "POST", "/v1/p/default/events", { type: "edit", session_id: a.id, paths: ["src/x.ts"] }));
+  await assert.rejects(api("bob", "POST", "/v1/p/default/events", { type: "snapshot", workspace_id: a.workspace_id, sha: "0".repeat(40) }));
+  await assert.rejects(
+    api("bob", "POST", "/v1/p/default/events", {
+      type: "session_start",
+      session: { dev: "bob", agent: "codex", workspace_id: a.workspace_id, workspace_label: "x", agent_session_id: "steal" },
+    }),
+  );
+  assert.equal(rt.engine.store.workspace(a.workspace_id)?.dev, "alice");
+});

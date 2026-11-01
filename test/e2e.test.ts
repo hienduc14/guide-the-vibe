@@ -2,6 +2,7 @@
 // Hook payloads mimic each agent's native format.
 
 import { test, after } from "node:test";
+import { request } from "node:http";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { startServer, type Running } from "../src/server/main.ts";
@@ -207,6 +208,19 @@ test("Q&A relay: Claude asks, Operator forwards to Bob's Codex, Bob replies, ans
   assert.match(replied, /Answer sent/);
   const woke = await waiter;
   assert.match(woke.text ?? "", /String\(id\)/);
+});
+
+test("the daemon refuses browser requests (Origin header) and foreign Host names", async () => {
+  const url = `http://127.0.0.1:${alice.cfg.port}/statusline`;
+  assert.equal((await fetch(url, { headers: { origin: "https://evil.example" } })).status, 403);
+  // fetch always sends the real Host; DNS rebinding sends the attacker's name
+  const rebound = await new Promise<number>((resolve, reject) =>
+    request(url, { headers: { host: "evil.example" } }, (res) => resolve(res.statusCode!))
+      .on("error", reject)
+      .end(),
+  );
+  assert.equal(rebound, 403);
+  assert.equal((await fetch(url)).status, 200);
 });
 
 test("statusline and status describe the team", async () => {

@@ -44,6 +44,7 @@ export class Engine {
   private driftWarned = new Set<string>();
   private l3Count = { day: "", n: 0 };
   mainSha?: string;
+  private polledMain?: string;
 
   constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig }) {
     this.db = opts.db;
@@ -154,7 +155,7 @@ export class Engine {
       case "edit":
         return this.onEdit(ev.session_id, ev.paths);
       case "snapshot":
-        void this.onSnapshot(ev.workspace_id, ev.sha, ev.branch);
+        void this.onSnapshot(ev.workspace_id, ev.sha, ev.branch).catch((e) => log("engine", `snapshot ${ev.sha} failed: ${(e as Error).message}`));
         return { accepted: true };
     }
   }
@@ -426,8 +427,8 @@ export class Engine {
     await this.gitLock.use(async () => {
       await this.repo!.fetch();
       const main = await this.repo!.mainSha();
-      changedMain = !!main && main !== this.mainSha;
-      this.mainSha = main;
+      changedMain = !!main && main !== this.polledMain;
+      this.mainSha = this.polledMain = main;
       if (main && changedMain) {
         if (isActive(this.mode("knowledge.code_graph"))) await this.guarded("knowledge.code_graph", () => syncBase(this.graph, this.repo!, main));
         if (isActive(this.mode("knowledge.doc_kb"))) await this.guarded("knowledge.doc_kb", () => this.kb.syncFromRepo(this.repo!, main));
@@ -470,7 +471,7 @@ export class Engine {
     const committedAt = await this.repo!.commitTime(parent);
     const tasks = this.store.activeTasks().filter((t) => t.workspace_id === ws.id && committedAt && committedAt >= t.created_at);
     const leftover = this.store.footprints().some((f) => f.workspace_id === ws.id);
-    if (!tasks.length && !leftover) return;
+    if (!leftover) return; // nothing edited here: a clean checkout of a newer main is a pull, not a merge
     for (const t of tasks) this.store.updateTask(t.id, { status: "done" });
     this.tasksClosed(tasks.map((t) => t.id));
     this.store.clearFootprints(ws.id);

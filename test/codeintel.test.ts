@@ -68,6 +68,18 @@ test("parseMergeTree reads conflicted files and messages", () => {
   assert.equal(r.conflicts[0].type, "CONFLICT (contents)");
 });
 
+test("repo grep treats a pattern starting with dashes as a pattern, not a git option", async () => {
+  const origin = await makeOrigin({ "run.sh": "deploy --verbose\n" });
+  try {
+    const repo = new Repo(join(origin.root, "mirror.git"), origin.bare);
+    await repo.ensure();
+    await repo.fetch();
+    assert.deepEqual(await repo.grep((await repo.mainSha())!, "--verbose"), ["run.sh:1:deploy --verbose"]);
+  } finally {
+    origin.cleanup();
+  }
+});
+
 test("graph base + overlay views, callers across workspaces, and workspace changes", async () => {
   const origin = await makeOrigin({
     "src/auth/service.ts": "export function getUser(id: number) { return id }\nexport function login(u: string) { return getUser(1) }\n",

@@ -28,7 +28,13 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const body = (await c.req.json()) as { events?: GtvEvent[] } | GtvEvent;
     const events = "events" in body && body.events ? body.events : [body as GtvEvent];
     const results = [];
-    for (const ev of events) results.push(await engine.handle(c.get("dev"), ev));
+    for (const ev of events) {
+      const wsId = ev.type === "snapshot" ? ev.workspace_id : ev.type === "session_start" ? ev.session.workspace_id : undefined;
+      const ws = wsId ? engine.store.workspace(wsId) : undefined;
+      if (ws && ws.dev !== c.get("dev") && !c.get("admin")) throw new Error(`unknown workspace ${wsId}`);
+      if ("session_id" in ev) sessionOf(c, ev.session_id);
+      results.push(await engine.handle(c.get("dev"), ev));
+    }
     return c.json({ results });
   });
 

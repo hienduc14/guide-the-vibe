@@ -801,4 +801,7 @@ Hermes Agent v0.22.0 (cài sẵn, `HERMES_HOME` riêng, không Docker) + LLM qua
 - Hermes kết nối `/mcp` bằng `Bearer GTV_BRAIN_TOKEN`, đăng ký đúng 13 tool `mcp__gtv__*`; toolset built-in đều tắt.
 - Câu hỏi bậc 1 "Which functions call getUser, and does refund() respect the refund policy in the docs?" (`custom/gemini-3-flash`, chọn qua `PUT /api/brain`): trả lời sau **12 s**, `confidence: high`, đúng (caller `placeOrder`; `refund()` thiếu hạn 14/30 ngày, duyệt > 5.000.000 VND), 3 nguồn. Hermes gọi `team_status`, `who_calls`, `grep`, `kb_search`, `read_file` ×2. Session của job bị xóa sau đó.
 - Model bị rate limit (`claude-sonnet-5-5`, 429 cooldown): Hermes tự thử lại sau 600 s; gtv cắt sau 180 s, ticket đóng "Operator could not answer" — fail-open đúng thiết kế. Session của run đó còn lại trong Hermes tới khi run kết thúc.
-- Chưa chạy: image Docker `v0.22.2`, self-test RealWorld với Hermes.
+- **Self-test RealWorld với Hermes** (`custom/gemini-3.8-flash-high` qua CLIProxyAPI, server + 2 daemon chạy bằng node thay cho Docker): **21/21 check**, 3 job Brain, p50 33 s (`docs/reports/selftest-realworld.md`). Job L3 mất 62 s > `registration.wait_s` (30 s) nên phản hồi đăng ký trả `l3: pending`, đánh giá L3 (có lời khuyên đúng) đến sau thành conflict HIGH gửi vào agent cả hai bên — đúng thiết kế; với model chậm có thể tăng `registration.wait_s`. Trước đây với OpenCode + `gpt-6-luna`: p50 9,7 s.
+- Trích ý định từ plan (Claude `ExitPlanMode`, mode `shadow`): Hermes trả đăng ký đúng (title, goal, 3 file, symbol `createUser`, contract `POST /api/users/login` tìm được bằng tool).
+- Cả 3 loại job Brain (`answer_question`, `judge_registration`, `extract_intent_from_plan`) đều chạy thật, 0 lỗi.
+- Chưa chạy: image Docker `v0.22.2` (máy test không có Docker).

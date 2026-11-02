@@ -105,5 +105,6 @@ node bin/gtv.mjs         # in trợ giúp CLI
 ## Trạng thái
 
 Prototype cho đồ án: các luồng chính đã chạy thật (xem [báo cáo self-test](docs/reports/selftest-realworld.md)).
-Chưa có: gắn với GitHub (comment PR, cửa chặn pre-push), embedding cho KB, adapter Cursor/Grok, chạy thật với Claude Code/Codex ngoài kịch bản giả lập.
+Đã chạy thật với Claude Code, Codex và omp (SPEC §23.4) và stack Docker (self-test RealWorld 21/21).
+Chưa có: gắn với GitHub (comment PR, cửa chặn pre-push), embedding cho KB, adapter Cursor/Grok.
 Lộ trình và lý do thiết kế: [SPEC.md](SPEC.md).

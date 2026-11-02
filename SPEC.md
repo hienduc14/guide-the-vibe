@@ -804,4 +804,16 @@ Hermes Agent v0.22.0 (cài sẵn, `HERMES_HOME` riêng, không Docker) + LLM qua
 - **Self-test RealWorld với Hermes** (`custom/gemini-3.8-flash-high` qua CLIProxyAPI, server + 2 daemon chạy bằng node thay cho Docker): **21/21 check**, 3 job Brain, p50 33 s (`docs/reports/selftest-realworld.md`). Job L3 mất 62 s > `registration.wait_s` (30 s) nên phản hồi đăng ký trả `l3: pending`, đánh giá L3 (có lời khuyên đúng) đến sau thành conflict HIGH gửi vào agent cả hai bên — đúng thiết kế; với model chậm có thể tăng `registration.wait_s`. Trước đây với OpenCode + `gpt-6-luna`: p50 9,7 s.
 - Trích ý định từ plan (Claude `ExitPlanMode`, mode `shadow`): Hermes trả đăng ký đúng (title, goal, 3 file, symbol `createUser`, contract `POST /api/users/login` tìm được bằng tool).
 - Cả 3 loại job Brain (`answer_question`, `judge_registration`, `extract_intent_from_plan`) đều chạy thật, 0 lỗi.
-- Chưa chạy: image Docker `v0.22.2` (máy test không có Docker).
+- **Stack Docker thật** (`docker/compose.yml`, image `nousresearch/hermes-agent:v0.22.2` + image operator build từ repo; override chỉ đổi sang mạng host vì firewall máy test chặn container → host): config Hermes được chép vào volume ở lần chạy đầu, Hermes đăng ký 13 tool qua `Bearer GTV_BRAIN_TOKEN`, `/api` và `/mcp` trả 401 khi thiếu token, compose từ chối chạy khi thiếu `GTV_ADMIN_TOKEN`/`GTV_BRAIN_TOKEN`/`HERMES_API_KEY`. Self-test RealWorld trên stack này: **21/21**.
+
+### 23.4 Chạy với agent thật (02/11/2026)
+Cùng stack Docker, repo RealWorld, 3 dev, mỗi dev một daemon:
+| Dev | Agent | Model | Kết quả |
+|---|---|---|---|
+| alice | **Claude Code 2.1.316** (`claude -p`, hook HTTP + MCP do `gtv install claude` ghi) | haiku | `gtv_register_task` qua MCP; đổi chữ ký `profileMapper` + caller; hook PostToolUse chèn cảnh báo "sửa ngoài scope" (drift) vào agent và agent báo lại cho người dùng; snapshot đẩy lên `refs/gtv/alice/*` |
+| bob | **Codex CLI 0.163.0** (`codex exec`, hook command + MCP do `gtv install codex` ghi, hook được trust qua app-server `hooks/list` + `config/batchWrite` như nút Trust của `/hooks`) | gemini-3.8-flash-high qua CLIProxyAPI | Đăng ký → `needs_coordination`, HIGH: alice đổi chữ ký `profileMapper` mà bob định dùng — **trước khi viết code**; `gtv_ask` → Brain đọc WIP của alice, trả lời "dùng `id ? { id } : undefined`"; bob viết `getCommentAuthors` theo chữ ký mới; `gtv_ack` 5 conflict |
+| carol | **omp 18.12.2** (`omp -p -e src/adapters/omp/gtv-extension.ts`) | gemini-3.8-flash-high qua CLIProxyAPI | `gtv_status` + `gtv_ask` qua tool của extension; Brain trả lời ai đang đổi gì và xác nhận code của bob khớp chữ ký mới của alice, 4 nguồn |
+
+Lỗi tìm ra và đã sửa: Codex coi mọi tool MCP là cần duyệt; với `approval_policy = "never"` (`codex exec`) lời gọi `gtv_register_task` bị từ chối. `gtv install codex` giờ ghi `default_tools_approval_mode = "approve"` cho server `gtv` (tool gtv chỉ nói với Operator, không sửa code).
+
+Chưa kiểm tra: phiên tương tác (TUI) của Codex/omp, `asyncRewake` của Claude khi rảnh (chỉ chạy `-p`), Cursor/Grok (chưa có adapter).

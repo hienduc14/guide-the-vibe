@@ -31,11 +31,11 @@ Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, c�
 
 `gtv install codex` ghi:
 
-| File                                       | Nội dung                                                                                                                                                                                             |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.codex/hooks.json`                        | hook **command** `node bin/gtv.mjs hook codex --daemon <url>`: `SessionStart`, `UserPromptSubmit`, `PreToolUse` matcher `apply_patch\|Edit\|Write\|update_plan`, `PostToolUse`, `Stop`, `SessionEnd` |
-| `.codex/config.toml`                       | `[mcp_servers.gtv]` (`--agent codex`, `tool_timeout_sec = 150`)                                                                                                                                      |
-| `.codex/skills/gtv-collaboration/SKILL.md` | skill                                                                                                                                                                                                |
+| File                                       | Nội dung                                                                                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.codex/hooks.json`                        | hook **command** `node bin/gtv.mjs hook codex --daemon <url>`: `SessionStart`, `UserPromptSubmit`, `PreToolUse` matcher `apply_patch\|Edit\|Write\|update_plan`, `PostToolUse`, `Stop`, `SessionEnd`                                  |
+| `.codex/config.toml`                       | `[mcp_servers.gtv]` (`--agent codex`, `tool_timeout_sec = 150`, `default_tools_approval_mode = "approve"` — không có dòng này Codex hỏi duyệt mỗi lần gọi tool gtv, và `codex exec` với `approval_policy = "never"` thì từ chối luôn) |
+| `.codex/skills/gtv-collaboration/SKILL.md` | skill                                                                                                                                                                                                                                 |
 
 - Phải **trust project** và duyệt hook bằng `/hooks` trong Codex; hook đổi nội dung ⇒ phải duyệt lại.
 - Codex báo sửa file là `apply_patch`, nội dung ở `tool_input.command`; daemon đọc các dòng `*** Add/Update/Delete File:` / `*** Move to:`.

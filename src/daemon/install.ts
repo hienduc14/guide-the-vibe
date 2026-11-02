@@ -78,7 +78,7 @@ export function installCodex(project: string, daemon = daemonUrl()): string[] {
   const tomlPath = join(project, ".codex", "config.toml");
   let toml = existsSync(tomlPath) ? readFileSync(tomlPath, "utf8") : "";
   toml = toml.replace(/\n?\[mcp_servers\.gtv\][\s\S]*?(?=\n\[|$)/, "");
-  toml += `${toml && !toml.endsWith("\n") ? "\n" : ""}\n[mcp_servers.gtv]\ncommand = "node"\nargs = ["${GTV_BIN}", "mcp", "--agent", "codex", "--daemon", "${daemon}"]\ntool_timeout_sec = 150\n`;
+  toml += `${toml && !toml.endsWith("\n") ? "\n" : ""}\n[mcp_servers.gtv]\ncommand = "node"\nargs = ["${GTV_BIN}", "mcp", "--agent", "codex", "--daemon", "${daemon}"]\ntool_timeout_sec = 150\n# gtv tools only talk to the Operator (never touch code); without this Codex asks for every call, and fails them under approval_policy = "never"\ndefault_tools_approval_mode = "approve"\n`;
   writeFileSync(tomlPath, toml);
   const skill = installSkill(join(project, ".codex", "skills", "gtv-collaboration"));
   return [hooksPath, tomlPath, skill];

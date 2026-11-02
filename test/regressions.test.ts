@@ -11,7 +11,7 @@ import { KnowledgeBase } from "../src/server/knowledge/kb.ts";
 import { NullBrain } from "../src/server/brain/types.ts";
 import { git, patternsOverlap } from "../src/shared/util.ts";
 import { toRepoPaths } from "../src/daemon/hooks.ts";
-import { mkdirSync, symlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import { commitAndPush, makeOrigin, tempDir } from "./helpers.ts";
 
 process.env.GTV_QUIET = "1";
@@ -84,4 +84,14 @@ test("hook paths map into the repo when the agent's cwd is another spelling of i
   // git reports the real path; the agent runs in the alias. New files (not on disk yet) map too.
   assert.deepEqual(toRepoPaths(["src/new.ts", join(alias, "src", "a.ts")], alias, real), ["src/new.ts", "src/a.ts"]);
   assert.deepEqual(toRepoPaths(["../outside.ts"], alias, real), []);
+});
+
+test("gtv install codex lets Codex call gtv tools without per-call approval, and stays idempotent", async () => {
+  const { installCodex } = await import("../src/daemon/install.ts");
+  const dir = tempDir();
+  installCodex(dir, "http://127.0.0.1:7391");
+  installCodex(dir, "http://127.0.0.1:7391");
+  const toml = readFileSync(join(dir, ".codex", "config.toml"), "utf8");
+  assert.equal(toml.match(/\[mcp_servers\.gtv\]/g)?.length, 1);
+  assert.match(toml, /\[mcp_servers\.gtv\][\s\S]*default_tools_approval_mode = "approve"/);
 });

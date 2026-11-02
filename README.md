@@ -85,6 +85,7 @@ Chi tiết tích hợp từng agent: [docs/agents.md](docs/agents.md).
 | [docs/features.md](docs/features.md)                   | Từng feature/layer: cách hoạt động, chế độ, giới hạn |
 | [docs/api.md](docs/api.md)                             | API server, daemon, MCP                              |
 | [docs/agents.md](docs/agents.md)                       | Claude Code, Codex, omp                              |
+| [docs/hooks.md](docs/hooks.md)                         | Từng hook đi đâu, luồng chi tiết từng bước           |
 | [docs/operations.md](docs/operations.md)               | Docker, biến môi trường, token, Brain, sự cố         |
 | [docs/development.md](docs/development.md)             | Quy ước code, cách thêm tính năng                    |
 | [docs/testing.md](docs/testing.md)                     | Test tự động và self-test trên repo thật             |

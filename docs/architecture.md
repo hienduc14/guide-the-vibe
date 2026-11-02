@@ -21,6 +21,8 @@
 
 ## Luồng chính
 
+Bản tóm tắt; từng hook và sơ đồ tuần tự chi tiết: [hooks.md](hooks.md).
+
 ### 1. Bắt đầu phiên
 
 Agent → hook `SessionStart` → daemon tìm workspace (repo root, branch, project qua `.git/gtv-project` hoặc `GET /v1/resolve?remote=`) →

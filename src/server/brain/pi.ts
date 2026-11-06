@@ -23,7 +23,7 @@ import type { ProjectScopedBackend } from "./metered.ts";
 import { OPERATOR_SYSTEM } from "./prompts.ts";
 import { brainTools } from "./tools.ts";
 import { DbCredentialStore, Sealer, keyHint } from "./credentials.ts";
-import { antigravityProvider } from "./antigravity.ts";
+import { ANTIGRAVITY, antigravityProvider } from "./antigravity.ts";
 import type { Db } from "../../shared/db.ts";
 import { log, nowIso } from "../../shared/util.ts";
 
@@ -160,6 +160,7 @@ export class PiBrain implements ProjectScopedBackend {
   private readonly opts: PiOptions;
   private readonly sem: Semaphore;
   private pi: MutableModels;
+  private catalogTimer?: NodeJS.Timeout;
   private endpoints = new Map<string, Endpoint>();
   private db?: Db;
   private store?: DbCredentialStore;
@@ -179,8 +180,21 @@ export class PiBrain implements ProjectScopedBackend {
     this.store = new DbCredentialStore(db, this.sealer);
     this.pi = piModels(this.store);
     this.loadEndpoints();
+    this.refreshAntigravity();
+    this.catalogTimer ??= setInterval(() => this.refreshAntigravity(), 6 * 3600_000).unref();
     const stored = db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM brain_credentials`)?.n ?? 0;
     if (stored && !this.sealer.encrypted) log("brain", "WARNING: GTV_SECRET_KEY is not set — LLM keys in hub.db are stored unencrypted");
+  }
+
+  /** Antigravity's model list comes from the signed-in account; no-op when nobody is signed in. */
+  private refreshAntigravity(): void {
+    void this.pi
+      .refresh({ providers: [ANTIGRAVITY], allowNetwork: true })
+      .then(async () => {
+        const n = (await this.pi.getAvailable(ANTIGRAVITY)).length;
+        if (n) log("brain", `antigravity: ${n} models available to the signed-in account`);
+      })
+      .catch((e: Error) => log("brain", `antigravity: model list refresh failed: ${e.message}`));
   }
 
   private loadEndpoints(): void {
@@ -502,6 +516,7 @@ export class PiBrain implements ProjectScopedBackend {
       () => {
         view.status = "done";
         log("brain", `${providerId}: signed in with an account`);
+        if (providerId === ANTIGRAVITY) this.refreshAntigravity();
       },
       (e: Error) => {
         view.status = "error";

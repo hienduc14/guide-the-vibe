@@ -25,17 +25,20 @@ registerHooks({
 
 // Variable specifiers keep tsc from type-checking the package's source with our settings.
 const load = (path: string) => import(`pi-antigravity/src/${path}`);
-const [oauth, models, stream, client] = await Promise.all([
+const [oauth, models, stream, client, discovery] = await Promise.all([
   load("auth/oauth.ts"),
   load("models/models.ts"),
   load("stream/stream.ts"),
   load("client/client.ts"),
+  load("models/discovery.ts"),
 ]);
 
 export const ANTIGRAVITY = models.PROVIDER_ID as string; // "antigravity"
 
 export function antigravityProvider(): Provider {
+  let live: Set<string> | undefined;
   const api = stream.ANTIGRAVITY_API as Api;
+  const asModels = (list: object[]) => list.map((m) => ({ ...m, api, provider: ANTIGRAVITY, baseUrl: client.DEFAULT_ENDPOINT }));
   const oauthCred = async (c: Promise<object>): Promise<OAuthCredential> => ({ ...(await c), type: "oauth" }) as OAuthCredential;
   return createProvider({
     id: ANTIGRAVITY,
@@ -62,12 +65,18 @@ export function antigravityProvider(): Provider {
         toAuth: async (c) => ({ apiKey: oauth.getApiKey(c) as string }),
       },
     },
-    models: (models.getCurrentAntigravityCatalog().models as object[]).map((m) => ({
-      ...m,
-      api,
-      provider: ANTIGRAVITY,
-      baseUrl: client.DEFAULT_ENDPOINT,
-    })) as never,
+    models: asModels(models.getCurrentAntigravityCatalog().models) as never,
+    // Google retires models often ("Gemini 3.5 Flash is no longer available"), so the built-in list goes stale:
+    // ask the account's live catalog (fetchAvailableModels) and show only what it offers. On failure the
+    // previous list stays (createProvider keeps it when this throws).
+    fetchModels: async (ctx) => {
+      if (ctx.credential?.type !== "oauth") return [];
+      const catalog = await discovery.discoverAntigravityModels(oauth.getApiKey(ctx.credential), ctx.signal);
+      models.applyAntigravityCatalog(catalog); // its transport routes requests by this catalog
+      live = new Set(catalog.models.map((m: { id: string }) => m.id));
+      return asModels(catalog.models) as never;
+    },
+    filterModels: (list) => (live ? list.filter((m) => live!.has(m.id)) : list),
     api: { stream: stream.streamAntigravity, streamSimple: stream.streamAntigravity },
   });
 }

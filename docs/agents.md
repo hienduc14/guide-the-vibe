@@ -10,7 +10,7 @@ npx guide-the-vibe join https://<server>/j/<code>   # token, project, hook/MCP/s
 npx guide-the-vibe install                          # thêm repo khác
 ```
 
-Daemon chạy nền (log `~/.gtv/daemon.log`). Nếu nó tắt, phiên agent kế tiếp tự bật lại: `gtv mcp` kiểm tra `/health` khi khởi động và trước lời gọi tool lỗi. Daemon đang chạy với dev/server khác config thì bị tắt và bật lại.
+Daemon chạy nền (log `~/.gtv/daemon.log`). Quản lý bằng `npx guide-the-vibe daemon start | stop | restart | status`; `npx guide-the-vibe daemon` chạy nó ngay trong terminal để xem log. Nếu nó tắt, phiên agent kế tiếp tự bật lại: `gtv mcp` kiểm tra `/health` khi khởi động và trước lời gọi tool lỗi. Daemon đang chạy với dev/server khác config thì bị tắt và bật lại.
 
 Từng bước bằng tay (trong repo gtv, `node bin/gtv.mjs` = `gtv`):
 

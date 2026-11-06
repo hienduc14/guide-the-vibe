@@ -66,7 +66,8 @@ Setup (npx guide-the-vibe <command> works the same as gtv <command>)
   gtv join <invite link>             one-step setup from the link on the dashboard (Developers › Invite)
   gtv install                        set up another repo: link it, wire the agents, start the daemon
   gtv init --dev <name> --server <url> [--token <t>] [--port 7391]   manual setup with a dev token
-  gtv daemon                         run the local daemon in this terminal (it normally runs in the background)
+  gtv daemon start|stop|restart|status   manage the background daemon
+  gtv daemon                         run the daemon in this terminal instead (prints its log)
   gtv install claude|codex [dir] [--daemon <url>]   only wire hooks + MCP + skill into a project (default: cwd;
                                      --daemon when several daemons share a machine)
 
@@ -145,6 +146,31 @@ async function main(): Promise<void> {
       return;
     }
     case "daemon": {
+      const sub = rest[0];
+      if (sub === "start" || sub === "stop" || sub === "restart" || sub === "status") {
+        const { daemonHealth, ensureDaemon, stopDaemon } = await import("./install.ts");
+        const url = flag("daemon") ?? daemonUrl();
+        if (sub === "stop" || sub === "restart") {
+          if (!(await stopDaemon(url))) throw new Error(`could not stop the daemon on ${url} (started by another user?)`);
+          if (sub === "stop") return console.log("Daemon stopped.");
+        }
+        if (sub !== "status") {
+          if (!(await ensureDaemon(url)))
+            throw new Error(
+              `the daemon did not start: run \`npx guide-the-vibe daemon\` to see why (log: ${CONFIG_FILE.replace(/config\.json$/, "daemon.log")})`,
+            );
+        }
+        const h = await daemonHealth(url);
+        if (!h) return console.log(`No daemon running on ${url}. Start it with: npx guide-the-vibe daemon start`);
+        console.log(`Daemon running on ${url} (pid ${h.pid ?? "?"}) as ${h.dev}`);
+        console.log(`  server   ${h.server} ${h.reachable ? "(reachable)" : "(UNREACHABLE)"}`);
+        const projects = Object.entries(h.projects ?? {});
+        console.log(
+          `  projects ${projects.length ? projects.map(([id, ok]) => `${id}${ok ? "" : " (disconnected)"}`).join(", ") : "none yet (connects when an agent session starts in a linked repo)"}`,
+        );
+        console.log(`  sessions ${h.sessions}`);
+        return;
+      }
       const { Daemon } = await import("./daemon.ts");
       const d = new Daemon(loadDaemonConfig());
       await d.start();

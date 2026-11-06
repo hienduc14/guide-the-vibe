@@ -22,27 +22,50 @@ function ensureBin(): void {
   if (resolve(self) !== resolve(GTV_BIN)) copyFileSync(self, GTV_BIN);
 }
 
+export interface DaemonHealth {
+  pid?: number;
+  dev: string;
+  server: string;
+  token?: string | null;
+  reachable: boolean;
+  projects: Record<string, boolean>;
+  sessions: number;
+}
+
+/** The running daemon's /health, or undefined when none answers. */
+export const daemonHealth = (daemon = daemonUrl()): Promise<DaemonHealth | undefined> =>
+  fetch(`${daemon}/health`, { signal: AbortSignal.timeout(1000) })
+    .then((r) => r.json() as Promise<DaemonHealth>)
+    .catch(() => undefined);
+
+/** Stops the daemon on this port; true when none is left running. */
+export async function stopDaemon(daemon = daemonUrl()): Promise<boolean> {
+  const h = await daemonHealth(daemon);
+  if (!h) return true;
+  if (!h.pid) return false;
+  try {
+    process.kill(h.pid);
+  } catch {
+    return false; // another user's process
+  }
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    if (!(await daemonHealth(daemon))) return true;
+  }
+  return false;
+}
+
 /**
  * Starts the daemon in the background unless one already runs with the current config
  * (one running with another dev or server is stopped first). Returns false if it did not come up.
  */
 export async function ensureDaemon(daemon = daemonUrl()): Promise<boolean> {
   const cfg = loadDaemonConfig();
-  const health = () =>
-    fetch(`${daemon}/health`, { signal: AbortSignal.timeout(1000) })
-      .then((r) => r.json() as Promise<{ pid?: number; dev: string; server: string; token?: string | null }>)
-      .catch(() => undefined);
+  const health = () => daemonHealth(daemon);
   const h = await health();
   // A new invite rotates the token: a daemon still holding the old one would get 401s, so restart it.
   if (h && h.dev === cfg.dev && h.server === cfg.server && h.token === tokenFingerprint(cfg.token)) return true;
-  if (h?.pid) {
-    try {
-      process.kill(h.pid);
-    } catch {
-      return false; // someone else's daemon on this port
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
+  if (h && !(await stopDaemon(daemon))) return false; // someone else's daemon on this port
   ensureBin();
   mkdirSync(CONFIG_DIR, { recursive: true });
   const logFd = openSync(join(CONFIG_DIR, "daemon.log"), "a");

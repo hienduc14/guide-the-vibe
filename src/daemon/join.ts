@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { CONFIG_FILE, loadDaemonConfig, saveDaemonConfig } from "./config.ts";
 import { ServerClient } from "./client.ts";
 import { ensureDaemon, installClaude, installCodex } from "./install.ts";
-import { remoteUrl, writeLink } from "./workspace.ts";
+import { readLink, remoteUrl, writeLink } from "./workspace.ts";
 import { repoTop } from "./snapshot.ts";
 
 const ok = (s: string) => console.log(`✔ ${s}`);
@@ -59,16 +59,15 @@ export async function setupRepo(dir: string): Promise<void> {
   const cfg = loadDaemonConfig();
   const client = new ServerClient(cfg);
   const url = await remoteUrl(top, cfg.remote);
-  let project = url ? (await client.call<{ id: string }>("GET", `/v1/resolve?remote=${encodeURIComponent(url)}`).catch(() => undefined))?.id : undefined;
-  if (!project) {
-    const projects = await client.call<{ id: string; name: string; repo_url: string }[]>("GET", "/v1/projects");
-    if (!projects.length) throw new Error("the server has no projects yet: ask the admin to add this repo on the dashboard");
-    console.log(`  This repo's remote (${url ?? "none"}) matches no project. Projects on the server:`);
-    projects.forEach((p, i) => console.log(`    ${i + 1}) ${p.id}  ${p.repo_url}`));
-    const pick = projects[Number(await ask("Which project is this repo", "1")) - 1];
-    if (!pick) throw new Error("no such project");
-    project = pick.id;
-  }
+  // An earlier `gtv link` wins (e.g. a clone of a fork); otherwise the server matches the remote URL.
+  const project =
+    (await readLink(top)) ??
+    (url ? (await client.call<{ id: string }>("GET", `/v1/resolve?remote=${encodeURIComponent(url)}`).catch(() => undefined))?.id : undefined);
+  if (!project)
+    throw new Error(
+      `no project on ${cfg.server} matches this repo (remote: ${url ?? "none"}). Ask the admin to add it on the dashboard, ` +
+        "or if it is a fork of a project's repo, run `npx guide-the-vibe link <project>` first.",
+    );
   await writeLink(top, project);
   ok(`This repo belongs to project "${project}"`);
 

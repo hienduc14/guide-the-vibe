@@ -8,10 +8,13 @@
 // - one of Pi's built-in providers ("anthropic/claude-…", "openai/gpt-…", "google/…"…).
 // All auth goes through Pi: keys entered on the dashboard live in Pi's CredentialStore (credentials.ts),
 // and Pi falls back to each provider's usual env var (ANTHROPIC_API_KEY, ANTHROPIC_OAUTH_TOKEN, …).
+// "Log in with your account" (Claude Pro/Max, ChatGPT, Copilot…) runs Pi's OAuth flows here, headless: the admin
+// opens the URL or device page in their own browser and pastes back what the flow asks for (startLogin).
 // Pi does not enforce a JSON schema, so the schema goes into the prompt and the reply is validated here.
 
 import { Agent } from "@earendil-works/pi-agent-core";
-import { createProvider, type Api, type AssistantMessage, type Model, type MutableModels } from "@earendil-works/pi-ai";
+import { randomUUID } from "node:crypto";
+import { createProvider, type Api, type AssistantMessage, type AuthInteraction, type Model, type MutableModels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
@@ -20,6 +23,7 @@ import type { ProjectScopedBackend } from "./metered.ts";
 import { OPERATOR_SYSTEM } from "./prompts.ts";
 import { brainTools } from "./tools.ts";
 import { DbCredentialStore, Sealer, keyHint } from "./credentials.ts";
+import { antigravityProvider } from "./antigravity.ts";
 import type { Db } from "../../shared/db.ts";
 import { log, nowIso } from "../../shared/util.ts";
 
@@ -38,6 +42,8 @@ export interface PiOptions {
   secretKey?: string;
   /** How hard the model thinks; Pi maps it to each provider's knob (Claude: effort). Default off (fastest). */
   thinking?: ThinkingLevel;
+  /** How long an OAuth login session lives (default 10 minutes). */
+  loginTtlMs?: number;
 }
 
 export const THINKING_LEVELS = ["off", "low", "medium", "high"] as const;
@@ -64,7 +70,59 @@ export interface ProviderInfo {
   base_url?: string;
   api?: CustomApi;
   env?: boolean;
+  /** "oauth" when signed in with an account, "api_key" otherwise (only when configured). */
+  auth_type?: "api_key" | "oauth";
+  /** Accepts an API key (PUT …/key). */
+  api_key?: boolean;
+  /** Supports "log in with your account", and how (see OAuthProvider). */
+  oauth?: OAuthFlow;
+  /** Number of known models (built-in providers; endpoints list theirs live). */
+  models?: number;
 }
+
+/**
+ * "device": open verification_uri and enter user_code, nothing to paste.
+ * "redirect": open the URL, sign in, paste the code (or the final redirect URL) back — the Operator runs on a
+ * remote server, so the localhost redirect the browser lands on never reaches it.
+ */
+export type OAuthFlow = "device" | "redirect";
+export interface OAuthProvider {
+  id: string;
+  name: string;
+  flow: OAuthFlow;
+}
+
+/** One "log in with your account" attempt; never carries a token. */
+export interface OAuthSession {
+  id: string;
+  provider: string;
+  status: "pending" | "waiting_input" | "done" | "error";
+  /** redirect flows: open this, then paste what `prompt` asks for. */
+  url?: string;
+  instructions?: string;
+  /** device flows: open verification_uri and enter user_code. */
+  user_code?: string;
+  verification_uri?: string;
+  /** Set while status is waiting_input. */
+  prompt?: { message: string; placeholder?: string };
+  progress?: string;
+  error?: string;
+  expires_at: string;
+}
+
+interface Login {
+  view: OAuthSession;
+  abort: AbortController;
+  answer?: (value: string) => void;
+  waiters: (() => void)[];
+  done: Promise<void>;
+  timer: NodeJS.Timeout;
+}
+
+/** With Pi 1.5.0 the other OAuth flows are device-code ones once the headless option is picked. */
+const REDIRECT_FLOWS = new Set(["anthropic", "openai", "openrouter", "antigravity"]);
+/** Pi asks which login method to use; on a server only the headless one works. */
+const HEADLESS = /headless|device|another device/i;
 
 export const ENDPOINT_ID = /^[a-z0-9][a-z0-9-]{1,30}$/;
 const CUSTOM = "custom";
@@ -90,6 +148,13 @@ export function parseJsonReply<T>(text: string, schema: Record<string, unknown>)
 const TRANSIENT =
   /\b(429|502|503|504|529)\b|rate.?limit|overloaded|timed? ?out|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|connection error|network/i;
 
+/** Pi's built-in providers plus Google Antigravity (community extension, antigravity.ts). */
+function piModels(credentials?: DbCredentialStore): MutableModels {
+  const pi = builtinModels({ credentials });
+  pi.setProvider(antigravityProvider());
+  return pi;
+}
+
 export class PiBrain implements ProjectScopedBackend {
   readonly name = "pi";
   private readonly opts: PiOptions;
@@ -104,7 +169,7 @@ export class PiBrain implements ProjectScopedBackend {
     this.opts = opts;
     this.sem = new Semaphore(opts.concurrency ?? 2);
     this.sealer = new Sealer(opts.secretKey);
-    this.pi = builtinModels();
+    this.pi = piModels();
     this.loadEndpoints();
   }
 
@@ -112,7 +177,7 @@ export class PiBrain implements ProjectScopedBackend {
   init(db: Db): void {
     this.db = db;
     this.store = new DbCredentialStore(db, this.sealer);
-    this.pi = builtinModels({ credentials: this.store });
+    this.pi = piModels(this.store);
     this.loadEndpoints();
     const stored = db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM brain_credentials`)?.n ?? 0;
     if (stored && !this.sealer.encrypted) log("brain", "WARNING: GTV_SECRET_KEY is not set — LLM keys in hub.db are stored unencrypted");
@@ -203,7 +268,8 @@ export class PiBrain implements ProjectScopedBackend {
     const auth = await this.pi.getAuth(e.id);
     const key = auth?.auth.apiKey;
     const res = await fetch(`${e.base_url.replace(/\/$/, "")}/models`, {
-      headers: key ? { authorization: `Bearer ${key}`, "x-api-key": key, "anthropic-version": "2023-06-01" } : {},
+      // Anthropic-style headers only for Anthropic endpoints: CLIProxyAPI answers a "Claude client" with a disguised model list.
+      headers: !key ? {} : e.api === "anthropic-messages" ? { "x-api-key": key, "anthropic-version": "2023-06-01" } : { authorization: `Bearer ${key}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`${e.base_url}/models -> ${res.status}`);
@@ -261,6 +327,8 @@ export class PiBrain implements ProjectScopedBackend {
         kind: "endpoint",
         configured: true,
         source: auth?.source,
+        auth_type: "api_key",
+        api_key: true,
         key_hint: keyHint(key),
         base_url: e.base_url,
         api: e.api,
@@ -268,9 +336,20 @@ export class PiBrain implements ProjectScopedBackend {
       });
     }
     for (const p of this.pi.getProviders()) {
-      if (this.endpoints.has(p.id) || !p.auth.apiKey) continue;
+      if (this.endpoints.has(p.id) || (!p.auth.apiKey && !p.auth.oauth)) continue;
       const check = await this.pi.checkAuth(p.id).catch(() => undefined);
-      out.push({ id: p.id, name: p.name, kind: "builtin", configured: !!check, source: check?.source, key_hint: keyHint(await stored(p.id)) });
+      out.push({
+        id: p.id,
+        name: p.name,
+        kind: "builtin",
+        configured: !!check,
+        source: check?.source,
+        auth_type: check?.type,
+        key_hint: keyHint(await stored(p.id)),
+        api_key: !!p.auth.apiKey,
+        oauth: p.auth.oauth ? (REDIRECT_FLOWS.has(p.id) ? "redirect" : "device") : undefined,
+        models: p.getModels().length,
+      });
     }
     return out;
   }
@@ -322,6 +401,147 @@ export class PiBrain implements ProjectScopedBackend {
     await this.clearKey(id);
     this.endpoints.delete(id);
     this.pi.deleteProvider(id);
+  }
+
+  // ---- "log in with your account" (OAuth, Pi's own flows) --------------------------------
+
+  private logins = new Map<string, Login>();
+
+  oauthProviders(): OAuthProvider[] {
+    return this.pi
+      .getProviders()
+      .filter((p) => p.auth.oauth && !this.endpoints.has(p.id))
+      .map((p) => ({ id: p.id, name: p.auth.oauth!.name, flow: REDIRECT_FLOWS.has(p.id) ? "redirect" : "device" }));
+  }
+
+  /** OpenAI's ChatGPT login wants a stable id for this installation. */
+  private deviceId(): string {
+    const row = this.db!.get<{ value: string }>(`SELECT value FROM settings WHERE key = 'brain.device_id'`);
+    if (row) return row.value;
+    const id = randomUUID();
+    this.db!.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('brain.device_id', ?)`, id);
+    return id;
+  }
+
+  private wake(l: Login): void {
+    for (const w of l.waiters.splice(0)) w();
+  }
+
+  private changed(l: Login, ms: number): Promise<void> {
+    return new Promise((r) => {
+      const t = setTimeout(r, ms);
+      l.waiters.push(() => {
+        clearTimeout(t);
+        r();
+      });
+    });
+  }
+
+  /** Starts Pi's login flow for a provider; returns once there is something to show (URL, device code) or an outcome. */
+  async startLogin(providerId: string, opts: { domain?: string } = {}): Promise<OAuthSession> {
+    this.requireStore();
+    const p = this.pi.getProvider(providerId);
+    if (!p?.auth.oauth || this.endpoints.has(providerId)) throw new Error(`${providerId} has no account login`);
+    // One login per provider: a new start replaces the old one (fixed callback ports must be free again).
+    for (const old of [...this.logins.values()].filter((l) => l.view.provider === providerId)) {
+      this.cancelLogin(old.view.id);
+      await old.done;
+    }
+    const ttl = this.opts.loginTtlMs ?? 10 * 60_000;
+    const view: OAuthSession = { id: randomUUID(), provider: providerId, status: "pending", expires_at: new Date(Date.now() + ttl).toISOString() };
+    const abort = new AbortController();
+    const l: Login = {
+      view,
+      abort,
+      waiters: [],
+      done: Promise.resolve(),
+      timer: setTimeout(() => {
+        abort.abort(new Error("login expired"));
+        this.logins.delete(view.id);
+      }, ttl).unref(),
+    };
+    const interaction: AuthInteraction = {
+      signal: abort.signal,
+      notify: (e) => {
+        if (e.type === "auth_url") Object.assign(view, { url: e.url, instructions: e.instructions });
+        else if (e.type === "device_code") Object.assign(view, { user_code: e.userCode, verification_uri: e.verificationUri });
+        else view.progress = e.message;
+        this.wake(l);
+      },
+      prompt: async (q) => {
+        if (q.type === "select") return (q.options.find((o) => HEADLESS.test(o.label)) ?? q.options[0]).id;
+        if (q.type === "text") return opts.domain ?? ""; // GitHub Copilot: Enterprise domain, blank = github.com
+        // manual_code / secret: the admin pastes it on the dashboard.
+        const signal = q.signal ? AbortSignal.any([q.signal, abort.signal]) : abort.signal;
+        return new Promise<string>((resolve, reject) => {
+          const settle = () => {
+            signal.removeEventListener("abort", onAbort);
+            l.answer = undefined;
+            delete view.prompt;
+            if (view.status === "waiting_input") view.status = "pending";
+            this.wake(l);
+          };
+          const onAbort = () => {
+            settle();
+            reject(new Error("Login cancelled"));
+          };
+          if (signal.aborted) return onAbort();
+          signal.addEventListener("abort", onAbort, { once: true });
+          l.answer = (value) => {
+            settle();
+            resolve(value);
+          };
+          view.status = "waiting_input";
+          view.prompt = { message: q.message, placeholder: q.placeholder };
+          this.wake(l);
+        });
+      },
+    };
+    this.logins.set(view.id, l);
+    l.done = this.pi.login(providerId, "oauth", interaction, { getDeviceId: () => this.deviceId() }).then(
+      () => {
+        view.status = "done";
+        log("brain", `${providerId}: signed in with an account`);
+      },
+      (e: Error) => {
+        view.status = "error";
+        view.error = (abort.signal.aborted ? (abort.signal.reason as Error).message : e.message).slice(0, 300);
+      },
+    );
+    void l.done.finally(() => {
+      delete view.prompt;
+      this.wake(l);
+    });
+    const deadline = Date.now() + 15_000;
+    while (!view.url && !view.user_code && view.status === "pending" && Date.now() < deadline) await this.changed(l, deadline - Date.now());
+    return { ...view };
+  }
+
+  private login(id: string): Login {
+    const l = this.logins.get(id);
+    if (!l) throw new Error("login session expired or unknown");
+    return l;
+  }
+
+  loginStatus(id: string): OAuthSession {
+    return { ...this.login(id).view };
+  }
+
+  /** The code or redirect URL pasted by the admin; waits briefly for the outcome. */
+  async loginInput(id: string, value: string): Promise<OAuthSession> {
+    const l = this.login(id);
+    if (!l.answer) throw new Error("this login is not waiting for input");
+    l.answer(value.trim());
+    const deadline = Date.now() + 10_000;
+    while (l.view.status === "pending" && Date.now() < deadline) await this.changed(l, deadline - Date.now());
+    return { ...l.view };
+  }
+
+  cancelLogin(id: string): void {
+    const l = this.login(id);
+    clearTimeout(l.timer);
+    l.abort.abort(new Error("Login cancelled"));
+    this.logins.delete(id);
   }
 
   /** One tiny real request, to tell the user right away whether a key and model work. */

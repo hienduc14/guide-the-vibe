@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { startServer, type Running } from "../src/server/main.ts";
 import { loadConfig } from "../src/server/config.ts";
+import type { AuthInteraction } from "@earendil-works/pi-ai";
 import { PiBrain, parseJsonReply } from "../src/server/brain/pi.ts";
 import { Sealer } from "../src/server/brain/credentials.ts";
 import { BrainUnavailable, type BrainJob } from "../src/server/brain/types.ts";
@@ -301,5 +302,136 @@ test("providers on the dashboard: endpoint + key, model choice, nothing secret l
   } finally {
     await s.close();
     await m.close();
+  }
+});
+
+test("log in with an account (OAuth): device and paste flows, cancel, expiry, one per provider; no token leaves the server", async () => {
+  const ADMIN = "admin-secret";
+  const cfg = loadConfig({
+    GTV_DATA: tempDir(),
+    GTV_POLL_MS: "3600000",
+    GTV_ADMIN_TOKEN: ADMIN,
+    GTV_SECRET_KEY: "s",
+    BRAIN_BACKEND: "pi",
+  } as NodeJS.ProcessEnv);
+  const s = await startServer(cfg, { listen: false });
+  const brain = s.hub.brain as PiBrain;
+  const call = async (method: string, path: string, body?: unknown) => {
+    const res = await s.app.request(`/api/brain${path}`, {
+      method,
+      headers: { "content-type": "application/json", authorization: `Bearer ${ADMIN}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    assert.ok(!/ACCESS-|REFRESH-/.test(text), `no token in ${path}: ${text}`);
+    return { status: res.status, body: JSON.parse(text) };
+  };
+  const poll = async (id: string) => {
+    for (let i = 0; i < 100; i++) {
+      const r = await call("GET", `/oauth/sessions/${id}`);
+      if (r.body.status !== "pending") return r.body;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("still pending");
+  };
+  const cred = (tag: string) => ({ type: "oauth" as const, access: `ACCESS-${tag}`, refresh: `REFRESH-${tag}`, expires: Date.now() + 3_600_000 });
+  // Fake flows in place of Pi's real ones (no network).
+  const fake = (id: string, login: (i: AuthInteraction) => Promise<unknown>) => ((brain as any).pi.getProvider(id).auth.oauth.login = login);
+  let release!: () => void;
+  const signals: AbortSignal[] = [];
+  fake("xai", async (i) => {
+    signals.push(i.signal!);
+    i.notify({ type: "device_code", userCode: "ABCD-1234", verificationUri: "https://x.ai/device" });
+    await new Promise<void>((r, j) => {
+      release = r;
+      i.signal!.addEventListener("abort", () => j(new Error("aborted")));
+    });
+    return cred("xai");
+  });
+  let picked = "";
+  fake("anthropic", async (i) => {
+    picked = await i.prompt({
+      type: "select",
+      message: "method",
+      options: [
+        { id: "browser", label: "Browser login (default)" },
+        { id: "copy_code", label: "Copy code login (headless)" },
+      ],
+    });
+    i.notify({ type: "auth_url", url: "https://claude.ai/oauth/authorize?x=1", instructions: "paste the code" });
+    const code = await i.prompt({ type: "manual_code", message: "Paste the code", placeholder: "code#state" });
+    if (code !== "CODE-1") throw new Error("bad code");
+    return cred("anthropic");
+  });
+  try {
+    const list = (await call("GET", "/oauth")).body.providers;
+    assert.deepEqual(
+      list.find((p: any) => p.id === "github-copilot"),
+      { id: "github-copilot", name: "GitHub Copilot", flow: "device" },
+    );
+    assert.equal(list.find((p: any) => p.id === "anthropic").flow, "redirect");
+    assert.equal((await call("POST", "/oauth/groq/start")).status, 400, "no account login for groq");
+
+    // Device flow: the code shows right away; done once the provider says so.
+    let sess = (await call("POST", "/oauth/xai/start")).body;
+    assert.deepEqual([sess.status, sess.user_code, sess.verification_uri], ["pending", "ABCD-1234", "https://x.ai/device"]);
+    assert.equal((await call("POST", `/oauth/sessions/${sess.id}/input`, { value: "x" })).status, 400, "nothing to paste in a device flow");
+    release();
+    assert.equal((await poll(sess.id)).status, "done");
+    let xai = (await call("GET", "/providers")).body.providers.find((p: any) => p.id === "xai");
+    assert.deepEqual([xai.configured, xai.auth_type, xai.source, xai.key_hint, xai.oauth, xai.api_key], [true, "oauth", "OAuth", undefined, "device", true]);
+    assert.ok(xai.models > 0);
+    const raw = s.hub.db.all<{ data: string }>(`SELECT data FROM brain_credentials`);
+    assert.ok(raw.length === 1 && !raw[0].data.includes("ACCESS-"), "sealed in hub.db");
+
+    // Logging out = deleting the key.
+    assert.equal((await call("DELETE", "/providers/xai/key")).status, 200);
+    xai = (await call("GET", "/providers")).body.providers.find((p: any) => p.id === "xai");
+    assert.equal(xai.configured, false);
+
+    // Paste flow: the headless method is picked, the admin pastes the code.
+    sess = (await call("POST", "/oauth/anthropic/start")).body;
+    assert.equal(picked, "copy_code");
+    assert.deepEqual(
+      [sess.status, sess.url, sess.prompt],
+      ["waiting_input", "https://claude.ai/oauth/authorize?x=1", { message: "Paste the code", placeholder: "code#state" }],
+    );
+    assert.equal((await call("POST", `/oauth/sessions/${sess.id}/input`, { value: " CODE-1 " })).body.status, "done");
+    assert.equal((await call("GET", "/providers")).body.providers.find((p: any) => p.id === "anthropic").source, "OAuth");
+    // A wrong paste ends the session with the flow's error.
+    sess = (await call("POST", "/oauth/anthropic/start")).body;
+    const failed = (await call("POST", `/oauth/sessions/${sess.id}/input`, { value: "nope" })).body;
+    assert.deepEqual([failed.status, failed.error], ["error", "bad code"]);
+
+    // Cancel; a second start for the same provider replaces the first.
+    const a = (await call("POST", "/oauth/xai/start")).body;
+    const b = (await call("POST", "/oauth/xai/start")).body;
+    assert.equal(signals.at(-2)!.aborted, true);
+    assert.equal((await call("GET", `/oauth/sessions/${a.id}`)).status, 400);
+    assert.equal((await call("DELETE", `/oauth/sessions/${b.id}`)).status, 200);
+    assert.equal(signals.at(-1)!.aborted, true);
+    assert.equal((await call("GET", `/oauth/sessions/${b.id}`)).status, 400);
+
+    // Google Antigravity (community Pi extension): its real flow up to the paste step (nothing leaves the machine
+    // before the code exchange); a wrong paste asks again; its models are brain models.
+    assert.equal(list.find((p: any) => p.id === "antigravity").flow, "redirect");
+    assert.equal(brain.resolveModel("antigravity/gemini-3.5-flash").api, "antigravity-api");
+    const g = (await call("POST", "/oauth/antigravity/start")).body;
+    assert.equal(g.status, "waiting_input");
+    assert.match(g.url, /^https:\/\/accounts\.google\.com\//);
+    const again = (await call("POST", `/oauth/sessions/${g.id}/input`, { value: "http://localhost:51121/oauth-callback?state=other&code=x" })).body;
+    assert.deepEqual([again.status, /State mismatch/.test(again.prompt.message)], ["waiting_input", true]);
+    assert.equal((await call("DELETE", `/oauth/sessions/${g.id}`)).status, 200);
+    const auth = await (brain as any).pi.getProvider("antigravity").auth.oauth.toAuth(cred("g"));
+    assert.equal(JSON.parse(auth.apiKey).token, "ACCESS-g", "its transport gets {token, projectId}");
+
+    // Expiry.
+    (brain as any).opts.loginTtlMs = 100;
+    const c = (await call("POST", "/oauth/xai/start")).body;
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(signals.at(-1)!.aborted, true);
+    assert.match((await call("GET", `/oauth/sessions/${c.id}`)).body.error, /expired or unknown/);
+  } finally {
+    await s.close();
   }
 });

@@ -280,6 +280,21 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     const { model } = (await c.req.json().catch(() => ({}))) as { model?: string };
     return c.json(await pi().test(c.req.param("id"), model || undefined));
   });
+  // "Log in with your account" (OAuth): start → show url / user_code → paste input if asked → poll until done.
+  app.get("/brain/oauth", (c) => c.json({ providers: pi().oauthProviders() }));
+  app.post("/brain/oauth/:provider/start", async (c) => {
+    const { domain } = (await c.req.json().catch(() => ({}))) as { domain?: string };
+    return c.json(await pi().startLogin(c.req.param("provider"), { domain }));
+  });
+  app.get("/brain/oauth/sessions/:id", (c) => c.json(pi().loginStatus(c.req.param("id"))));
+  app.post("/brain/oauth/sessions/:id/input", async (c) => {
+    const { value } = (await c.req.json()) as { value?: string };
+    return c.json(await pi().loginInput(c.req.param("id"), value ?? ""));
+  });
+  app.delete("/brain/oauth/sessions/:id", (c) => {
+    pi().cancelLogin(c.req.param("id"));
+    return c.json({ ok: true });
+  });
   app.post("/brain/endpoints", async (c) => c.json(await pi().addEndpoint(await c.req.json())));
   app.delete("/brain/endpoints/:id", async (c) => {
     await pi().removeEndpoint(c.req.param("id"));

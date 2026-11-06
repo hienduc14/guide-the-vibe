@@ -1,5 +1,6 @@
 // Per-developer config: ~/.gtv/config.json, overridable by environment variables.
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -35,6 +36,9 @@ export function saveDaemonConfig(cfg: Partial<DaemonConfig>): DaemonConfig {
   writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2));
   return loadDaemonConfig();
 }
+
+/** Short hash of the token, so a running daemon can tell whether it still has the current one (never the token). */
+export const tokenFingerprint = (token?: string) => (token ? createHash("sha256").update(token).digest("hex").slice(0, 12) : null);
 
 export function daemonUrl(cfg: DaemonConfig = loadDaemonConfig()): string {
   return `http://127.0.0.1:${cfg.port}`;

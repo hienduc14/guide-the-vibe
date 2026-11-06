@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, openS
 import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CONFIG_DIR, daemonUrl, loadDaemonConfig } from "./config.ts";
+import { CONFIG_DIR, daemonUrl, loadDaemonConfig, tokenFingerprint } from "./config.ts";
 
 // Set by scripts/build-npm.mjs: the npm package is one bundled file with the skill inlined.
 declare const __GTV_SKILL__: string | undefined;
@@ -30,10 +30,11 @@ export async function ensureDaemon(daemon = daemonUrl()): Promise<boolean> {
   const cfg = loadDaemonConfig();
   const health = () =>
     fetch(`${daemon}/health`, { signal: AbortSignal.timeout(1000) })
-      .then((r) => r.json() as Promise<{ pid?: number; dev: string; server: string }>)
+      .then((r) => r.json() as Promise<{ pid?: number; dev: string; server: string; token?: string | null }>)
       .catch(() => undefined);
   const h = await health();
-  if (h && h.dev === cfg.dev && h.server === cfg.server) return true;
+  // A new invite rotates the token: a daemon still holding the old one would get 401s, so restart it.
+  if (h && h.dev === cfg.dev && h.server === cfg.server && h.token === tokenFingerprint(cfg.token)) return true;
   if (h?.pid) {
     try {
       process.kill(h.pid);

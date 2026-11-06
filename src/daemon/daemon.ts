@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import type { DaemonConfig } from "./config.ts";
+import { tokenFingerprint, type DaemonConfig } from "./config.ts";
 import { ServerClient } from "./client.ts";
 import { normalize, toRepoPaths, formatOutput, type NormalizedHook } from "./hooks.ts";
 import { decidePreEdit, messagesFor, statusline, type LocalSession } from "./decide.ts";
@@ -355,6 +355,7 @@ export class Daemon {
       c.json({
         ok: true,
         pid: process.pid,
+        token: tokenFingerprint(this.cfg.token),
         dev: this.cfg.dev,
         server: this.cfg.server,
         reachable: this.serverReachable,

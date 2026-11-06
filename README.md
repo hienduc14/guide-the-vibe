@@ -1,6 +1,6 @@
 # gtv — Project Operator cho nhóm vibe code chung một repo
 
-2–3 developer, mỗi người dùng một AI coding agent riêng (Claude Code, Codex, omp…) trên cùng một repo.
+2–3 developer, mỗi người dùng một AI coding agent riêng (Claude Code, Codex) trên cùng một repo.
 gtv đặt một **Project Operator** trên server; agent của mọi người nói chuyện với nó:
 
 1. **Đăng ký task** trước khi sửa → Operator báo chồng lấn với việc của người khác _trước khi viết code_.
@@ -15,26 +15,26 @@ gtv đặt một **Project Operator** trên server; agent của mọi người n
 
 3. **Hỏi Operator giữa lúc code** (`gtv_ask`): trả lời từ code graph, docs/ADR và WIP của đồng đội; câu cần người khác quyết định được **chuyển vào agent của họ** và câu trả lời quay lại tự động.
 
-Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain ([Hermes Agent](https://hermes-agent.nousresearch.com/docs/), LLM tùy chọn) dùng chung.
+Mỗi **project = một repo**. Một server phục vụ nhiều project; Brain (vòng lặp agent của [Pi](https://github.com/earendil-works/pi) chạy ngay trong Operator, LLM tùy chọn) dùng chung.
 
 ## Kiến trúc trong 30 giây
 
 ```
  Máy dev (mỗi người)                          Server (docker)
  ┌───────────────────────────────┐   HTTPS   ┌──────────────────────────────────────────┐
- │ Claude Code / Codex / omp     │  + SSE    │ Operator (Node 24)                        │
+ │ Claude Code / Codex           │  + SSE    │ Operator (Node 24)                        │
  │   hooks · MCP gtv_* · skill   │◄────────► │  hub: projects, dev tokens, brain stats   │
  │            │                  │           │  project runtime × N:                     │
  │            ▼                  │           │    registry · L0–L3 · Q&A · KB · graph    │
  │ gtv daemon (127.0.0.1:7391)   │           │  /api (dashboard) · /v1/p/:id (agents)    │
- │   quyết định local, inbox,    │           │  /mcp (tool chỉ-đọc cho Brain)            │
- │   WIP snapshot ──git push──┐  │           │  dashboard web (/)                        │
+ │   quyết định local, inbox,    │           │  Brain (Pi, trong tiến trình):            │
+ │   WIP snapshot ──git push──┐  │           │    13 tool chỉ-đọc gọi thẳng engine       │
  └────────────────────────────┼──┘           └──────────────┬─────────────────────┬──────┘
-                              ▼                     git fetch│                     │ HTTP
+                              ▼                     git fetch│                     │ HTTPS
                        ┌────────────┐                        │              ┌──────▼───────┐
-                       │ GitHub /   │◄───────────────────────┘              │ Brain:       │
-                       │ bare repo  │                                       │ Hermes Agent │
-                       └────────────┘                                       │ ChatGPT login│
+                       │ GitHub /   │◄───────────────────────┘              │ LLM bất kỳ   │
+                       │ bare repo  │                                       │ (OpenAI-     │
+                       └────────────┘                                       │ compatible…) │
                                                                             └──────────────┘
 ```
 
@@ -45,19 +45,23 @@ Cần: Node ≥ 24, git ≥ 2.40, Docker Desktop.
 ```bash
 npm ci
 npm run web:install
-node scripts/sandbox.ts                 # sandbox/origin.git (mini-shop) + clone alice / bob / carol
-cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN, GTV_BRAIN_TOKEN, HERMES_API_KEY (openssl rand -hex 32)
+node scripts/sandbox.ts                 # sandbox/origin.git (mini-shop) + clone alice / bob
+cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN (openssl rand -hex 32) và LLM cho Brain
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Cho Brain (Hermes) một LLM — provider nào cũng được. Mặc định là gói ChatGPT (một lần, lưu trong volume `hermes-data`; lệnh in URL + mã để nhập trên trình duyệt); dùng endpoint tương thích OpenAI có sẵn thì sửa `docker/hermes/config.yaml`:
+Cho Brain một LLM — provider nào cũng được. Dễ nhất là một endpoint tương thích OpenAI (CLIProxyAPI, OpenRouter, LiteLLM, Ollama…) trong `docker/.env`:
 
 ```bash
-docker compose -f docker/compose.yml --env-file docker/.env exec brain hermes auth add openai-codex --no-browser
+BRAIN_BASE_URL=https://openrouter.ai/api/v1
+BRAIN_API_KEY=<key>
+BRAIN_MODEL=<model id>
 ```
 
+hoặc một provider có sẵn trong Pi: `BRAIN_MODEL=anthropic/<model>` + `ANTHROPIC_API_KEY` (tương tự `openai/…`, `google/…`).
+
 Mở dashboard: **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`). Ở đó: tạo project (repo URL), cấp token cho dev,
-chọn model Brain (dạng `provider/model`; xem [docs/operations.md](docs/operations.md#brain-hermes-agent)).
+đổi model Brain (dạng `provider/model`; xem [docs/operations.md](docs/operations.md#brain-pi)).
 
 Hoặc bằng CLI (trong Git Bash phải tắt chuyển đường dẫn MSYS, nếu không `/repos/...` thành `C:/Program Files/Git/repos/...`):
 
@@ -84,7 +88,7 @@ Chi tiết tích hợp từng agent: [docs/agents.md](docs/agents.md).
 | [docs/project-structure.md](docs/project-structure.md) | Cấu trúc thư mục và chia vùng việc cho developer     |
 | [docs/features.md](docs/features.md)                   | Từng feature/layer: cách hoạt động, chế độ, giới hạn |
 | [docs/api.md](docs/api.md)                             | API server, daemon, MCP                              |
-| [docs/agents.md](docs/agents.md)                       | Claude Code, Codex, omp                              |
+| [docs/agents.md](docs/agents.md)                       | Claude Code, Codex                                   |
 | [docs/hooks.md](docs/hooks.md)                         | Từng hook đi đâu, luồng chi tiết từng bước           |
 | [docs/operations.md](docs/operations.md)               | Docker, biến môi trường, token, Brain, sự cố         |
 | [docs/development.md](docs/development.md)             | Quy ước code, cách thêm tính năng                    |
@@ -106,6 +110,6 @@ node bin/gtv.mjs         # in trợ giúp CLI
 ## Trạng thái
 
 Prototype cho đồ án: các luồng chính đã chạy thật (xem [báo cáo self-test](docs/reports/selftest-realworld.md)).
-Đã chạy thật với Claude Code, Codex và omp (SPEC §23.4) và stack Docker (self-test RealWorld 21/21).
+Đã chạy thật với Claude Code và Codex trên stack Docker, Brain là Pi (SPEC §24).
 Chưa có: gắn với GitHub (comment PR, cửa chặn pre-push), embedding cho KB, adapter Cursor/Grok.
 Lộ trình và lý do thiết kế: [SPEC.md](SPEC.md).

@@ -1,4 +1,4 @@
-# Development stack: Operator server + Hermes Agent brain.
+# Development stack: the Operator server; its brain (Pi) runs inside it and calls the model over HTTPS.
 #   docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 services:
   operator:
@@ -8,34 +8,26 @@ services:
       # Optional: bootstrap a project "default" from one repo; otherwise create projects in the dashboard.
       GTV_REPO_URL: ${GTV_REPO_URL:-}
       GTV_MAIN_BRANCH: ${GTV_MAIN_BRANCH:-main}
-      # Port 7390 is published: without these the dashboard API and the brain's MCP tools (which read the code) are open.
+      # Port 7390 is published: without it the dashboard API is open to anyone who can reach the port.
       GTV_ADMIN_TOKEN: ${GTV_ADMIN_TOKEN:?set GTV_ADMIN_TOKEN in docker/.env}
-      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:?set GTV_BRAIN_TOKEN in docker/.env}
-      GTV_INTERNAL_URL: http://operator:7390
       GTV_TOKENS: ${GTV_TOKENS:-}
       GTV_POLL_MS: ${GTV_POLL_MS:-15000}
       GTV_CONFIG: /config/gtv.config.yml
-      BRAIN_BACKEND: ${BRAIN_BACKEND:-hermes}
+      # Brain: see docker/.env.example
+      BRAIN_BACKEND: ${BRAIN_BACKEND:-pi}
       BRAIN_MODEL: ${BRAIN_MODEL:-}
-      HERMES_URL: http://brain:8642
-      HERMES_API_KEY: ${HERMES_API_KEY:?set HERMES_API_KEY in docker/.env (openssl rand -hex 32)}
+      BRAIN_BASE_URL: ${BRAIN_BASE_URL:-}
+      BRAIN_API_KEY: ${BRAIN_API_KEY:-}
+      BRAIN_API: ${BRAIN_API:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - gtv-data:/data
       - ./gtv.config.yml:/config/gtv.config.yml:ro
       # Local bare repos for development (GTV_REPO_URL=/repos/<name>.git)
       - ${GTV_LOCAL_REPOS:-../sandbox}:/repos
     restart: unless-stopped
-  brain:
-    build: { context: .., dockerfile: docker/Dockerfile.brain }
-    environment:
-      API_SERVER_HOST: 0.0.0.0
-      API_SERVER_KEY: ${HERMES_API_KEY:?set HERMES_API_KEY in docker/.env (openssl rand -hex 32)}
-      # Sent by Hermes to the Operator's /mcp (docker/hermes/config.yaml)
-      GTV_BRAIN_TOKEN: ${GTV_BRAIN_TOKEN:?set GTV_BRAIN_TOKEN in docker/.env}
-    volumes:
-      - hermes-data:/opt/data # config.yaml, .env, auth.json (ChatGPT login), sessions
-    ports: ["127.0.0.1:8642:8642"]
-    restart: unless-stopped
 volumes:
   gtv-data: {}
-  hermes-data: {}

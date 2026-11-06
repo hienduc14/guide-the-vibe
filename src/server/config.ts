@@ -14,23 +14,19 @@ export interface ServerConfig {
   defaultProject: string;
   /** Protects /api (dashboard). Unset + no developers = open dev mode. */
   adminToken?: string;
-  /** How the OpenCode brain reaches this server, e.g. http://operator:7390 inside docker (Hermes has it in its own config). */
-  internalUrl: string;
   /** Built dashboard (web/dist). */
   webDir: string;
   pollMs: number;
   tokens: Map<string, string>;
   authOpen: boolean;
-  brainToken?: string;
   brain: {
-    backend: "hermes" | "opencode" | "null";
-    url: string;
-    /** Hermes: API_SERVER_KEY of the gateway. */
-    apiKey?: string;
-    /** OpenCode: server password and agent. */
-    password?: string;
-    agent?: string;
+    backend: "pi" | "null";
+    /** "provider/model"; "custom/<id>" (or a bare id) uses baseUrl. */
     model?: string;
+    /** OpenAI-compatible endpoint for "custom" models, e.g. http://127.0.0.1:8317/v1. */
+    baseUrl?: string;
+    apiKey?: string;
+    api?: "openai-completions" | "anthropic-messages";
     concurrency: number;
     timeoutMs: number;
   };
@@ -71,19 +67,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     mainBranch: env.GTV_MAIN_BRANCH ?? "main",
     defaultProject: env.GTV_DEFAULT_PROJECT ?? "default",
     adminToken: env.GTV_ADMIN_TOKEN || undefined,
-    internalUrl: env.GTV_INTERNAL_URL ?? `http://127.0.0.1:${env.GTV_PORT ?? 7390}`,
     webDir: env.GTV_WEB_DIR ?? "web/dist",
     pollMs: Number(env.GTV_POLL_MS ?? 30_000),
     tokens,
     authOpen: env.GTV_AUTH === "open",
-    brainToken: env.GTV_BRAIN_TOKEN || undefined,
     brain: {
-      backend: env.BRAIN_BACKEND === "hermes" || env.BRAIN_BACKEND === "opencode" ? env.BRAIN_BACKEND : "null",
-      url: env.BRAIN_BACKEND === "opencode" ? (env.OPENCODE_URL ?? "http://127.0.0.1:4096") : (env.HERMES_URL ?? "http://127.0.0.1:8642"),
-      apiKey: env.HERMES_API_KEY || undefined,
-      password: env.OPENCODE_SERVER_PASSWORD || undefined,
+      backend: env.BRAIN_BACKEND === "pi" ? "pi" : "null",
       model: env.BRAIN_MODEL || undefined,
-      agent: env.BRAIN_AGENT ?? "operator",
+      baseUrl: env.BRAIN_BASE_URL || undefined,
+      apiKey: env.BRAIN_API_KEY || undefined,
+      api: env.BRAIN_API === "anthropic-messages" ? "anthropic-messages" : "openai-completions",
       concurrency: Number(env.BRAIN_CONCURRENCY ?? 2),
       timeoutMs: Number(env.BRAIN_TIMEOUT_MS ?? 180_000),
     },

@@ -1,5 +1,7 @@
-// The Brain is the LLM half of the Operator. Everything it needs comes through tools (MCP) and the
-// job input; it must answer in the job's JSON schema. Backends are swappable.
+// The Brain is the LLM half of the Operator. Everything it needs comes through its read-only tools and
+// the job input; it must answer in the job's JSON schema.
+
+import type { Engine } from "../project/engine.ts";
 
 export type JobKind = "answer_question" | "judge_registration" | "extract_intent_from_plan";
 
@@ -10,6 +12,7 @@ export interface BrainJob {
   timeoutMs?: number;
   /** Set by MeteredBrain: the project whose tools the job may use. */
   project?: string;
+  engine?: () => Engine | undefined;
 }
 
 export interface BrainResult<T> {

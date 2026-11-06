@@ -24,7 +24,7 @@ export const FEATURES = {
   "qa.tier3_human": { default: "on", description: "Escalate to the human when agents cannot decide" },
   "policy.ask": { default: "on", description: "Ask/deny on high and critical conflicts" },
   "notify.desktop": { default: "on", description: "Desktop notifications on the dev machine" },
-  brain: { default: "on", description: "LLM brain (OpenCode / null)" },
+  brain: { default: "on", description: "LLM brain (Pi / null)" },
 } satisfies Record<string, FeatureDef>;
 
 export type FeatureKey = keyof typeof FEATURES;

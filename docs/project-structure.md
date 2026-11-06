@@ -14,14 +14,14 @@ src/
     detect/                 L0, L1, L2 (L3 nằm trong project/engine.ts)
     qa/                     ticket hỏi đáp 3 bậc
     knowledge/              KB docs/ADR/Q&A (FTS5)
-    brain/                  Hermes/OpenCode/Null brain, metering, prompt + schema, MCP tool cho Brain
+    brain/                  Pi/Null brain, metering, prompt + schema, tool chỉ-đọc cho Brain
     http/                   app, auth, agent-routes (/v1/p/:id), admin-routes (/api)
   daemon/                   daemon trên máy dev, hooks, decide, workspace, tools, snapshot, MCP stdio, install, CLI
-  adapters/                 omp extension, SKILL.md dùng chung
+  adapters/                 SKILL.md dùng chung
 web/                        dashboard (Vite + React), xem web/README.md
-docker/                     Dockerfile (operator + dashboard), Dockerfile.brain (Hermes), hermes/config.yaml, compose, gtv.config.yml; Dockerfile.opencode + opencode/ (backend thay thế)
+docker/                     Dockerfile (operator + dashboard, Brain chạy bên trong), compose, gtv.config.yml
 scripts/                    sandbox.ts, selftest/realworld.ts
-test/                       node:test — codeintel, server, admin, e2e
+test/                       node:test — codeintel, server, admin, e2e, pi, regressions
 examples/sample-repo/       repo mẫu "mini-shop" cho sandbox
 docs/                       tài liệu (docs/reports: báo cáo sinh tự động)
 ```
@@ -48,7 +48,7 @@ docs/                       tài liệu (docs/reports: báo cáo sinh tự độ
 - `src/shared` không import gì ngoài chính nó.
 - `src/codeintel` chỉ import `shared/` và **type** `Repo` từ `server/project/repo.ts` (không import `http`, `hub`, `daemon`).
 - `src/server/detect`, `qa`, `knowledge`, `brain` không import `http` hay `hub`. Chỉ `project/engine.ts` ghép chúng lại.
-- `src/daemon` chỉ dùng `shared/`; nói với server **chỉ qua HTTP**. `src/adapters/omp` không import gì trong repo (chạy trong tiến trình omp).
+- `src/daemon` chỉ dùng `shared/`; nói với server **chỉ qua HTTP**.
 - `web/` chỉ nói với server qua HTTP; kiểu dữ liệu sao chép ở `web/src/api/types.ts`.
 - Đổi shape JSON của API ⇒ cập nhật `web/src/api/types.ts` và [api.md](api.md) cùng lúc.
 
@@ -79,14 +79,14 @@ docs/                       tài liệu (docs/reports: báo cáo sinh tự độ
 
 ### C — Q&A & Brain · `src/server/qa/`, `src/server/brain/`
 
-|                |                                                                                                                                         |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Trách nhiệm    | Ticket 3 bậc, timeout/leo thang; backend Brain; prompt + JSON schema; MCP tool chỉ-đọc cho Brain; metering                              |
-| File chính     | `qa/tickets.ts`, `brain/types.ts`, `brain/hermes.ts`, `brain/opencode.ts`, `brain/metered.ts`, `brain/prompts.ts`, `brain/mcp-tools.ts` |
-| Cung cấp       | `TicketService.ask/reply/tick`, interface `Brain`, `ProjectScopedBackend`, `buildBrainMcp`                                              |
-| Test           | `test/server.test.ts` (FakeBrain, 3 bậc, MCP), `test/admin.test.ts` (metering), self-test (Brain thật, vài lượt)                        |
-| Việc điển hình | backend mới (Codex app-server, Claude Agent SDK), tool mới cho Brain, chỉnh prompt                                                      |
-| Làm độc lập    | dùng `FakeBrain` trong test; **không chạy vòng lặp gọi LLM thật**                                                                       |
+|                |                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trách nhiệm    | Ticket 3 bậc, timeout/leo thang; backend Brain; prompt + JSON schema; tool chỉ-đọc cho Brain; metering                                                  |
+| File chính     | `qa/tickets.ts`, `brain/types.ts`, `brain/pi.ts`, `brain/tools.ts`, `brain/metered.ts`, `brain/prompts.ts`                                              |
+| Cung cấp       | `TicketService.ask/reply/tick`, interface `Brain`, `ProjectScopedBackend`, `brainTools`                                                                 |
+| Test           | `test/server.test.ts` (FakeBrain, 3 bậc, tool), `test/pi.test.ts` (Pi với model giả), `test/admin.test.ts` (metering), self-test (Brain thật, vài lượt) |
+| Việc điển hình | tool mới cho Brain, chỉnh prompt, provider LLM mới (thường chỉ là cấu hình Pi)                                                                          |
+| Làm độc lập    | dùng `FakeBrain` trong test; **không chạy vòng lặp gọi LLM thật**                                                                                       |
 
 ### D — Knowledge · `src/server/knowledge/`
 
@@ -109,12 +109,12 @@ docs/                       tài liệu (docs/reports: báo cáo sinh tự độ
 
 ### F — Daemon & agent adapters · `src/daemon/`, `src/adapters/`, `bin/`
 
-|                |                                                                                                                                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trách nhiệm    | Hook → quyết định local; SSE theo project; inbox; snapshot; tool `gtv_*`; cài đặt cho từng agent; CLI                                                                                                       |
-| File chính     | `daemon.ts`, `hooks.ts` (normalize/format theo agent), `decide.ts`, `workspace.ts`, `tools.ts`, `snapshot.ts`, `mcp.ts`, `install.ts`, `cli.ts`, `adapters/omp/gtv-extension.ts`, `adapters/skill/SKILL.md` |
-| Test           | `test/e2e.test.ts` (2 daemon thật + server + git), self-test                                                                                                                                                |
-| Việc điển hình | adapter Cursor/Grok, tối ưu độ trễ hook, statusline                                                                                                                                                         |
+|                |                                                                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trách nhiệm    | Hook → quyết định local; SSE theo project; inbox; snapshot; tool `gtv_*`; cài đặt cho từng agent; CLI                                                                      |
+| File chính     | `daemon.ts`, `hooks.ts` (normalize/format theo agent), `decide.ts`, `workspace.ts`, `tools.ts`, `snapshot.ts`, `mcp.ts`, `install.ts`, `cli.ts`, `adapters/skill/SKILL.md` |
+| Test           | `test/e2e.test.ts` (2 daemon thật + server + git), self-test                                                                                                               |
+| Việc điển hình | adapter Cursor/Grok, tối ưu độ trễ hook, statusline                                                                                                                        |
 
 ### G — Dashboard · `web/`
 

@@ -5,8 +5,7 @@ import { loadConfig, type ServerConfig } from "./config.ts";
 import { Hub } from "./hub/hub.ts";
 import { buildApp } from "./http/app.ts";
 import { NullBrain } from "./brain/types.ts";
-import { OpenCodeBrain } from "./brain/opencode.ts";
-import { HermesBrain } from "./brain/hermes.ts";
+import { PiBrain } from "./brain/pi.ts";
 import type { ProjectScopedBackend } from "./brain/metered.ts";
 import { log } from "../shared/util.ts";
 
@@ -18,9 +17,7 @@ export interface Running {
 }
 
 export function createBrain(cfg: ServerConfig): ProjectScopedBackend {
-  if (cfg.brain.backend === "hermes") return new HermesBrain(cfg.brain);
-  if (cfg.brain.backend === "opencode") return new OpenCodeBrain({ ...cfg.brain, operatorUrl: cfg.internalUrl, operatorToken: cfg.brainToken });
-  return new NullBrain();
+  return cfg.brain.backend === "pi" ? new PiBrain(cfg.brain) : new NullBrain();
 }
 
 export async function startServer(cfg: ServerConfig, opts: { brain?: ProjectScopedBackend; listen?: boolean } = {}): Promise<Running> {

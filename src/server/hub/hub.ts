@@ -137,7 +137,7 @@ export class Hub {
     if (pending) return pending;
     const rec = this.record(id);
     if (!rec || rec.archived) return Promise.reject(new Error(`unknown project ${id}`));
-    const p = ProjectRuntime.open(rec, this.cfg, new MeteredBrain(this.brain, id, this.db))
+    const p = ProjectRuntime.open(rec, this.cfg, new MeteredBrain(this.brain, id, this.db, () => this.runtimes.get(id)?.engine))
       .then((rt) => {
         this.runtimes.set(id, rt);
         log("hub", `project ${id} ready (${rec.repo_url})`);

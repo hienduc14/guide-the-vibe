@@ -41,8 +41,9 @@ api() { MSYS_NO_PATHCONV=1 curl -sf -X "$1" "http://127.0.0.1:7390$2" -H "author
 api POST /api/projects '{"id":"realworld","name":"RealWorld API (Node/Express)","repo_url":"/repos/realworld/origin.git","main_branch":"master"}' > /dev/null
 [ -d sandbox/origin.git ] && api POST /api/projects '{"id":"mini-shop","name":"mini-shop sample","repo_url":"/repos/origin.git","main_branch":"main"}' > /dev/null
 for d in alice bob; do
+  port=$([ $d = alice ] && echo 7391 || echo 7392)
   token=$(api POST /api/devs "{\"name\":\"$d\"}" | node -e "let s='';process.stdin.on('data',x=>s+=x).on('end',()=>console.log(JSON.parse(s).token))")
-  GTV_HOME="$ROOT/sandbox/.home-$d" node bin/gtv.mjs init --dev $d --server http://127.0.0.1:7390 --token "$token" > /dev/null
+  GTV_HOME="$ROOT/sandbox/.home-$d" node bin/gtv.mjs init --dev $d --server http://127.0.0.1:7390 --port $port --token "$token" > /dev/null
 done
 echo "Ready. Start the daemons (one terminal each), then: GTV_ADMIN_TOKEN=... node scripts/selftest/realworld.ts"
 echo "  GTV_HOME=$ROOT/sandbox/.home-alice node bin/gtv.mjs daemon"

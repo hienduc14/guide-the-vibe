@@ -5,6 +5,7 @@ import { startServer, type Running } from "../src/server/main.ts";
 import type { ProjectRuntime } from "../src/server/project/runtime.ts";
 import { loadConfig } from "../src/server/config.ts";
 import type { Brain, BrainJob, BrainResult } from "../src/server/brain/types.ts";
+import { brainTools } from "../src/server/brain/tools.ts";
 import { snapshotWorktree } from "../src/daemon/snapshot.ts";
 import { makeOrigin, writeFiles, tempDir, type Origin } from "./helpers.ts";
 import type { Message, Ticket } from "../src/shared/types.ts";
@@ -211,20 +212,17 @@ test("tier 3: escalation asks bob as a human, timeouts expire", async () => {
   assert.equal(rt.engine.store.ticket(t.id)!.status, "expired");
 });
 
-test("brain MCP endpoint lists and runs read-only tools", async () => {
-  const call = async (body: unknown) => {
-    const res = await srv.app.request("/p/default/mcp", {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
-      body: JSON.stringify(body),
-    });
-    return (await res.json()) as any;
-  };
-  const list = await call({ jsonrpc: "2.0", id: 1, method: "tools/list" });
-  const names = list.result.tools.map((t: any) => t.name);
-  for (const n of ["team_status", "who_calls", "kb_search", "read_file", "wip_diff"]) assert.ok(names.includes(n), n);
-  const res = await call({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "who_calls", arguments: { symbol: "getUser", view: "ws_b" } } });
-  assert.match(res.result.content[0].text, /src\/sso\/google\.ts/);
+test("brain tools: read-only tools bound to the project's engine", async () => {
+  const tools = brainTools(rt.engine);
+  for (const n of ["team_status", "who_calls", "kb_search", "read_file", "wip_diff"])
+    assert.ok(
+      tools.some((t) => t.name === n),
+      n,
+    );
+  const whoCalls = tools.find((t) => t.name === "who_calls")!;
+  const res = await whoCalls.execute("t1", { symbol: "getUser", view: "ws_b" });
+  assert.match((res.content[0] as { text: string }).text, /src\/sso\/google\.ts/);
+  await assert.rejects(whoCalls.execute("t2", { view: "ws_b" }), /symbol/, "arguments are validated");
 });
 
 test("events: a developer cannot act on another developer's workspace or session", async () => {
@@ -238,23 +236,4 @@ test("events: a developer cannot act on another developer's workspace or session
     }),
   );
   assert.equal(rt.engine.store.workspace(a.workspace_id)?.dev, "alice");
-});
-
-test("shared brain MCP endpoint takes a project argument", async () => {
-  const call = async (body: unknown) => {
-    const res = await srv.app.request("/mcp", {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
-      body: JSON.stringify(body),
-    });
-    return (await res.json()) as any;
-  };
-  const list = await call({ jsonrpc: "2.0", id: 1, method: "tools/list" });
-  const whoCalls = list.result.tools.find((t: any) => t.name === "who_calls");
-  assert.ok(whoCalls.inputSchema.required.includes("project"));
-  const tool = (id: number, name: string, args: unknown) => call({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
-  const res = await tool(2, "who_calls", { project: "default", symbol: "getUser", view: "ws_b" });
-  assert.match(res.result.content[0].text, /src\/sso\/google\.ts/);
-  const unknown = await tool(3, "team_status", { project: "nope" });
-  assert.match(unknown.result.content[0].text, /unknown project nope/);
 });

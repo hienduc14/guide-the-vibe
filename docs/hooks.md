@@ -25,17 +25,15 @@ sequenceDiagram
   D-->>A: output đúng định dạng của agent
 ```
 
-Ba cách agent gọi daemon:
+Hai cách agent gọi daemon:
 
-| Agent       | Kiểu hook                   | Gọi daemon thế nào                                                                                                                    |
-| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code | `type: "http"`              | Claude POST thẳng payload tới `http://127.0.0.1:<port>/hook/claude`                                                                   |
-| Codex       | `type: "command"`           | Codex chạy `node bin/gtv.mjs hook codex --daemon <url>`; shim JS thuần đọc stdin, POST tới daemon (timeout 8 s), in kết quả ra stdout |
-| omp         | extension TS (`pi.on(...)`) | Extension POST `/hook/omp` với payload tự dựng; kết quả là `HookDecision` thô (`decision`, `reason`, `context`)                       |
+| Agent       | Kiểu hook         | Gọi daemon thế nào                                                                                                                    |
+| ----------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | `type: "http"`    | Claude POST thẳng payload tới `http://127.0.0.1:<port>/hook/claude`                                                                   |
+| Codex       | `type: "command"` | Codex chạy `node bin/gtv.mjs hook codex --daemon <url>`; shim JS thuần đọc stdin, POST tới daemon (timeout 8 s), in kết quả ra stdout |
 
 **Fail-open ở mọi bước:** repo không thuộc project ⇒ body rỗng; không tạo được session (server sập) ⇒ body rỗng;
-lỗi bất kỳ trong `handleHook` ⇒ log và trả 200 rỗng; shim Codex lỗi/timeout ⇒ không in gì, exit 0; extension omp
-không tới được daemon ⇒ không chặn. Body rỗng nghĩa là agent làm tiếp như không có gtv.
+lỗi bất kỳ trong `handleHook` ⇒ log và trả 200 rỗng; shim Codex lỗi/timeout ⇒ không in gì, exit 0. Body rỗng nghĩa là agent làm tiếp như không có gtv.
 
 **Quyết định không chờ server:** `decide()` chỉ đọc `TeamState` (task, footprint, conflict, feature) mà daemon nhận qua
 SSE và giữ trong bộ nhớ, nên hook trả lời trong vài chục ms. Event gửi lên server đi qua một hàng đợi nối tiếp
@@ -43,34 +41,34 @@ SSE và giữ trong bộ nhớ, nên hook trả lời trong vài chục ms. Even
 
 ## 2. Bảng tra cứu từng hook
 
-| Kind (sau normalize) | Claude Code                                                                      | Codex                                                                                                   | omp                           |
-| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `session_start`      | `SessionStart`                                                                   | `SessionStart`                                                                                          | `session_start`               |
-| `prompt`             | `UserPromptSubmit`                                                               | `UserPromptSubmit`                                                                                      | `input`                       |
-| `pre_edit`           | `PreToolUse`, tool `Edit` / `Write` / `MultiEdit` / `NotebookEdit` (`file_path`) | `PreToolUse`, tool `apply_patch` (đọc `*** Add/Update/Delete File:`, `*** Move to:`) / `Edit` / `Write` | `tool_call` có đường dẫn file |
-| `plan`               | `PreToolUse`, tool `ExitPlanMode` (`tool_input.plan`)                            | `PreToolUse`, tool `update_plan` (`explanation` + các bước)                                             | —                             |
-| `post_tool`          | `PostToolUse` (mọi tool; có `paths` nếu là tool sửa file)                        | `PostToolUse`                                                                                           | `tool_result`                 |
-| `stop`               | `Stop` (+ hook command `gtv hook-wait claude`, `asyncRewake: true`)              | `Stop`                                                                                                  | —                             |
-| `session_end`        | `SessionEnd`                                                                     | `SessionEnd`                                                                                            | `session_shutdown`            |
+| Kind (sau normalize) | Claude Code                                                                      | Codex                                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `session_start`      | `SessionStart`                                                                   | `SessionStart`                                                                                          |
+| `prompt`             | `UserPromptSubmit`                                                               | `UserPromptSubmit`                                                                                      |
+| `pre_edit`           | `PreToolUse`, tool `Edit` / `Write` / `MultiEdit` / `NotebookEdit` (`file_path`) | `PreToolUse`, tool `apply_patch` (đọc `*** Add/Update/Delete File:`, `*** Move to:`) / `Edit` / `Write` |
+| `plan`               | `PreToolUse`, tool `ExitPlanMode` (`tool_input.plan`)                            | `PreToolUse`, tool `update_plan` (`explanation` + các bước)                                             |
+| `post_tool`          | `PostToolUse` (mọi tool; có `paths` nếu là tool sửa file)                        | `PostToolUse`                                                                                           |
+| `stop`               | `Stop` (+ hook command `gtv hook-wait claude`, `asyncRewake: true`)              | `Stop`                                                                                                  |
+| `session_end`        | `SessionEnd`                                                                     | `SessionEnd`                                                                                            |
 
 Daemon xử lý từng kind (`src/daemon/daemon.ts`, `decide()`):
 
-| Kind            | Daemon làm tại chỗ                                                                                                         | Event gửi server                     | Agent nhận lại                                                                                                                                   |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `session_start` | Tạo session (nếu mới) → lấy **briefing**; rút hộp thư                                                                      | `session_start` (khi session mới)    | `additionalContext` = briefing + tin chờ                                                                                                         |
-| `prompt`        | Rút hộp thư                                                                                                                | `prompt` (cắt 500 ký tự, chỉ để log) | `additionalContext` = tin chờ (nếu có)                                                                                                           |
-| `plan`          | Rút hộp thư                                                                                                                | `plan` (toàn văn)                    | `additionalContext` = tin chờ; luôn **allow**                                                                                                    |
-| `pre_edit`      | Đổi `paths` thành đường dẫn trong repo (bỏ file ngoài repo); `decidePreEdit()` → allow / ask / deny + ghi chú; rút hộp thư | `edit` `phase: "pre"`                | Claude/Codex: `permissionDecision` (chỉ khi ask/deny) + `permissionDecisionReason` + `additionalContext`; omp: `{block, reason}` nếu không allow |
-| `post_tool`     | Nếu có file bị sửa: hẹn **snapshot** sau `GTV_SNAPSHOT_DEBOUNCE_MS` (20 s, mỗi lần sửa đặt lại hẹn); rút hộp thư           | `edit` `phase: "post"` (khi có file) | `additionalContext` = tin chờ (omp: nối vào kết quả tool)                                                                                        |
-| `stop`          | Hẹn snapshot sau 2 s                                                                                                       | —                                    | không gì (Claude: waiter `hook-wait` bắt đầu chờ tin)                                                                                            |
-| `session_end`   | Hẹn snapshot sau 1 s                                                                                                       | `session_end`                        | không gì                                                                                                                                         |
+| Kind            | Daemon làm tại chỗ                                                                                                         | Event gửi server                     | Agent nhận lại                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `session_start` | Tạo session (nếu mới) → lấy **briefing**; rút hộp thư                                                                      | `session_start` (khi session mới)    | `additionalContext` = briefing + tin chờ                                                                 |
+| `prompt`        | Rút hộp thư                                                                                                                | `prompt` (cắt 500 ký tự, chỉ để log) | `additionalContext` = tin chờ (nếu có)                                                                   |
+| `plan`          | Rút hộp thư                                                                                                                | `plan` (toàn văn)                    | `additionalContext` = tin chờ; luôn **allow**                                                            |
+| `pre_edit`      | Đổi `paths` thành đường dẫn trong repo (bỏ file ngoài repo); `decidePreEdit()` → allow / ask / deny + ghi chú; rút hộp thư | `edit` `phase: "pre"`                | Claude/Codex: `permissionDecision` (chỉ khi ask/deny) + `permissionDecisionReason` + `additionalContext` |
+| `post_tool`     | Nếu có file bị sửa: hẹn **snapshot** sau `GTV_SNAPSHOT_DEBOUNCE_MS` (20 s, mỗi lần sửa đặt lại hẹn); rút hộp thư           | `edit` `phase: "post"` (khi có file) | `additionalContext` = tin chờ                                                                            |
+| `stop`          | Hẹn snapshot sau 2 s                                                                                                       | —                                    | không gì (Claude: waiter `hook-wait` bắt đầu chờ tin)                                                    |
+| `session_end`   | Hẹn snapshot sau 1 s                                                                                                       | `session_end`                        | không gì                                                                                                 |
 
 ### `decidePreEdit()` — quyết định trước khi sửa
 
 Đầu vào: các file sắp sửa, conflict đang mở của workspace, footprint và task của người khác (`src/daemon/decide.ts`).
 
 1. Conflict đang mở chạm vào file (theo `subject`, `evidence.path`, danh sách file hai bên, hoặc vị trí caller của L2), xếp mức cao trước:
-   - `critical`, hoặc `high` **lần đầu** trong session, khi `policy.ask` bật ⇒ Claude: **ask**; agent không có ask (Codex, omp): **deny**.
+   - `critical`, hoặc `high` **lần đầu** trong session, khi `policy.ask` bật ⇒ Claude: **ask**; agent không có ask (Codex): **deny**.
      Lý do kèm theo: high ⇒ "Stopped once so you can coordinate… If you still want this edit, retry it." (thử lại thì high đã "seen" nên cho qua);
      critical ⇒ "blocked until the conflict is acknowledged" (chặn tới khi `gtv_ack`).
    - mức khác, lần đầu ⇒ thêm ghi chú `[gtv <level>] <message> (<id>)`. `info` không ghi chú.
@@ -78,7 +76,7 @@ Daemon xử lý từng kind (`src/daemon/daemon.ts`, `decide()`):
 3. File nằm trong scope đã đăng ký của người khác ⇒ ghi chú ngay, không chờ server.
 4. Session chưa đăng ký task ⇒ nhắc `gtv_register_task` một lần.
 
-Khả năng từng agent (`AGENT_CAPABILITIES`): Claude `ask + inject + rewake`; Codex `inject`; omp `inject + rewake`.
+Khả năng từng agent (`AGENT_CAPABILITIES`): Claude `ask + inject + rewake`; Codex `inject`.
 
 ## 3. Kênh ngược: server → agent
 
@@ -103,7 +101,6 @@ sequenceDiagram
 - **Claude đang rảnh** (đã trả lời xong, chờ người): hook `Stop` chạy `gtv hook-wait claude` với `asyncRewake: true` → long-poll
   `GET /wait` (tối đa 30 phút, mỗi Stop mới thay waiter cũ). Có tin ⇒ waiter in tin ra stderr và **exit 2** ⇒ Claude được
   đánh thức với nội dung đó.
-- **omp:** tin được chèn bằng `pi.sendMessage(…, { deliverAs: "steer" })`, hoặc nối vào kết quả tool ở `tool_result`.
 - **Codex:** không có cơ chế đánh thức; tin đến ở lần gọi tool kế tiếp.
 - **Tin cho người** (`human_request`): không chèn vào agent; hiện ở `gtv inbox`, statusline (✉), thông báo desktop.
 
@@ -116,7 +113,6 @@ muộn), `ticket_question` (bậc 2), `ticket_answer` (câu trả lời đến s
 Agent ──MCP stdio──► gtv mcp (--agent auto|claude|codex) ──POST /api/<tool> {agent, cwd, args}──► Daemon
 Daemon: sessionForTool() = session hook gần nhất của agent đó trong workspace (chưa có thì tạo "mcp-<agent>-<ws>")
        → runTool() → API server (/tasks, /tickets, /conflicts/:id/ack, …) → text trả về agent
-omp: extension tự đăng ký 9 tool, gọi cùng /api/<tool> (không qua MCP)
 ```
 
 `gtv_inbox` rút hộp thư (tin chờ + câu hỏi đang chờ mình); `gtv_finish_task` hẹn snapshot sau 0,5 s để server sớm thấy trạng thái cuối.

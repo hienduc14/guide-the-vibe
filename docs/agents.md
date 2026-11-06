@@ -6,7 +6,7 @@ Daemon tự biết repo thuộc project nào: file `.git/gtv-project` (`gtv link
 ```bash
 node bin/gtv.mjs init --dev alice --server http://<server>:7390 --token <dev token>
 node bin/gtv.mjs daemon                      # giữ chạy
-node bin/gtv.mjs install claude [dir]        # hoặc: install codex [dir] / install omp
+node bin/gtv.mjs install claude [dir]        # hoặc: install codex [dir]
 node bin/gtv.mjs link <project> [dir]        # khi remote của clone không khớp repo_url của project
 ```
 
@@ -42,30 +42,16 @@ Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, c�
 - Codex **không hỗ trợ `ask`** ⇒ high: `deny` lần đầu kèm lý do, lần thử lại cho qua; critical: `deny` tới khi ack.
 - Shim `bin/gtv.mjs hook` viết bằng JS thuần để khởi động nhanh (~270 ms trên Windows, phần lớn là khởi động Node).
 
-## omp (oh-my-pi)
-
-Không cần cài file; chạy với extension:
-
-```powershell
-$env:GTV_DAEMON_URL="http://127.0.0.1:7391"; omp -e "<repo>/src/adapters/omp/gtv-extension.ts"
-```
-
-(`node bin/gtv.mjs install omp` in đúng lệnh.) Extension:
-
-- `session_start`, `input`, `tool_call` (chặn bằng `{block, reason}`), `tool_result` (nối tin của Operator vào kết quả tool), `session_shutdown`;
-- tự đăng ký đủ 9 tool như MCP: `gtv_register_task`, `gtv_update_task`, `gtv_finish_task`, `gtv_ask`, `gtv_reply`, `gtv_status`, `gtv_check`, `gtv_inbox`, `gtv_ack` (không qua MCP);
-- tin chèn bằng `pi.sendMessage(..., { deliverAs: "steer" })`.
-
 ## Ma trận khả năng
 
-|                        | Claude Code     | Codex            | omp                 | Cursor          | Grok Build       |
-| ---------------------- | --------------- | ---------------- | ------------------- | --------------- | ---------------- |
-| Kiểu hook              | http + command  | command          | extension TS        | command         | command, http    |
-| Chặn trước khi sửa     | allow/ask/deny  | deny (không ask) | block               | allow/deny      | deny             |
-| Chèn context giữa lượt | Pre/PostToolUse | Pre/PostToolUse  | steer / tool_result | chỉ postToolUse | chưa có tài liệu |
-| Đánh thức khi rảnh     | asyncRewake     | —                | —                   | —               | —                |
-| Trích plan             | `ExitPlanMode`  | `update_plan`    | —                   | —               | —                |
-| Adapter trong repo     | ✅              | ✅               | ✅                  | ❌              | ❌               |
+|                        | Claude Code     | Codex            | Cursor          | Grok Build       |
+| ---------------------- | --------------- | ---------------- | --------------- | ---------------- |
+| Kiểu hook              | http + command  | command          | command         | command, http    |
+| Chặn trước khi sửa     | allow/ask/deny  | deny (không ask) | allow/deny      | deny             |
+| Chèn context giữa lượt | Pre/PostToolUse | Pre/PostToolUse  | chỉ postToolUse | chưa có tài liệu |
+| Đánh thức khi rảnh     | asyncRewake     | —                | —               | —                |
+| Trích plan             | `ExitPlanMode`  | `update_plan`    | —               | —                |
+| Adapter trong repo     | ✅              | ✅               | ❌              | ❌               |
 
 ## Xử lý sự cố
 

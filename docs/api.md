@@ -5,12 +5,11 @@ Kiểu dữ liệu chung: `src/shared/types.ts`. Dashboard sao chép ở `web/sr
 
 ## Xác thực
 
-| Vùng                      | Header                                    | Ghi chú                                                                                       |
-| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `/v1/*`                   | `Authorization: Bearer <dev token>`       | Admin token cũng được (dev = `X-Gtv-Dev` hoặc `admin`). Chế độ mở: header `X-Gtv-Dev: <tên>`. |
-| `/api/*`                  | `Authorization: Bearer <GTV_ADMIN_TOKEN>` | Không đặt admin token ⇒ mở. Token cũng nhận qua `?token=`.                                    |
-| `/mcp`, `/p/:project/mcp` | `Authorization: Bearer <GTV_BRAIN_TOKEN>` | Chỉ khi `GTV_BRAIN_TOKEN` được đặt.                                                           |
-| `GET /health`             | —                                         | `{ ok, brain: {backend, model, ok, detail}, projects: [id] }`                                 |
+| Vùng          | Header                                    | Ghi chú                                                                                       |
+| ------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `/v1/*`       | `Authorization: Bearer <dev token>`       | Admin token cũng được (dev = `X-Gtv-Dev` hoặc `admin`). Chế độ mở: header `X-Gtv-Dev: <tên>`. |
+| `/api/*`      | `Authorization: Bearer <GTV_ADMIN_TOKEN>` | Không đặt admin token ⇒ mở. Token cũng nhận qua `?token=`.                                    |
+| `GET /health` | —                                         | `{ ok, brain: {backend, model, ok, detail}, projects: [id] }`                                 |
 
 Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](operations.md#token)).
 
@@ -113,12 +112,9 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 
 Summary của project: `{ id, name, repo_url, main_branch, main_sha, last_sync, counts: { people_active, sessions_active, tasks_active, conflicts_open, conflicts_by_level, tickets_waiting, kb_unverified }, people: [{ dev, status, agents, workspaces, last_seen, tasks, editing, conflicts }] }`.
 
-## MCP cho Brain — `/mcp` và `/p/:project/mcp`
+## Tool chỉ-đọc của Brain (trong tiến trình, không có endpoint HTTP)
 
-Streamable HTTP, stateless, JSON. Hai endpoint cùng một bộ tool:
-
-- `/mcp`: mọi project; **mọi tool có thêm tham số bắt buộc `project`** (project lạ → kết quả là thông báo lỗi). Hermes dùng endpoint này qua server MCP `gtv` (tên tool trong Hermes: `mcp__gtv__<tool>`).
-- `/p/:project/mcp`: một project. OpenCode đăng ký mỗi project thành server `gtv_<project>` (ký tự khác chữ/số → `_`).
+Brain (Pi) gọi các tool này **trực tiếp** trên `Engine` của project đang chạy job (`src/server/brain/tools.ts`); không có endpoint nào mở chúng ra mạng. Tham số được kiểm bằng zod trước khi chạy; kết quả cắt ở 24 000 ký tự.
 
 `view` = `"base"` (main, mặc định) hoặc workspace id.
 
@@ -142,7 +138,7 @@ Streamable HTTP, stateless, JSON. Hai endpoint cùng một bộ tool:
 
 | Method | Path                             | Mô tả                                                                                                                       |
 | ------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/hook/:agent`                   | payload hook gốc của agent (`claude`, `codex`, `omp`, …) → output native của agent, hoặc body rỗng (= cho qua)              |
+| POST   | `/hook/:agent`                   | payload hook gốc của agent (`claude`, `codex`, …) → output native của agent, hoặc body rỗng (= cho qua)                     |
 | POST   | `/api/:tool`                     | `{ agent, cwd, args }` → `{ text }`; tool: `register_task, update_task, finish_task, ask, reply, status, check, inbox, ack` |
 | GET    | `/wait?agent=&session=&timeout=` | long-poll cho Claude `asyncRewake` → `{ text \| null }`                                                                     |
 | GET    | `/statusline?cwd=`               | 1 dòng text                                                                                                                 |
@@ -153,7 +149,7 @@ Streamable HTTP, stateless, JSON. Hai endpoint cùng một bộ tool:
 
 ## Tool cho agent — `gtv_*`
 
-Phục vụ bởi `gtv mcp` (Claude, Codex) hoặc extension omp; tất cả chuyển tới `POST /api/:tool` của daemon.
+Phục vụ bởi `gtv mcp` (Claude, Codex); tất cả chuyển tới `POST /api/:tool` của daemon.
 
 | Tool                | Tham số                                              |
 | ------------------- | ---------------------------------------------------- |

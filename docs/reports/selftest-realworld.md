@@ -1,10 +1,10 @@
 # Self-test: RealWorld (Node/Express) — 2 developers editing in parallel
 
-Run: 2026-11-02T01:54:13.008Z · duration 136.3s · checks **21/21 passed** · real brain jobs: **3** (35220 ms p50)
+Run: 2026-11-06T04:29:01.171Z · duration 141.4s · checks **21/21 passed** · real brain jobs: **3** (42192 ms p50)
 
 Repo: `gothinkster/node-express-realworld-example-app` (TypeScript, 67 files) mirrored as a local bare repo.
 Agents are simulated by sending the exact hook payloads of Claude Code (alice) and Codex (bob) to the real daemons;
-files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (`hermes`, ChatGPT plan) are real.
+files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (`pi gemini-3.8-flash-high`) are real.
 
 ## Scenario
 - **alice** (Claude Code): `profileMapper(user, id)` → `profileMapper(user, viewer?: { id })` (breaking), updates the 5 existing callers, caps article page size at 100.
@@ -15,8 +15,8 @@ files are really edited in two clones, WIP snapshots really pushed, the Operator
 | | Check | Detail |
 |---|---|---|
 | ✅ | both sessions receive the Operator briefing |  |
-| ✅ | alice registration accepted | Registered task task_0272db5e3d97 "Profiles take a viewer object; cap article page size at 100". Status: ok. |
-| ✅ | bob is told about the overlap at registration (before any code) | Registered task task_62d994a95e4e "Show comment authors' profiles; default article page size 20". Status: needs_coordination. |
+| ✅ | alice registration accepted | Registered task task_996d67d36c7e "Profiles take a viewer object; cap article page size at 100". Status: ok. |
+| ✅ | bob is told about the overlap at registration (before any code) | Registered task task_fcae278b65f9 "Show comment authors' profiles; default article page size 20". Status: needs_coordination. |
 | ✅ | registration feedback names alice's breaking change on profileMapper |  |
 | ✅ | alice is warned when editing inside bob's registered scope | [gtv] src/app/routes/article/article.service.ts is inside the registered scope of bob ("Show comment authors' profiles; default article page size 20"). Keep changes there minimal or coordinate with gt |
 | ✅ | unrelated tag.service.ts edit is allowed with no warning about it | [gtv HIGH · L0] alice (alice@master, task "Profiles take a viewer object; cap article page size at 100") and bob (bob@master, task "Show comment authors' profil |
@@ -27,11 +27,11 @@ files are really edited in two clones, WIP snapshots really pushed, the Operator
 | ✅ | no false critical-path alarm (nobody touched migrations/lockfiles/CI) |  |
 | ✅ | Claude: editing the conflicted symbol asks the human | ask |
 | ✅ | Codex: stopped once (no ask support), allowed on retry |  |
-| ✅ | conflict notices reach alice's agent (pre/post hooks) | [gtv WARNING · L0] bob (bob@master, task "Show comment authors' profiles; default article page size 20") is editing src/app/routes/article/article.service.ts, which is inside the registered scope "src |
-| ✅ | tier 1: the brain answers from bob's WIP with sources | [gtv answer tk_accbe0b24e42 from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: Bob calls profileMapper in his new getCommentAut |
-| ✅ | brain routes a decision question to the owner (tier 2) | Ticket tk_d26262d52ac2: forwarded to alice (Operator note: In src/app/routes/article/article.service.ts line 83, Alice capped the query limit at 100 with a default of 10 (`Math.min(Number(query.limit) |
-| ✅ | the forwarded question is injected into alice's agent mid-turn | [gtv HIGH · L3] Operator: task "Show comment authors' profiles; default article page size 20" (bob) and "Profiles take a viewer object; cap article page size at 100" (alice) may conflict: Alice is mak |
-| ✅ | alice's answer is delivered back into bob's agent | [gtv HIGH · L3] Operator: task "Show comment authors' profiles; default article page size 20" (bob) and "Profiles take a viewer object; cap article page size at 100" (alice) may conflict: Alice is mak |
+| ✅ | conflict notices reach alice's agent (pre/post hooks) | [gtv WARNING · L0] alice (alice@master, task "Profiles take a viewer object; cap article page size at 100") is editing src/app/routes/article/article.service.ts, which is inside the registered scope " |
+| ✅ | tier 1: the brain answers from bob's WIP with sources | [gtv answer tk_6e04070f91ef from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: In his work in progress, Bob calls `profileMappe |
+| ✅ | brain routes a decision question to the owner (tier 2) | Ticket tk_e433202d0313: forwarded to alice (Operator note: In `src/app/routes/article/article.service.ts:81` (`getArticles`), the base default limit is 10. Alice added a cap of 100 (`Math.min(Number(q |
+| ✅ | the forwarded question is injected into alice's agent mid-turn | [gtv HIGH · L3] Operator: task "Show comment authors' profiles; default article page size 20" (bob) and "Profiles take a viewer object; cap article page size at 100" (alice) may conflict: Alice is cha |
+| ✅ | alice's answer is delivered back into bob's agent | [gtv HIGH · L3] Operator: task "Show comment authors' profiles; default article page size 20" (bob) and "Profiles take a viewer object; cap article page size at 100" (alice) may conflict: Alice is cha |
 | ✅ | L1 resolves by itself once the overlapping edit is gone | 21.1s |
 | ✅ | alice's task closes automatically after her work lands on master | 0.0s |
 | ✅ | bob's WIP merges cleanly with the new master |  |
@@ -40,22 +40,22 @@ files are really edited in two clones, WIP snapshots really pushed, the Operator
 | t | who | action | result |
 |---|---|---|---|
 | 0.2s | alice/claude | SessionStart | gtv Project Operator is active for this repo. |
-| 0.2s | bob/codex | SessionStart | gtv Project Operator is active for this repo. |
-| 0.3s | alice/claude | gtv_register_task | Registered task task_0272db5e3d97 "Profiles take a viewer object; cap article page size at 100". Status: ok. |
-| 30.3s | bob/codex | gtv_register_task (30.0s incl. L3 brain) | Registered task task_62d994a95e4e "Show comment authors' profiles; default article page size 20". Status: needs_coordination. / - [info L0] with alice (alice@master): Registered scopes overlap: alice (alice@master, task "Profiles take a viewer object; cap arti |
-| 30.3s | alice/claude | edited profile.utils.ts, profile.service.ts, article.service.ts | pre-edit decision on article.service.ts: allow; context: [gtv] src/app/routes/article/article.service.ts is inside the registered scope of bob ("Show comment authors' profiles; default article page size 20"). Keep cha |
+| 0.3s | bob/codex | SessionStart | gtv Project Operator is active for this repo. |
+| 0.3s | alice/claude | gtv_register_task | Registered task task_996d67d36c7e "Profiles take a viewer object; cap article page size at 100". Status: ok. |
+| 30.4s | bob/codex | gtv_register_task (30.1s incl. L3 brain) | Registered task task_fcae278b65f9 "Show comment authors' profiles; default article page size 20". Status: needs_coordination. / - [info L0] with alice (alice@master): Registered scopes overlap: alice (alice@master, task "Profiles take a viewer object; cap arti |
+| 30.4s | alice/claude | edited profile.utils.ts, profile.service.ts, article.service.ts | pre-edit decision on article.service.ts: allow; context: [gtv] src/app/routes/article/article.service.ts is inside the registered scope of bob ("Show comment authors' profiles; default article page size 20"). Keep cha |
 | 30.4s | bob/codex | edited tag.service.ts (independent) and article.service.ts (new getCommentAuthors + page size 20) | pre-edit: allow; [gtv] src/app/routes/article/article.service.ts is inside the registered scope of alice ("Profiles take a viewer object; cap article page size at 100"). Keep changes there minimal or coordinate with g |
-| 51.5s | operator | conflicts after bob's edit (+21.1s) | L0/warning/same_file:src/app/routes/article/article.service.ts, L0/info/scope_overlap:src/app/routes/article/article.service.ts ~ src/app/routes/article/**, L0/high/same_symbol_declared:symbol:profileMapper, L0/warning/same_symbol_declared:symbol:getArticles,  |
-| 53.0s | alice/claude | PreToolUse on profile.utils.ts | ask (10ms) |
-| 53.0s | bob/codex | PreToolUse on article.service.ts twice | deny then allow (9ms) |
-| 88.2s | alice/claude | gtv_ask (tier 1, real brain) | [gtv answer tk_accbe0b24e42 from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: Bob calls profileMapper in his new getCommentAuthors function in src/app/routes/article/ |
-| 114.8s | bob/codex | gtv_ask (decision question, real brain) | Ticket tk_d26262d52ac2: forwarded to alice (Operator note: In src/app/routes/article/article.service.ts line 83, Alice capped the query limit at 100 with a default of 10 (`Math.min(Number(query.limit) // 10, 100)`), while Bob changed the default limit to 20 (` |
-| 114.8s | alice/claude | gtv_reply | Answer sent for tk_d26262d52ac2. |
-| 136.0s | operator | after coordination | L0/warning/open:src/app/routes/article/article.service.ts, L0/info/open:src/app/routes/article/article.service.ts ~ src/app/routes/article/**, L0/high/open:symbol:profileMapper, L0/warning/open:symbol:getArticles, L0/high/open:planned:profileMapper, L2/high/ac |
+| 51.6s | operator | conflicts after bob's edit (+21.1s) | L0/warning/same_file:src/app/routes/article/article.service.ts, L0/info/scope_overlap:src/app/routes/article/article.service.ts ~ src/app/routes/article/**, L0/high/same_symbol_declared:symbol:profileMapper, L0/warning/same_symbol_declared:symbol:getArticles,  |
+| 53.1s | alice/claude | PreToolUse on profile.utils.ts | ask (11ms) |
+| 53.1s | bob/codex | PreToolUse on article.service.ts twice | deny then allow (19ms) |
+| 95.3s | alice/claude | gtv_ask (tier 1, real brain) | [gtv answer tk_6e04070f91ef from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: In his work in progress, Bob calls `profileMapper` in `getCommentAuthors` at `src/app/ro |
+| 119.8s | bob/codex | gtv_ask (decision question, real brain) | Ticket tk_e433202d0313: forwarded to alice (Operator note: In `src/app/routes/article/article.service.ts:81` (`getArticles`), the base default limit is 10. Alice added a cap of 100 (`Math.min(Number(query.limit) // 10, 100)`), while Bob changed the default to  |
+| 119.9s | alice/claude | gtv_reply | Answer sent for tk_e433202d0313. |
+| 141.0s | operator | after coordination | L0/warning/open:src/app/routes/article/article.service.ts, L0/info/open:src/app/routes/article/article.service.ts ~ src/app/routes/article/**, L0/high/open:symbol:profileMapper, L0/warning/open:symbol:getArticles, L0/high/open:planned:profileMapper, L2/high/ac |
 
 ## Brain
 - L3 registration judgement: (no advice line)
-- Tier-1 answer: [gtv answer tk_accbe0b24e42 from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: Bob calls profileMapper in his new getCommentAuthors function in src/app/routes/article/article.service.ts:659 as profileMapper(comment.author, id), passing the raw id (number / undefined). Your change to viewer?: { id: number } will break his code: TypeScript will fail on the type mismatch (number is not assignable to { id: number }), and at runtime viewer.id would evaluate to undefined on a numeric id, making following always false. Bob will need to pass { id } or profileMapper must be updated to accept either format. Sources: file:src/app/routes/article/article.service.ts:659, file:src/app/routes/profile/profile.utils.ts:5, conflict:cf_1b2790d15a8d
+- Tier-1 answer: [gtv answer tk_6e04070f91ef from operator, confidence high] Q: How is bob calling profileMapper in his work in progress, and will my change to a viewer object break it? A: In his work in progress, Bob calls `profileMapper` in `getCommentAuthors` at `src/app/routes/article/article.service.ts:659` with a bare `id?: number`: `profileMapper(comment.author, id)`.  Yes, your change will break it: 1. Compile error: TypeScript will reject passing `number / undefined` where `{ id: number } / undefined` is expected. 2. Runtime bug: If executed, `viewer` is truthy when `id` is a number (e.g. `5`), but `viewer.id` evaluates to `undefined`, so `user.followedBy.some(...)` will check `followingUser.id === undefined` and `following` will always resolve to `false`.  Bob would need to pass `id ? { id } : undefined`, or `profileMapper` would need backward compatibility to accept `number / { id: number }`. Sources: file:src/app/routes/article/article.service.ts:659, file:src/app/routes/profile/profile.utils.ts:4, conflict:cf_cb6743f02710
 
 ## Layers after the run
 | feature | mode | metrics |

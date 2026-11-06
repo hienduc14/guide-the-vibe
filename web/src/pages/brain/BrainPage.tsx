@@ -60,13 +60,13 @@ export function BrainPage() {
                 void reload();
               }}
             >
-              <Field label="Model" hint="provider/model — tài khoản ChatGPT chỉ dùng được các model Codex cho phép">
+              <Field label="Model" hint="provider/model — custom/<id> cho BRAIN_BASE_URL, hoặc provider có sẵn của Pi (anthropic/…, openai/…)">
                 <input
                   className="input mono"
                   list="gtv-models"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="openai-codex/gpt-6-luna"
+                  placeholder="custom/gemini-3.8-flash-high"
                 />
                 <datalist id="gtv-models">
                   {data.models.map((m) => (

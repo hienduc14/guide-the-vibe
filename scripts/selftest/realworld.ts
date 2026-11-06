@@ -349,7 +349,7 @@ function writeReport(x: { stats: any; layers: any[]; brainJobs: number; brain: s
     "",
     "Repo: `gothinkster/node-express-realworld-example-app` (TypeScript, 67 files) mirrored as a local bare repo.",
     "Agents are simulated by sending the exact hook payloads of Claude Code (alice) and Codex (bob) to the real daemons;",
-    "files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (`" + x.brain + "`, ChatGPT plan) are real.",
+    "files are really edited in two clones, WIP snapshots really pushed, the Operator and the brain (`" + x.brain + "`) are real.",
     "",
     "## Scenario",
     "- **alice** (Claude Code): `profileMapper(user, id)` → `profileMapper(user, viewer?: { id })` (breaking), updates the 5 existing callers, caps article page size at 100.",

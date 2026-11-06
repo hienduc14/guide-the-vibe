@@ -1,13 +1,12 @@
 // Wraps the shared brain per project: tags jobs with the project, records every job in the hub
-// (count, latency, failures) for the dashboard, and lets backends scope tools to the project.
+// (count, latency, failures) for the dashboard, and hands the backend the project's engine for its tools.
 
 import type { Db } from "../../shared/db.ts";
 import type { Brain, BrainJob, BrainResult } from "./types.ts";
+import type { Engine } from "../project/engine.ts";
 import { nowIso } from "../../shared/util.ts";
 
 export interface ProjectScopedBackend extends Brain {
-  /** Optional: make the project's tools available to the backend before a job runs. */
-  prepareProject?(project: string): Promise<void>;
   readonly model?: string;
   /** Optional: model choice from the dashboard ("provider/model"). */
   setModel?(model: string | undefined): void;
@@ -19,12 +18,14 @@ export class MeteredBrain implements Brain {
   private readonly base: ProjectScopedBackend;
   private readonly project: string;
   private readonly hubDb: Db;
+  private readonly engine: () => Engine | undefined;
 
-  constructor(base: ProjectScopedBackend, project: string, hubDb: Db) {
+  constructor(base: ProjectScopedBackend, project: string, hubDb: Db, engine: () => Engine | undefined = () => undefined) {
     this.base = base;
     this.name = base.name;
     this.project = project;
     this.hubDb = hubDb;
+    this.engine = engine;
   }
 
   health() {
@@ -34,8 +35,7 @@ export class MeteredBrain implements Brain {
   async run<T>(job: BrainJob): Promise<BrainResult<T>> {
     const started = Date.now();
     try {
-      await this.base.prepareProject?.(this.project);
-      const res = await this.base.run<T>({ ...job, project: this.project });
+      const res = await this.base.run<T>({ ...job, project: this.project, engine: this.engine });
       this.record(job.kind, Date.now() - started, true);
       return res;
     } catch (e) {

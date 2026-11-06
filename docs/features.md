@@ -89,9 +89,10 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 
 ## Khả năng theo agent
 
-|                                                            | Claude Code      | Codex           | omp                      | Cursor / Grok     |
-| ---------------------------------------------------------- | ---------------- | --------------- | ------------------------ | ----------------- |
-| `ask` khi sửa                                              | ✅               | ❌ → deny 1 lần | ❌ → block 1 lần         | ❌                |
-| Chèn context giữa lượt                                     | ✅               | ✅              | ✅ (nối vào tool result) | Cursor chỉ ở post |
-| Đánh thức khi rảnh                                         | ✅ `asyncRewake` | ❌              | —                        | ❌                |
-| Adapter Cursor/Grok chưa làm (xem [agents.md](agents.md)). |
+|                        | Claude Code      | Codex           | Cursor / Grok     |
+| ---------------------- | ---------------- | --------------- | ----------------- |
+| `ask` khi sửa          | ✅               | ❌ → deny 1 lần | ❌                |
+| Chèn context giữa lượt | ✅               | ✅              | Cursor chỉ ở post |
+| Đánh thức khi rảnh     | ✅ `asyncRewake` | ❌              | ❌                |
+
+Adapter Cursor/Grok chưa làm (xem [agents.md](agents.md)).

@@ -9,7 +9,7 @@ npm run typecheck
 npm test
 ```
 
-Chạy server không docker: `GTV_DATA=.gtv-data GTV_ADMIN_TOKEN=dev node src/server/main.ts` (Brain tắt nếu không đặt `BRAIN_BACKEND=hermes` + `HERMES_URL`/`HERMES_API_KEY`, hoặc `BRAIN_BACKEND=opencode`).
+Chạy server không docker: `GTV_DATA=.gtv-data GTV_ADMIN_TOKEN=dev node src/server/main.ts` (Brain tắt nếu không đặt `BRAIN_BACKEND=pi` + `BRAIN_MODEL`, thường kèm `BRAIN_BASE_URL`/`BRAIN_API_KEY`; xem [operations.md](operations.md#brain-pi)).
 Dashboard dev: `npm run web:dev` → `http://localhost:5173` (proxy về `GTV_SERVER`, mặc định `:7390`).
 
 ### Node 24 chạy thẳng TypeScript (type stripping)
@@ -60,10 +60,10 @@ Dashboard dev: `npm run web:dev` → `http://localhost:5173` (proxy về `GTV_SE
 2. Gọi `engine.brain.run({ kind, prompt, schema })` bên trong `engine.guarded(...)`; `MeteredBrain` tự gắn project và ghi thống kê.
 3. Test bằng `FakeBrain` (xem `test/server.test.ts`).
 
-### Thêm tool MCP
+### Thêm tool
 
-- **Cho Brain**: `tool(...)` trong `src/server/brain/mcp-tools.ts` (handler nhận `Engine` của project; ở `/mcp` tự thêm tham số `project`) — chỉ đọc, giới hạn kích thước output (`text()` cắt 24 000 ký tự). Thêm tên tool vào danh sách trong `hermesSystemPrompt` (`brain/hermes.ts`).
-- **Cho agent**: thêm case trong `runTool` (`src/daemon/tools.ts`), đăng ký trong `src/daemon/mcp.ts` (`gtv_<tên>`) và trong `src/adapters/omp/gtv-extension.ts`; cập nhật `SKILL.md` nếu agent cần biết khi nào dùng.
+- **Cho Brain**: `tool(...)` trong `src/server/brain/tools.ts` (handler nhận `Engine` của project, tham số khai báo bằng zod và được kiểm trước khi chạy) — chỉ đọc, giới hạn kích thước output (`text()` cắt 24 000 ký tự). Pi tự gửi tên + mô tả + JSON schema của tool cho model; test danh sách tool trong `test/pi.test.ts`.
+- **Cho agent**: thêm case trong `runTool` (`src/daemon/tools.ts`), đăng ký trong `src/daemon/mcp.ts` (`gtv_<tên>`); cập nhật `SKILL.md` nếu agent cần biết khi nào dùng.
 
 ### Thêm adapter cho agent mới
 

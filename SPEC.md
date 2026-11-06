@@ -817,3 +817,29 @@ Cùng stack Docker, repo RealWorld, 3 dev, mỗi dev một daemon:
 Lỗi tìm ra và đã sửa: Codex coi mọi tool MCP là cần duyệt; với `approval_policy = "never"` (`codex exec`) lời gọi `gtv_register_task` bị từ chối. `gtv install codex` giờ ghi `default_tools_approval_mode = "approve"` cho server `gtv` (tool gtv chỉ nói với Operator, không sửa code).
 
 Chưa kiểm tra: phiên tương tác (TUI) của Codex/omp, `asyncRewake` của Claude khi rảnh (chỉ chạy `-p`), Cursor/Grok (chưa có adapter).
+
+## 24. v0.7 — Brain chuyển sang Pi, tập trung Claude Code + Codex (06/11/2026)
+
+### 24.1 Quyết định
+
+| #   | Quyết định | Lý do |
+| --- | ---------- | ----- |
+| D27 | Brain = **vòng lặp agent của Pi** (`@earendil-works/pi-agent-core` + `@earendil-works/pi-ai`, ghim 1.5.0) chạy **trong tiến trình Operator**. Thay D23 (Hermes). Bỏ luôn backend OpenCode. | Pi là thư viện TypeScript nhúng được vào Node: bớt một service (container Hermes, khóa `HERMES_API_KEY`, gateway Python), bớt một bước mạng. Chỉ dùng phần lõi (agent loop + provider), không dùng `pi-coding-agent` (TUI, bash, edit, quét `~/.pi`). |
+| D28 | Tool của Brain gọi **thẳng** `Engine` của project (`brain/tools.ts`), không qua MCP. Bỏ `/mcp`, `/p/:id/mcp` và `GTV_BRAIN_TOKEN`. Thay D24, D26. | Không còn endpoint nào trên cổng 7390 mở tool đọc code ra mạng. Mỗi job một agent mới trong RAM, chỉ có 13 tool chỉ-đọc; tham số kiểm bằng zod. |
+| D29 | LLM chọn bằng `BRAIN_MODEL=provider/model`: `custom/<id>` (hoặc chỉ `<id>`) đi tới `BRAIN_BASE_URL` (endpoint tương thích OpenAI, hoặc Anthropic với `BRAIN_API=anthropic-messages`); provider khác là provider có sẵn trong Pi, lấy key từ biến môi trường của nó. | Provider nào cũng được (yêu cầu của nhóm). Đổi model trên dashboard như trước. |
+| D30 | Như D25: Pi không ép schema ⇒ schema trong prompt, gtv tự kiểm JSON, nhắc lại một lần **trong cùng lịch sử**. Lỗi tạm thời (429/5xx, mất kết nối, quá giờ) ⇒ `BrainUnavailable` (không nhảy cầu dao); key/model sai ⇒ lỗi thật. | Giữ hành vi fail-open của các bản trước. |
+| D31 | **Bỏ adapter omp** (thay D22). Agent được hỗ trợ: Claude Code và Codex. | Nhóm tập trung hai agent này; ít mã và ít ma trận test hơn. Session cũ có `agent = omp` rơi về khả năng `other`. |
+
+### 24.2 Kiểm tra
+
+- `npm run check`: typecheck, prettier, **41/41 test**. `test/pi.test.ts` dùng endpoint tương thích OpenAI giả lập (SSE): model giả gọi `find_symbol`, tool chạy thật trên engine, ticket `answered` có nguồn; model chỉ thấy 13 tool chỉ-đọc; thử lại JSON; key sai/400 là lỗi, không kết nối/quá giờ là `BrainUnavailable`; `/mcp` trả 404.
+- **Brain thật** (`gemini-3.8-flash-high` qua CLIProxyAPI, `BRAIN_BASE_URL`): câu hỏi trên repo nhỏ → Pi gọi tool, trả lời đúng với nguồn `file:dòng` (36 s).
+- **Stack Docker** (1 container `operator`; override chỉ đổi sang mạng host vì firewall máy test chặn container → host): `/health` báo `brain: pi, ok`. Self-test RealWorld **21/21** (`docs/reports/selftest-realworld.md`, 3 job Brain: 24 s, 42 s, 114 s). Lần chạy trước đó 20/21: câu trả lời bậc 1 mất 60,4 s, quá `ask_wait_s` = 60 s nên đến sau qua hộp thư (đúng thiết kế, nhưng check đòi trả lời ngay). Đánh giá L3 lúc đăng ký (114 s) cũng quá `registration.wait_s`, nên kết quả đến sau dưới dạng tin `HIGH · L3`. Model "high" này chậm; muốn trả lời ngay thì chọn model nhanh hơn trên dashboard.
+- **Agent thật**, cùng stack, repo RealWorld:
+
+| Dev   | Agent                                         | Kết quả |
+| ----- | --------------------------------------------- | ------- |
+| alice | **Claude Code 2.1.318** (`claude -p`, haiku) | `gtv_register_task` qua MCP; đổi chữ ký `profileMapper` và caller; hook báo sửa ngoài scope đã đăng ký, agent báo lại cho người dùng; snapshot đẩy lên `refs/gtv/alice/*`. |
+| bob   | **Codex CLI 0.163.0** (`codex exec`, gemini-3.8-flash-high qua CLIProxyAPI) | Đăng ký → `needs_coordination`, HIGH: alice đổi chữ ký `profileMapper` — **trước khi viết code**; `gtv_ask` → Pi đọc WIP của alice, trả lời "truyền `{ id }`" kèm nguồn; câu hỏi chậm hơn đến sau qua `gtv_inbox`; `gtv_check`, `gtv_ack`; viết `getCommentAuthors` theo chữ ký mới. |
+
+Chưa kiểm tra: provider có sẵn của Pi với key thật (chỉ thử qua endpoint `custom`), `BRAIN_API=anthropic-messages` với endpoint thật, phiên tương tác (TUI) của Codex, `asyncRewake` của Claude khi rảnh.

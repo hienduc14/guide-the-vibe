@@ -1,47 +1,40 @@
-// Read-only MCP tools for the Operator brain (served over streamable HTTP, stateless).
-// Two endpoints share these tools: /p/<project>/mcp is scoped to one project (OpenCode registers one per
-// project); /mcp serves every project and each tool takes a `project` argument (Hermes has one static MCP config).
+// Read-only tools of the Operator brain, called in-process by the Pi agent loop (no MCP hop).
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { z } from "zod";
 import type { Engine } from "../project/engine.ts";
 import { BASE } from "../../codeintel/graph.ts";
-import { truncate } from "../../shared/util.ts";
+import { git, truncate } from "../../shared/util.ts";
 
 const MAX_TEXT = 24_000;
 
 function text(value: unknown) {
   const s = typeof value === "string" ? value : JSON.stringify(value, null, 1);
-  return { content: [{ type: "text" as const, text: truncate(s, MAX_TEXT) }] };
+  return { content: [{ type: "text" as const, text: truncate(s, MAX_TEXT) }], details: undefined };
 }
 
-const VIEW = z.string().optional().describe('Code view: "base" (main, default) or a workspace id from gtv_team_status');
+const VIEW = z.string().optional().describe('Code view: "base" (main, default) or a workspace id from team_status');
 
-const PROJECT = z.string().describe("Project id given in the job prompt");
+/** The brain's tools, bound to one project's engine. */
+export function brainTools(e: Engine): AgentTool<any>[] {
+  const tools: AgentTool<any>[] = [];
 
-/** `resolve(undefined)` must return the fixed project's engine; with `shared`, tools require a project id. */
-export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, shared = false): McpServer {
-  const server = new McpServer({ name: "gtv-operator", version: "0.1.0" });
-
-  const shaFor = async (e: Engine, view?: string): Promise<string | undefined> => {
+  const shaFor = async (view?: string): Promise<string | undefined> => {
     if (!view || view === BASE) return e.mainSha ?? (await e.repo?.mainSha());
     return e.store.workspace(view)?.snapshot_sha ?? undefined;
   };
 
-  // Registers a tool whose handler gets the project's engine; in shared mode the schema gains `project`.
-  const tool = (name: string, config: { description: string; inputSchema?: z.ZodRawShape }, fn: (e: Engine, args: any) => Promise<unknown> | unknown) =>
-    server.registerTool(name, { description: config.description, inputSchema: { ...config.inputSchema, ...(shared ? { project: PROJECT } : {}) } }, (async (
-      args: any,
-    ) => {
-      let e: Engine;
-      try {
-        e = await resolve(shared ? args.project : undefined);
-      } catch (err) {
-        return text((err as Error).message);
-      }
-      return fn(e, args);
-    }) as any);
+  // Arguments are validated with zod here too: the model's JSON is untrusted input.
+  const tool = (name: string, config: { description: string; inputSchema?: z.ZodRawShape }, fn: (e: Engine, args: any) => Promise<unknown> | unknown) => {
+    const schema = z.object(config.inputSchema ?? {});
+    tools.push({
+      name,
+      label: name,
+      description: config.description,
+      parameters: z.toJSONSchema(schema) as object,
+      execute: async (_id, args) => (await fn(e, schema.parse(args ?? {}))) as ReturnType<typeof text>,
+    });
+  };
 
   tool("team_status", { description: "Active sessions, registered tasks (with scopes), files being edited and open conflicts, per workspace." }, async (e) => {
     const s = e.store.teamState();
@@ -61,7 +54,7 @@ export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, sh
       inputSchema: { path: z.string(), view: VIEW, start_line: z.number().int().optional(), end_line: z.number().int().optional() },
     },
     async (e, { path, view, start_line, end_line }) => {
-      const sha = await shaFor(e, view);
+      const sha = await shaFor(view);
       if (!sha || !e.repo) return text("No snapshot for that view.");
       const content = await e.repo.readFile(sha, path);
       if (content === undefined) return text(`${path} does not exist in view ${view ?? BASE}.`);
@@ -81,7 +74,7 @@ export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, sh
     "grep",
     { description: "Search code with an extended regex (git grep) in main or a workspace view.", inputSchema: { pattern: z.string(), view: VIEW } },
     async (e, { pattern, view }) => {
-      const sha = await shaFor(e, view);
+      const sha = await shaFor(view);
       if (!sha || !e.repo) return text("No snapshot for that view.");
       const hits = await e.repo.grep(sha, pattern);
       return text(hits.length ? hits.join("\n") : "No matches.");
@@ -97,7 +90,6 @@ export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, sh
     async (e, { workspace, path }) => {
       const ws = e.store.workspace(workspace);
       if (!ws?.snapshot_sha || !ws.snapshot_base || !e.repo) return text("No WIP snapshot for that workspace.");
-      const { git } = await import("../../shared/util.ts");
       const args = ["diff", "--stat", "-p", "--unified=2", ws.snapshot_base, ws.snapshot_sha];
       if (path) args.push("--", path);
       const r = await git(e.repo.dir, args, { allowFail: true });
@@ -163,7 +155,7 @@ export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, sh
     "owners",
     { description: "Who has worked on a path (git history authors) and recent commits.", inputSchema: { path: z.string() } },
     async (e, { path }) => {
-      const sha = await shaFor(e, BASE);
+      const sha = await shaFor(BASE);
       if (!sha || !e.repo) return text("No repository.");
       return text({ authors: await e.repo.authors(sha, path), recent: await e.repo.log(sha, path, 8) });
     },
@@ -188,16 +180,5 @@ export function buildBrainMcp(resolve: (project?: string) => Promise<Engine>, sh
     async (e, { workspace }) => text(e.store.conflicts("open").filter((c) => !workspace || c.workspace_a === workspace || c.workspace_b === workspace)),
   );
 
-  return server;
-}
-
-export async function handleBrainMcp(resolve: (project?: string) => Promise<Engine>, req: Request, shared = false): Promise<Response> {
-  const server = buildBrainMcp(resolve, shared);
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await server.connect(transport);
-  try {
-    return await transport.handleRequest(req);
-  } finally {
-    void server.close();
-  }
+  return tools;
 }

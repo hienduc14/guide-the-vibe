@@ -7,7 +7,7 @@ import { Badge, LevelBadge } from "../../components/Badge";
 import { BarChart, HBars, lastDays } from "../../components/Charts";
 import { ErrorNotice, Loading, Empty } from "../../components/Empty";
 import { isLoaded, type Level, type ProjectEntry } from "../../api/types";
-import { ago, ms, shortSha } from "../../lib/format";
+import { ago, ms, repoName, shortSha } from "../../lib/format";
 import { AddProjectForm } from "./AddProjectForm";
 
 const LEVELS: Level[] = ["critical", "high", "warning", "info"];
@@ -29,7 +29,9 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
       <div className="card-head">
         <div style={{ minWidth: 0 }}>
           <h3 className="truncate">{p.name}</h3>
-          <div className="xs muted mono truncate">{p.repo_url}</div>
+          <div className="xs muted mono truncate" title={p.repo_url}>
+            {repoName(p.repo_url)}
+          </div>
         </div>
         {p.last_sync && !p.last_sync.ok ? (
           <Badge tone="danger">sync lỗi</Badge>
@@ -140,11 +142,15 @@ export function OverviewPage() {
           <div className="stack">
             <div className="row">
               <span className={`dot${data.brain.ok ? " on" : " bad"}`} />
-              <span className="small">
-                {data.brain.backend} {data.brain.model ? <code>{data.brain.model}</code> : <span className="faint">(model mặc định)</span>}
-              </span>
+              {data.brain.backend === "null" ? (
+                <span className="small">Đang tắt</span>
+              ) : (
+                <span className="small">
+                  {data.brain.backend} {data.brain.model ? <code>{data.brain.model}</code> : <span className="faint">chưa chọn model</span>}
+                </span>
+              )}
             </div>
-            {!data.brain.ok && <span className="small danger-text">{data.brain.detail ?? "Brain không sẵn sàng"}</span>}
+            {!data.brain.ok && data.brain.backend !== "null" && <span className="small danger-text">{data.brain.detail ?? "Brain không sẵn sàng"}</span>}
             <HBars
               data={bs.byKind.map((k) => ({ label: k.kind, value: k.jobs, hint: k.failed ? `${k.failed} lỗi` : undefined }))}
               empty="Chưa có job nào trong 7 ngày"

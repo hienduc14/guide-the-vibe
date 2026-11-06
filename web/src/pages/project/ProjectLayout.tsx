@@ -5,9 +5,8 @@ import type { ProjectDetail } from "../../api/types";
 import { usePoll, type Poll } from "../../hooks/usePoll";
 import { PageHead } from "../../components/Layout";
 import { Tabs } from "../../components/Tabs";
-import { Badge } from "../../components/Badge";
 import { ErrorNotice, Loading } from "../../components/Empty";
-import { shortSha, ago } from "../../lib/format";
+import { shortSha, ago, repoName } from "../../lib/format";
 
 interface ProjectCtx {
   id: string;
@@ -34,18 +33,21 @@ export function ProjectLayout() {
       <PageHead
         title={data.name}
         subtitle={
-          <span className="mono wrap-anywhere">
-            {data.repo_url} · {data.main_branch}@{shortSha(data.main_sha)}
+          <span className="meta">
+            <span className="mono" title={data.repo_url}>
+              {repoName(data.repo_url)}
+            </span>
+            <span className="mono">
+              {data.main_branch}@{shortSha(data.main_sha)}
+            </span>
             {data.last_sync && (
               <span className={data.last_sync.ok ? "" : "danger-text"}>
-                {" "}
-                · sync {ago(data.last_sync.at)}
+                sync {ago(data.last_sync.at)}
                 {data.last_sync.ok ? "" : ` lỗi: ${data.last_sync.error}`}
               </span>
             )}
           </span>
         }
-        actions={<Badge mono>{id}</Badge>}
       />
       <Tabs
         items={[

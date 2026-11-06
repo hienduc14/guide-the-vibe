@@ -168,11 +168,12 @@ a.card:hover {
   padding: var(--s3) var(--s4);
 }
 .stat-value {
-  font-size: var(--text-2xl);
+  font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .stat-value.alert {
   color: var(--accent);
@@ -227,8 +228,6 @@ table.table {
   text-align: left;
   font-weight: 600;
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--muted);
   padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--line);
@@ -236,6 +235,7 @@ table.table {
 }
 .table td {
   padding: var(--s2) var(--s4);
+  min-width: 6ch;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
@@ -413,17 +413,71 @@ details > summary {
 .feed {
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .feed-item {
   display: grid;
-  grid-template-columns: 74px 1fr;
+  grid-template-columns: 84px 1fr;
   gap: var(--s3);
-  padding: var(--s2) var(--s4);
+  padding: var(--s2) var(--s4) var(--s2) calc(var(--s4) - 2px);
   border-bottom: 1px solid var(--line);
+  border-left: 2px solid transparent;
   font-size: var(--text-sm);
 }
 .feed-item:last-child {
   border-bottom: 0;
+}
+.feed-item time {
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+  white-space: nowrap;
+}
+/* Severity stripe: the one place the feed uses the accent. */
+.feed-item.lvl-high,
+.feed-item.lvl-critical {
+  border-left-color: var(--accent);
+}
+.feed-item.lvl-warning {
+  border-left-color: var(--line-strong);
+}
+.feed-text {
+  all: unset;
+  min-width: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.feed-text.open {
+  -webkit-line-clamp: unset;
+}
+.feed-text:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.feed-text .badge {
+  height: 18px;
+  vertical-align: 1px;
+}
+.card-foot {
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--line);
+}
+.task-item {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.task-item:last-child {
+  border-bottom: 0;
+}
+.meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s3);
 }
 .notice {
   padding: var(--s3) var(--s4);
@@ -502,4 +556,8 @@ details > summary {
   white-space: pre-wrap;
   font-size: var(--text-sm);
   line-height: 1.6;
+}
+.cell-wide {
+  display: block;
+  min-width: 200px;
 }

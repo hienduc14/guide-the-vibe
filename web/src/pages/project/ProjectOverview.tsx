@@ -1,54 +1,18 @@
 import { api } from "../../api/endpoints";
-import type { ActivityEvent, Person, Task } from "../../api/types";
+import type { Person, Task } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useProject } from "./ProjectLayout";
 import { Card, Stat } from "../../components/Card";
 import { Badge, StatusBadge } from "../../components/Badge";
 import { Table } from "../../components/Table";
 import { Empty } from "../../components/Empty";
-import { ago, clock, parseJson } from "../../lib/format";
-
-/** One-line human summary of an event_log row. */
-function describe(e: ActivityEvent): string {
-  const p = parseJson(e.payload) as Record<string, any>;
-  switch (e.type) {
-    case "session_start":
-      return `mở phiên ${p.agent ?? ""} (${p.workspace_label ?? ""})`;
-    case "register":
-      return `đăng ký task “${p.title}”`;
-    case "snapshot":
-      return `snapshot ${String(p.sha ?? "").slice(0, 8)}`;
-    case "conflict":
-      return `${p.layer} ${p.level}: ${p.message}`;
-    case "ticket_ask":
-      return `hỏi: ${p.question}`;
-    case "ticket_tier1":
-      return `Operator → ${p.output?.route ?? "?"} (${p.ms ?? "?"} ms)`;
-    case "drift":
-      return `sửa ngoài phạm vi: ${(p.paths ?? []).join(", ")}`;
-    case "shadow_conflicts":
-      return `[shadow] ${p.feature}: ${(p.found ?? []).length} phát hiện`;
-    case "feature_set":
-      return `đặt ${p.feature} = ${p.mode ?? "default"}`;
-    case "feature_error":
-      return `lỗi ${p.feature}: ${p.error}`;
-    case "manual_message":
-      return `ghi chú gửi ${p.to_dev}: ${p.body}`;
-    case "work_merged":
-      return `work đã merge vào main`;
-    default:
-      return typeof p === "string"
-        ? p
-        : Object.keys(p ?? {})
-            .slice(0, 4)
-            .join(", ");
-  }
-}
+import { ago } from "../../lib/format";
+import { ActivityFeed } from "./ActivityFeed";
 
 export function ProjectOverview() {
   const { id, detail } = useProject();
   const state = usePoll(() => api.projects.state(id), [id], 5000);
-  const activity = usePoll(() => api.projects.activity(id, 40), [id], 5000);
+  const activity = usePoll(() => api.projects.activity(id, 120), [id], 5000);
   const c = detail.counts;
 
   return (
@@ -80,7 +44,11 @@ export function ProjectOverview() {
               render: (p) => <div className="row">{p.agents.length ? p.agents.map((a) => <Badge key={a}>{a}</Badge>) : <span className="faint">—</span>}</div>,
             },
             { key: "ws", title: "Workspace", render: (p) => <span className="mono xs">{p.workspaces.join(", ") || "—"}</span> },
-            { key: "tasks", title: "Task", render: (p) => (p.tasks.length ? p.tasks.join("; ") : <span className="faint">chưa đăng ký</span>) },
+            {
+              key: "tasks",
+              title: "Task",
+              render: (p) => <span className="cell-wide">{p.tasks.length ? p.tasks.join("; ") : <span className="faint">chưa đăng ký</span>}</span>,
+            },
             { key: "editing", title: "Đang sửa", render: (p) => <span className="mono">{p.editing}</span> },
             { key: "conflicts", title: "Conflict", render: (p) => <span className={`mono${p.conflicts ? " danger-text" : ""}`}>{p.conflicts}</span> },
             { key: "seen", title: "Lần cuối", render: (p) => <span className="xs muted">{ago(p.last_seen)}</span> },
@@ -93,7 +61,7 @@ export function ProjectOverview() {
           {state.data?.tasks.length ? (
             <div className="feed">
               {state.data.tasks.map((t: Task) => (
-                <div key={t.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }} className="stack tight">
+                <div key={t.id} className="task-item stack tight">
                   <div className="row between">
                     <b className="small">{t.title}</b>
                     <span className="xs muted">
@@ -117,22 +85,7 @@ export function ProjectOverview() {
           )}
         </Card>
 
-        <Card title="Hoạt động gần đây" flush>
-          {activity.data?.length ? (
-            <div className="feed">
-              {activity.data.map((e) => (
-                <div className="feed-item" key={e.id}>
-                  <span className="xs faint mono">{clock(e.ts)}</span>
-                  <span className="wrap-anywhere">
-                    <b>{e.actor ?? "system"}</b> <span className="muted">{describe(e)}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Empty>Chưa có hoạt động</Empty>
-          )}
-        </Card>
+        <ActivityFeed events={activity.data ?? []} />
       </div>
     </>
   );

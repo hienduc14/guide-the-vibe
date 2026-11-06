@@ -29,6 +29,7 @@ export function BrainPage() {
   if (!data) return <Loading />;
   const s = data.stats;
   const n = Number(days);
+  const off = data.backend === "null";
 
   return (
     <>
@@ -52,12 +53,19 @@ export function BrainPage() {
           <div className="stack">
             <div className="row">
               <span className={`dot${data.health.ok ? " on" : " bad"}`} />
-              <b>{data.backend}</b>
+              <b>{off ? "Đang tắt" : data.backend}</b>
               <span className={`small ${data.health.ok ? "muted" : "danger-text"}`}>
-                {data.health.detail ?? (data.health.ok ? "sẵn sàng" : "không sẵn sàng")}
+                {off ? "" : (data.health.detail ?? (data.health.ok ? "sẵn sàng" : "không sẵn sàng"))}
               </span>
             </div>
+            {off && (
+              <p className="small muted">
+                Brain đang tắt nên Operator không tự trả lời câu hỏi và không chạy L3. Đặt <code>BRAIN_BACKEND=pi</code> cho Operator rồi khởi động lại để kết
+                nối provider và chọn model ở đây.
+              </p>
+            )}
             <form
+              hidden={off}
               className="stack tight"
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -90,7 +98,7 @@ export function BrainPage() {
                 </Field>
               )}
               <div className="row">
-                <button className="btn primary" type="submit" disabled={data.backend === "null"}>
+                <button className="btn primary" type="submit">
                   Lưu
                 </button>
                 <span className="xs faint">
@@ -101,7 +109,7 @@ export function BrainPage() {
             </form>
           </div>
         </Card>
-        <div className="grid stats" style={{ alignContent: "start" }}>
+        <div className="grid stats" style={{ alignContent: "start", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}>
           <Stat label="Job" value={s.totals.jobs} />
           <Stat label="Lỗi" value={s.totals.failed} alert={s.totals.failed > 0} />
           <Stat label="Trung bình" value={ms(s.totals.avg_ms)} />
@@ -110,7 +118,7 @@ export function BrainPage() {
         </div>
       </div>
 
-      <ProvidersCard onChange={() => void reload()} />
+      {!off && <ProvidersCard onChange={() => void reload()} />}
 
       <div className="split">
         <Card title="Job theo ngày">

@@ -11,8 +11,8 @@ export function ago(iso: string | null | undefined): string {
 
 export function clock(iso: string): string {
   const d = new Date(iso);
-  const sameDay = d.toDateString() === new Date().toDateString();
-  return sameDay ? d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} ${time}`;
 }
 
 export const shortSha = (sha: string | null | undefined) => (sha ? sha.slice(0, 8) : "—");
@@ -28,3 +28,9 @@ export function parseJson(text: string): unknown {
 }
 
 export const plural = (n: number, word: string) => `${n} ${word}`;
+
+/** Last path segment of a repo URL or path: "…/realworld/origin.git" → "realworld/origin.git". */
+export function repoName(url: string): string {
+  const parts = url.replace(/\/+$/, "").split(/[/:]/).filter(Boolean);
+  return parts.slice(-2).join("/");
+}

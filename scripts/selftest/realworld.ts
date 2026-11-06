@@ -206,7 +206,7 @@ async function main() {
     `pre-edit: ${decisionOf(bArticle.pre)}; ${ctxOf(bArticle.pre).slice(0, 200)}`,
   );
 
-  // 6. Wait for WIP snapshots (daemon debounce 20s) → L1 + L2 on the server.
+  // 6. Wait for WIP snapshots (prepare.sh starts the daemons with a 20 s debounce) → L1 + L2 on the server.
   const l2 = await waitFor("L2 conflict", async () => (await conflicts()).find((c) => c.layer === "L2" && c.subject.includes("profileMapper")), 120_000);
   const l1 = await waitFor("L1 conflict", async () => (await conflicts()).find((c) => c.layer === "L1" && c.kind === "text"), 60_000);
   const sinceEdit = ((Date.now() - bEdit) / 1000).toFixed(1);

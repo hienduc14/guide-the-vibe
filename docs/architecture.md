@@ -42,7 +42,7 @@ Agent gọi `gtv_register_task` → daemon `POST /v1/p/:id/tasks` → `Engine.re
 
 - `PreToolUse` sửa file → daemon **quyết định local** (`decide.ts`): conflict đang mở chạm file, file đang được người khác sửa, file nằm trong scope đã đăng ký của người khác, chưa đăng ký task. High → `ask` (Claude) hoặc `deny` một lần (agent không có ask); Critical → chặn tới khi ack.
 - Daemon gửi event `edit` (async) → footprint → L0 → thông báo.
-- `PostToolUse` → lên lịch snapshot (debounce `snapshotDebounceMs`, mặc định 20 s): index tạm + `commit-tree` → `git push --force <remote> <sha>:refs/gtv/<dev>/<workspace>` → event `snapshot`.
+- `PostToolUse` → lên lịch snapshot (debounce `snapshotDebounceMs`, mặc định 5 phút): index tạm + `commit-tree` → `git push --force <remote> <sha>:refs/gtv/<dev>/<workspace>` → event `snapshot`.
 - Server: `fetch` → đồng bộ graph (`syncBase`, `syncOverlay`) → symbol diff so với merge-base + dòng đã sửa (`changedLines`) → L1 (`merge-tree` với mọi snapshot khác và với `main`) → L2 → L0.
 
 ### 4. Hỏi đáp

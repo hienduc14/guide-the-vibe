@@ -60,7 +60,7 @@ l3: { daily_budget: 60 }
 | `GTV_DEV`, `GTV_SERVER`, `GTV_TOKEN` | tên user, `http://127.0.0.1:7390`, — |                                                         |
 | `GTV_DAEMON_PORT`                    | `7391`                               |                                                         |
 | `GTV_REMOTE`                         | `origin`                             | remote để push snapshot và nhận diện project            |
-| `GTV_SNAPSHOT_DEBOUNCE_MS`           | `20000`                              |                                                         |
+| `GTV_SNAPSHOT_DEBOUNCE_MS`           | `300000` (5 phút)                    |                                                         |
 | `GTV_DAEMON_URL`                     | —                                    | shim `gtv hook` dùng (thay cho `--daemon`)              |
 | `GTV_CWD`                            | cwd                                  | thư mục mà `gtv mcp` coi là repo                        |
 | `GTV_ADMIN_TOKEN`                    | —                                    | `gtv project add` dùng                                  |

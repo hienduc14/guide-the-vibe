@@ -107,6 +107,9 @@ async function main(): Promise<void> {
     }
     case "hook-wait": {
       const agent = rest[0] ?? "claude";
+      // Headless Claude (claude -p, SDK) has nobody to wake, and it would wait for this waiter (up to 30 min)
+      // before exiting. Messages stay in the inbox and arrive with the next hook.
+      if (process.env.CLAUDE_CODE_SESSION_ATTENDED === "0") return;
       try {
         const input = JSON.parse((await readStdin()) || "{}");
         const res = await daemon<{ text: string | null }>(

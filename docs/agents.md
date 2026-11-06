@@ -24,7 +24,7 @@ Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, c�
 
 - Hook HTTP lỗi = không chặn (Claude coi là non-blocking error).
 - `PreToolUse` chỉ trả `permissionDecision` khi cần `ask`/`deny`, nên không vượt qua quyền của người dùng.
-- `asyncRewake`: khi Claude rảnh, waiter long-poll `/wait`; có tin ⇒ exit 2, nội dung ở stderr đánh thức Claude. Waiter mới thay waiter cũ cùng session.
+- `asyncRewake`: khi Claude rảnh, waiter long-poll `/wait`; có tin ⇒ exit 2, nội dung ở stderr đánh thức Claude. Waiter mới thay waiter cũ cùng session. Claude chạy không người (`claude -p`, SDK: `CLAUDE_CODE_SESSION_ATTENDED=0`) thì waiter thoát ngay, vì không có ai để đánh thức và Claude sẽ chờ waiter trước khi thoát (trước đây treo tới 30 phút).
 - Lần đầu mở project: duyệt MCP server `gtv`.
 
 ## Codex CLI

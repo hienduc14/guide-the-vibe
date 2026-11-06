@@ -114,6 +114,17 @@ test("registration returns overlaps, knowledge and L3 advice", async () => {
   assert.equal(fb.l3, "off"); // no other active task yet -> L3 not needed
 });
 
+test("updating a task with some fields keeps the others (gtv_update_task / gtv_finish_task send partial patches)", async () => {
+  const [t] = rt.engine.store.activeTasks().filter((x) => x.dev === "bob");
+  const goal = await api("bob", "PATCH", `/v1/p/default/tasks/${t.id}`, { goal: "Tokens expire after 15 minutes" });
+  assert.equal(goal.goal, "Tokens expire after 15 minutes");
+  assert.deepEqual(goal.resources, t.resources);
+  assert.equal(goal.title, t.title);
+  const status = await api("bob", "PATCH", `/v1/p/default/tasks/${t.id}`, { status: "pr_open" }); // same shape as finish_task's {status: "done"}
+  assert.equal(status.status, "pr_open");
+  assert.deepEqual(status.resources, t.resources);
+});
+
 test("snapshots: L2 detects a signature change used by the other workspace; L1 detects text conflicts", async () => {
   const a = await origin.clone("alice");
   const b = await origin.clone("bob");

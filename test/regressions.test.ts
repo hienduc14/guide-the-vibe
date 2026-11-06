@@ -95,3 +95,32 @@ test("gtv install codex lets Codex call gtv tools without per-call approval, and
   assert.equal(toml.match(/\[mcp_servers\.gtv\]/g)?.length, 1);
   assert.match(toml, /\[mcp_servers\.gtv\][\s\S]*default_tools_approval_mode = "approve"/);
 });
+
+test("headless Claude (claude -p): the asyncRewake waiter exits at once instead of holding Claude for 30 min", async () => {
+  const { spawn } = await import("node:child_process");
+  const { createServer } = await import("node:http");
+  // A daemon that never answers /wait: an attended waiter would hang on it.
+  const hang = createServer(() => undefined);
+  await new Promise<void>((r) => hang.listen(0, "127.0.0.1", r));
+  const port = (hang.address() as import("node:net").AddressInfo).port;
+  const run = (attended: string) =>
+    new Promise<number>((resolve) => {
+      const started = Date.now();
+      const p = spawn(process.execPath, ["bin/gtv.mjs", "hook-wait", "claude", "--daemon", `http://127.0.0.1:${port}`], {
+        env: { ...process.env, CLAUDE_CODE_SESSION_ATTENDED: attended },
+      });
+      p.stdin.end(JSON.stringify({ session_id: "s1" }));
+      const t = setTimeout(() => p.kill(), 3000);
+      p.on("exit", () => {
+        clearTimeout(t);
+        resolve(Date.now() - started);
+      });
+    });
+  try {
+    assert.ok((await run("0")) < 2500, "unattended: exits right away");
+    assert.ok((await run("1")) >= 2900, "attended: keeps waiting for messages");
+  } finally {
+    hang.closeAllConnections();
+    hang.close();
+  }
+});

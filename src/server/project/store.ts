@@ -166,7 +166,9 @@ export class Store extends EventEmitter {
   updateTask(id: string, patch: Partial<Pick<Task, "title" | "goal" | "resources" | "status">>): Task | undefined {
     const t = this.task(id);
     if (!t) return undefined;
-    const next = { ...t, ...patch, updated_at: nowIso() };
+    // Fields left out (undefined) keep their value: PATCH {status} must not wipe title or resources.
+    const given = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined && v !== null));
+    const next = { ...t, ...given, updated_at: nowIso() };
     this.db.upsert("tasks", { ...next, resources: next.resources });
     this.changed();
     return next;

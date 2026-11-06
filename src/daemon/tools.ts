@@ -40,7 +40,7 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
     }
     case "finish_task": {
       const t = myTask();
-      if (!t) return "No registered task for this session.";
+      if (!t) return "No open task for this session (it may already be finished).";
       await client.call("PATCH", `${p}/tasks/${t.id}`, { status: args.status ?? "done" });
       ctx.snapshotSoon();
       return `Task ${t.id} marked ${args.status ?? "done"}.`;

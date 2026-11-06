@@ -98,7 +98,7 @@ sequenceDiagram
 ```
 
 - **Ai nhận:** tin có `to_session` ⇒ đúng session; `to_workspace` ⇒ mọi session trong workspace đó; còn lại theo `to_dev`.
-- **Claude đang rảnh** (đã trả lời xong, chờ người): hook `Stop` chạy `gtv hook-wait claude` với `asyncRewake: true` → long-poll
+- **Claude đang rảnh** (đã trả lời xong, chờ người; không áp dụng khi chạy không người như `claude -p`, `CLAUDE_CODE_SESSION_ATTENDED=0`): hook `Stop` chạy `gtv hook-wait claude` với `asyncRewake: true` → long-poll
   `GET /wait` (tối đa 30 phút, mỗi Stop mới thay waiter cũ). Có tin ⇒ waiter in tin ra stderr và **exit 2** ⇒ Claude được
   đánh thức với nội dung đó.
 - **Codex:** không có cơ chế đánh thức; tin đến ở lần gọi tool kế tiếp.

@@ -105,7 +105,6 @@ export function toRepoPaths(paths: string[], cwd: string, top: string): string[]
 
 /** Native output for Claude Code / Codex / Grok (same JSON shape). `undefined` = print nothing. */
 export function formatOutput(h: NormalizedHook, d: HookDecision): Record<string, unknown> | undefined {
-  if (h.agent === "omp") return { ...d };
   const ctx = d.context?.trim() || undefined;
   switch (h.kind) {
     case "pre_edit":

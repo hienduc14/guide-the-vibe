@@ -1,12 +1,12 @@
 // Create a local playground: sandbox/origin.git (the "GitHub" repo, seeded from examples/sample-repo)
 // and one clone per developer, each wired to its own daemon:
-//   alice → Claude Code (port 7391), bob → Codex (7392), carol → omp (7393)
+//   alice → Claude Code (port 7391), bob → Codex (7392)
 // Usage: node scripts/sandbox.ts [--reset]
 
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { git } from "../src/shared/util.ts";
-import { installClaude, installCodex, ompCommand, GTV_ROOT } from "../src/daemon/install.ts";
+import { installClaude, installCodex, GTV_ROOT } from "../src/daemon/install.ts";
 import { writeLink } from "../src/daemon/workspace.ts";
 
 const PROJECT = "mini-shop";
@@ -16,7 +16,6 @@ const ORIGIN = join(SANDBOX, "origin.git");
 const DEVS = [
   { dev: "alice", agent: "claude", port: 7391 },
   { dev: "bob", agent: "codex", port: 7392 },
-  { dev: "carol", agent: "omp", port: 7393 },
 ] as const;
 
 if (process.argv.includes("--reset")) rmSync(SANDBOX, { recursive: true, force: true });
@@ -62,12 +61,11 @@ console.log(`Sandbox ready in ${SANDBOX}
 1. Start the operator (docker):   docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 2. Create the project and dev tokens (dashboard http://127.0.0.1:7390, or CLI):
      MSYS_NO_PATHCONV=1 GTV_ADMIN_TOKEN=<admin> node "${bin}" project add ${PROJECT} --repo /repos/origin.git --branch main
-     dashboard → Developers → alice / bob / carol → copy each token, then per dev:
-     $env:GTV_HOME="${join(SANDBOX, ".home-<dev>")}"; node "${bin}" init --dev <dev> --server http://127.0.0.1:7390 --port <7391|7392|7393> --token <token>
+     dashboard → Developers → alice / bob → copy each token, then per dev:
+     $env:GTV_HOME="${join(SANDBOX, ".home-<dev>")}"; node "${bin}" init --dev <dev> --server http://127.0.0.1:7390 --port <7391|7392> --token <token>
 3. Start one daemon per dev (separate terminals, PowerShell):
 ${DEVS.map((d) => `     $env:GTV_HOME="${join(SANDBOX, `.home-${d.dev}`)}"; node "${bin}" daemon`).join("\n")}
 4. Agents:
      alice: open ${join(SANDBOX, "alice")} in Claude Code
      bob:   cd ${join(SANDBOX, "bob")}; codex
-     carol: cd ${join(SANDBOX, "carol")}; ${ompCommand("http://127.0.0.1:7393")}
 `);

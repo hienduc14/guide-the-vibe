@@ -8,7 +8,6 @@ import { daemonUrl } from "./config.ts";
 export const GTV_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const GTV_BIN = join(GTV_ROOT, "bin", "gtv.mjs").replace(/\\/g, "/");
 const SKILL = join(GTV_ROOT, "src", "adapters", "skill", "SKILL.md");
-const OMP_EXTENSION = join(GTV_ROOT, "src", "adapters", "omp", "gtv-extension.ts").replace(/\\/g, "/");
 
 /** Every command carries the daemon URL explicitly, so several devs/daemons can share one machine. */
 const cmd = (daemon: string, ...args: string[]) => `node "${GTV_BIN}" ${args.join(" ")} --daemon ${daemon}`;
@@ -82,8 +81,4 @@ export function installCodex(project: string, daemon = daemonUrl()): string[] {
   writeFileSync(tomlPath, toml);
   const skill = installSkill(join(project, ".codex", "skills", "gtv-collaboration"));
   return [hooksPath, tomlPath, skill];
-}
-
-export function ompCommand(daemon = daemonUrl()): string {
-  return process.platform === "win32" ? `$env:GTV_DAEMON_URL="${daemon}"; omp -e "${OMP_EXTENSION}"` : `GTV_DAEMON_URL=${daemon} omp -e "${OMP_EXTENSION}"`;
 }

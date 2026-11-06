@@ -20,7 +20,6 @@ export function detectAgent(arg: string | undefined): AgentKind {
   if (arg && arg !== "auto") return arg as AgentKind;
   if (process.env.CLAUDECODE || process.env.CLAUDE_CODE_ENTRYPOINT) return "claude";
   if (Object.keys(process.env).some((k) => k.startsWith("CODEX_"))) return "codex";
-  if (Object.keys(process.env).some((k) => k.startsWith("PI_") || k.startsWith("OMP_"))) return "omp";
   return "other";
 }
 

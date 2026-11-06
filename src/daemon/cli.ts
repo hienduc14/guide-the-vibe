@@ -67,7 +67,6 @@ Setup
   gtv daemon                         run the local daemon (keep it open)
   gtv install claude|codex [dir] [--daemon <url>]   wire hooks + MCP + skill into a project (default: cwd;
                                      --daemon when several daemons share a machine)
-  gtv install omp [--daemon <url>]   print how to start omp with the gtv extension
 
 Projects (one per repo)
   gtv projects                       list projects on the server
@@ -153,15 +152,14 @@ async function main(): Promise<void> {
       return;
     }
     case "install": {
-      const { installClaude, installCodex, ompCommand } = await import("./install.ts");
+      const { installClaude, installCodex } = await import("./install.ts");
       const dir = rest[1] && !rest[1].startsWith("--") ? rest[1] : process.cwd();
       const d = flag("daemon");
       if (rest[0] === "claude")
         console.log("Wrote:\n  " + installClaude(dir, d).join("\n  ") + "\nRestart Claude Code in this project and approve the gtv MCP server.");
       else if (rest[0] === "codex")
         console.log("Wrote:\n  " + installCodex(dir, d).join("\n  ") + "\nIn Codex, trust the project and review the hooks with /hooks.");
-      else if (rest[0] === "omp") console.log(`Start omp with the gtv extension:\n  ${ompCommand(d)}`);
-      else console.log("usage: gtv install claude|codex|omp [project-dir]");
+      else console.log("usage: gtv install claude|codex [project-dir]");
       return;
     }
     case "status": {

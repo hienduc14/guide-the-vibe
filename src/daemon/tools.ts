@@ -1,4 +1,4 @@
-// The gtv_* tools agents call (through MCP or the omp extension), executed against the server.
+// The gtv_* tools agents call (through MCP), executed against the server.
 
 import type { ServerClient } from "./client.ts";
 import type { LocalSession } from "./decide.ts";

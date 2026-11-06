@@ -1,6 +1,6 @@
 // Shared domain types used by the Operator server, the local daemon and the adapters.
 
-export type AgentKind = "claude" | "codex" | "omp" | "cursor" | "grok" | "other";
+export type AgentKind = "claude" | "codex" | "cursor" | "grok" | "other";
 
 export type Level = "info" | "warning" | "high" | "critical";
 export const LEVEL_RANK: Record<Level, number> = { info: 0, warning: 1, high: 2, critical: 3 };
@@ -69,7 +69,6 @@ export interface AgentCapabilities {
 export const AGENT_CAPABILITIES: Record<AgentKind, AgentCapabilities> = {
   claude: { ask: true, inject: true, rewake: true },
   codex: { ask: false, inject: true, rewake: false },
-  omp: { ask: false, inject: true, rewake: true },
   cursor: { ask: false, inject: true, rewake: false },
   grok: { ask: false, inject: false, rewake: false },
   other: { ask: false, inject: false, rewake: false },

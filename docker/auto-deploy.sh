@@ -24,7 +24,11 @@ current=$(git rev-parse HEAD)
 [ "$target" = "$(cat "$failed_file" 2>/dev/null)" ] && exit 0 # already rolled back once; wait for the next commit
 
 # All check runs completed and none failed; anything else means "not yet" or "never".
-state=$(curl -fsS -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/commits/$target/check-runs?per_page=100" |
+# A private repository needs a token to read its checks: GITHUB_TOKEN, else this machine's gh login.
+token="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+auth=()
+[ -n "$token" ] && auth=(-H "Authorization: Bearer $token")
+state=$(curl -fsS "${auth[@]}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/commits/$target/check-runs?per_page=100" |
   python3 -c '
 import json, sys
 runs = json.load(sys.stdin)["check_runs"]

@@ -132,7 +132,7 @@ Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashbo
   WantedBy=timers.target
   ```
 
-  `sudo systemctl enable --now gtv-deploy.timer`; log: `journalctl -u gtv-deploy -f`. Biến tuỳ chọn: `GTV_DEPLOY_BRANCH`, `GTV_DEPLOY_REPO`, `GTV_DEPLOY_HEALTH`, `GTV_DEPLOY_PROJECT`. File `docker/compose.local.yml` (nếu có, ví dụ chỉ nghe ở 127.0.0.1) được dùng kèm.
+  `sudo systemctl enable --now gtv-deploy.timer`; log: `journalctl -u gtv-deploy -f`. Repo private: script đọc trạng thái CI bằng `GITHUB_TOKEN` hoặc tài khoản `gh` đã đăng nhập trên máy (user chạy service), còn `git` cần credential đọc được repo. Biến tuỳ chọn: `GTV_DEPLOY_BRANCH`, `GTV_DEPLOY_REPO`, `GTV_DEPLOY_HEALTH`, `GTV_DEPLOY_PROJECT`. File `docker/compose.local.yml` (nếu có, ví dụ chỉ nghe ở 127.0.0.1) được dùng kèm.
 
 - Reset hoàn toàn dữ liệu Operator: `docker volume rm docker_gtv-data` (mất project, token, lịch sử).
 

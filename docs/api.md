@@ -96,19 +96,23 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 
 ## Admin API — `/api` (dashboard)
 
-| Method               | Path                                  | Mô tả                                                                                            |
-| -------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| GET                  | `/overview`                           | `{ open_mode, brain, brain_stats (7 ngày), projects: [summary], devs }`                          |
-| GET / POST           | `/projects`                           | danh sách summary / tạo `{ id, repo_url, main_branch?, name?, aliases?, policy?, description? }` |
-| GET / PATCH / DELETE | `/projects/:id`                       | chi tiết / sửa (đổi `repo_url` hoặc `main_branch` ⇒ mở lại runtime) / lưu trữ                    |
-| POST                 | `/projects/:id/sync`                  | fetch ngay → `{ last_sync, main }`                                                               |
-| GET                  | `/projects/:id/state`                 | `TeamState`                                                                                      |
-| GET                  | `/projects/:id/stats?days=7`          | brain (totals, p50/p95, byKind, byDay, recent), conflicts, tickets, events, kb                   |
-| GET                  | `/projects/:id/layers`                | mỗi feature: `mode, override, blocked_by, requires, tripped, errors, metrics`                    |
-| GET                  | `/projects/:id/activity?type=&limit=` | event log (bỏ `prompt`)                                                                          |
-| POST                 | `/projects/:id/messages`              | `{ to_dev, body }` → ghi chú vào agent của dev                                                   |
-| GET / POST / DELETE  | `/devs`, `/devs/:name`                | liệt kê / cấp hoặc xoay token `{ name }` → `{ name, token }` (hiện 1 lần) / xóa                  |
-| GET / PUT            | `/brain`                              | `{ backend, model, health, models, stats }` / `{ model }` (lưu vào settings)                     |
+| Method               | Path                                       | Mô tả                                                                                                                                                    |
+| -------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET                  | `/overview`                                | `{ open_mode, brain, brain_stats (7 ngày), projects: [summary], devs }`                                                                                  |
+| GET / POST           | `/projects`                                | danh sách summary / tạo `{ id, repo_url, main_branch?, name?, aliases?, policy?, description? }`                                                         |
+| GET / PATCH / DELETE | `/projects/:id`                            | chi tiết / sửa (đổi `repo_url` hoặc `main_branch` ⇒ mở lại runtime) / lưu trữ                                                                            |
+| POST                 | `/projects/:id/sync`                       | fetch ngay → `{ last_sync, main }`                                                                                                                       |
+| GET                  | `/projects/:id/state`                      | `TeamState`                                                                                                                                              |
+| GET                  | `/projects/:id/stats?days=7`               | brain (totals, p50/p95, byKind, byDay, recent), conflicts, tickets, events, kb                                                                           |
+| GET                  | `/projects/:id/layers`                     | mỗi feature: `mode, override, blocked_by, requires, tripped, errors, metrics`                                                                            |
+| GET                  | `/projects/:id/activity?type=&limit=`      | event log (bỏ `prompt`)                                                                                                                                  |
+| POST                 | `/projects/:id/messages`                   | `{ to_dev, body }` → ghi chú vào agent của dev                                                                                                           |
+| GET / POST / DELETE  | `/devs`, `/devs/:name`                     | liệt kê / cấp hoặc xoay token `{ name }` → `{ name, token }` (hiện 1 lần) / xóa                                                                          |
+| GET / PUT            | `/brain`                                   | `{ backend, model, thinking, health, models, stats }` / `{ model?, thinking? }` (lưu vào settings; model lạ → 400)                                       |
+| GET                  | `/brain/providers`                         | `{ secrets_encrypted, providers: [{ id, name, kind: endpoint\|builtin, configured, source, key_hint, base_url?, api?, env? }] }` — không bao giờ trả key |
+| PUT / DELETE         | `/brain/providers/:id/key`                 | `{ key }` → lưu key (mã hoá bằng `GTV_SECRET_KEY`) / xoá key đã lưu                                                                                      |
+| POST                 | `/brain/providers/:id/test`                | `{ model? }` → một request nhỏ thật: `{ ok, model, ms, detail }`                                                                                         |
+| POST / DELETE        | `/brain/endpoints`, `/brain/endpoints/:id` | `{ id, name?, base_url, api?: openai-completions\|anthropic-messages, key? }` → thêm / xoá endpoint                                                      |
 
 Summary của project: `{ id, name, repo_url, main_branch, main_sha, last_sync, counts: { people_active, sessions_active, tasks_active, conflicts_open, conflicts_by_level, tickets_waiting, kb_unverified }, people: [{ dev, status, agents, workspaces, last_seen, tasks, editing, conflicts }] }`.
 

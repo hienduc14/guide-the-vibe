@@ -843,3 +843,29 @@ Chưa kiểm tra: phiên tương tác (TUI) của Codex/omp, `asyncRewake` của
 | bob   | **Codex CLI 0.163.0** (`codex exec`, gemini-3.8-flash-high qua CLIProxyAPI) | Đăng ký → `needs_coordination`, HIGH: alice đổi chữ ký `profileMapper` — **trước khi viết code**; `gtv_ask` → Pi đọc WIP của alice, trả lời "truyền `{ id }`" kèm nguồn; câu hỏi chậm hơn đến sau qua `gtv_inbox`; `gtv_check`, `gtv_ack`; viết `getCommentAuthors` theo chữ ký mới. |
 
 Chưa kiểm tra: provider có sẵn của Pi với key thật (chỉ thử qua endpoint `custom`), `BRAIN_API=anthropic-messages` với endpoint thật, phiên tương tác (TUI) của Codex, `asyncRewake` của Claude khi rảnh.
+
+### 24.3 Provider và model trên dashboard (06/11/2026)
+
+| #   | Quyết định                                                                                                                                                                                                                                                                                             | Lý do                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| D32 | Kết nối LLM **trên dashboard** (Brain › Providers, chỉ admin): API key cho provider có sẵn trong Pi, hoặc thêm endpoint tương thích OpenAI/Anthropic; nút Kiểm tra gửi một request nhỏ thật; chọn `provider/model`. Biến môi trường vẫn là mặc định.                                                  | Không phải sửa `docker/.env` và khởi động lại mỗi lần đổi LLM.                                                                               |
+| D33 | Xác thực **chỉ qua Pi**: gtv cài `CredentialStore` của Pi trên `hub.db` (`brain/credentials.ts`), endpoint tự thêm được đăng ký thành provider của Pi. Key mã hoá AES-256-GCM bằng `GTV_SECRET_KEY` (compose bắt buộc); API không bao giờ trả key, chỉ `…a1b2`. Token `claude setup-token` dán như API key. | Một đường xác thực duy nhất; Pi lo thứ tự ưu tiên (key lưu → biến môi trường) và cách gửi token gói Claude.                                    |
+| D34 | **Mức suy nghĩ** `off` (mặc định) / `low` / `medium` / `high` trên dashboard (`BRAIN_THINKING`); Pi đổi thành tham số của từng provider (Claude: `effort`).                                                                                                                                              | Brain cần nhanh vì agent đang chờ; khi cần suy luận kỹ thì bật lên.                                                                          |
+| D35 | Prompt: câu hỏi tra cứu được (kể cả "thay đổi của tôi có làm hỏng code WIP của B không?") phải **trả lời**, không chuyển cho đồng đội chỉ vì sau đó cần phối hợp.                                                                                                                                     | Sonnet 5.5 trả lời đúng nhưng lại chọn `forward` (self-test 20/21); sau khi sửa: 21/21 với cả Sonnet và Haiku.                                 |
+
+Lỗi tìm ra khi chạy agent thật, đã sửa và có test hồi quy:
+
+| Lỗi                                                                                                       | Hậu quả                                                        | Sửa                                                                    |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `PATCH /tasks/:id` chỉ có vài trường ⇒ `updateTask` ghi `undefined` đè lên title/resources                 | `gtv_update_task` không có `resources` và **mọi `gtv_finish_task`** báo `NOT NULL constraint failed` | bỏ trường không gửi (`store.ts`)                                       |
+| Waiter `asyncRewake` chạy cả khi Claude không có người (`claude -p`, SDK)                                   | Claude headless chờ waiter tới 30 phút mới thoát               | `gtv hook-wait` thoát ngay khi `CLAUDE_CODE_SESSION_ATTENDED=0`        |
+
+Chạy thật (Docker, cấu hình Brain **chỉ qua API của dashboard**, không biến `BRAIN_*` nào): token claude2 cho provider `anthropic` và endpoint CLIProxyAPI, cả hai Kiểm tra đạt (1,1 s và 1,4 s); trong `hub.db` hai key đều ở dạng `v1:…` (mã hoá).
+
+| Brain (suy nghĩ off)          | Self-test RealWorld | Thời gian mỗi job |
+| ----------------------------- | ------------------- | ----------------- |
+| `anthropic/claude-sonnet-5-5` | 21/21               | 12–44 s           |
+| `anthropic/claude-haiku-5-5`  | 21/21               | 7–9 s             |
+| gemini-3.8-flash-high (trước) | 21/21 (20/21 lần đầu) | 24–114 s        |
+
+Agent thật với Brain Sonnet 5.5: **Claude Code** (haiku) đăng ký, sửa `profileMapper` và caller, được báo sửa ngoài scope; **Codex 0.163.0** (gemini-3-flash qua CLIProxyAPI) đăng ký → `needs_coordination`, viết `getCommentAuthors` theo chữ ký mới, ack 3 conflict. Mức suy nghĩ `medium` với token gói Claude: job thật chạy đúng (6,4 s).

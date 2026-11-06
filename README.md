@@ -46,22 +46,13 @@ Cần: Node ≥ 24, git ≥ 2.40, Docker Desktop.
 npm ci
 npm run web:install
 node scripts/sandbox.ts                 # sandbox/origin.git (mini-shop) + clone alice / bob
-cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN (openssl rand -hex 32) và LLM cho Brain
+cp docker/.env.example docker/.env      # đặt GTV_ADMIN_TOKEN và GTV_SECRET_KEY (openssl rand -hex 32)
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Cho Brain một LLM — provider nào cũng được. Dễ nhất là một endpoint tương thích OpenAI (CLIProxyAPI, OpenRouter, LiteLLM, Ollama…) trong `docker/.env`:
+Mở dashboard **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`) → **Brain › Providers**: dán API key của một provider có sẵn (Anthropic, OpenAI, Google, OpenRouter…; với Claude dán được cả token `claude setup-token`), hoặc thêm một endpoint tương thích OpenAI (CLIProxyAPI, LiteLLM, Ollama…) → **Kiểm tra** → chọn model (vd `anthropic/claude-sonnet-5-5`) và mức suy nghĩ. Key được mã hoá bằng `GTV_SECRET_KEY`.
 
-```bash
-BRAIN_BASE_URL=https://openrouter.ai/api/v1
-BRAIN_API_KEY=<key>
-BRAIN_MODEL=<model id>
-```
-
-hoặc một provider có sẵn trong Pi: `BRAIN_MODEL=anthropic/<model>` + `ANTHROPIC_API_KEY` (tương tự `openai/…`, `google/…`).
-
-Mở dashboard: **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`). Ở đó: tạo project (repo URL), cấp token cho dev,
-đổi model Brain (dạng `provider/model`; xem [docs/operations.md](docs/operations.md#brain-pi)).
+Cũng trên dashboard: tạo project (repo URL), cấp token cho dev. Chi tiết Brain: [docs/operations.md](docs/operations.md#brain-pi).
 
 Hoặc bằng CLI (trong Git Bash phải tắt chuyển đường dẫn MSYS, nếu không `/repos/...` thành `C:/Program Files/Git/repos/...`):
 

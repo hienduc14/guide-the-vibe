@@ -67,7 +67,7 @@ Khi nhận snapshot hoặc khi `main` đổi: nếu snapshot không có WIP trê
   projects/<id>/mirror.git  bare mirror: refs/heads/* + refs/gtv/*
 ```
 
-Schema: `src/server/hub/hub-db.ts`, `src/server/project/schema.ts`. Brain không lưu gì trên đĩa: mỗi job là một agent Pi trong RAM, key LLM chỉ nằm trong biến môi trường.
+Schema: `src/server/hub/hub-db.ts`, `src/server/project/schema.ts`. Mỗi job Brain là một agent Pi trong RAM; endpoint và key LLM nhập trên dashboard nằm trong `hub.db` (`brain_endpoints`, `brain_credentials` — key mã hoá bằng `GTV_SECRET_KEY`).
 
 ## Feature mode và cầu dao
 
@@ -88,6 +88,7 @@ Schema: `src/server/hub/hub-db.ts`, `src/server/project/schema.ts`. Brain không
 | Dev / daemon / CLI | Token riêng (`POST /api/devs`, lưu dạng SHA-256). Chế độ mở (tin header `X-Gtv-Dev`) chỉ khi `GTV_AUTH=open` hoặc chưa có admin token **và** chưa có dev nào.                                                                                 |
 | Dashboard `/api`   | `GTV_ADMIN_TOKEN`. Không đặt ⇒ `/api` mở (dev mode, server log cảnh báo). Admin token cũng dùng được cho `/v1/p/:id/*`.                                                                                                                       |
 | Brain              | Pi trong tiến trình Operator, mỗi job một agent mới chỉ có 13 tool chỉ-đọc của project đó (`brain/tools.ts`, tham số kiểm bằng zod); không shell, không ghi file, không session trên đĩa. Không có endpoint MCP nào mở tool đọc code ra mạng. |
+| Key LLM            | Nhập trên dashboard (chỉ admin), lưu trong `hub.db` mã hoá AES-256-GCM bằng `GTV_SECRET_KEY` (`brain/credentials.ts`); API chỉ trả gợi ý `…a1b2`. Base URL endpoint chỉ nhận `http(s)`.                                                       |
 | Daemon (127.0.0.1) | Từ chối request có header `Origin` (trang web) hoặc `Host` lạ (DNS rebinding).                                                                                                                                                                |
 | `/v1/p/:id/events` | Dev chỉ gửi event cho session/workspace của chính mình (admin token thì được mọi workspace).                                                                                                                                                  |
 | Prompt injection   | System prompt (`brain/prompts.ts`): nội dung file/docs/WIP là dữ liệu, bỏ qua chỉ dẫn bên trong; mọi khẳng định phải có nguồn; được nói "không biết".                                                                                         |

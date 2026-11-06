@@ -9,7 +9,7 @@
 | `operator` | `docker/Dockerfile` (stage 1 build `web/`, stage 2 Node 24 + git) | `7390` | `gtv-data:/data`, `./gtv.config.yml:/config/gtv.config.yml`, `${GTV_LOCAL_REPOS:-../sandbox}:/repos` |
 
 ```bash
-cp docker/.env.example docker/.env      # rồi đặt GTV_ADMIN_TOKEN (openssl rand -hex 32; thiếu thì compose không chạy) và LLM cho Brain (mục Brain)
+cp docker/.env.example docker/.env      # rồi đặt GTV_ADMIN_TOKEN và GTV_SECRET_KEY (mỗi cái: openssl rand -hex 32; thiếu thì compose không chạy); LLM kết nối trên dashboard (mục Brain)
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 docker compose -f docker/compose.yml --env-file docker/.env logs -f operator
 ```
@@ -85,19 +85,19 @@ l3: { daily_budget: 60 }
 
 Brain chạy bằng vòng lặp agent của [Pi](https://github.com/earendil-works/pi) (`@earendil-works/pi-agent-core` + `@earendil-works/pi-ai`, ghim bản 1.5.0) **ngay trong tiến trình Operator**. Mỗi job là một agent mới trong RAM: system prompt của Operator + schema JSON của job, và **chỉ có 13 tool chỉ-đọc của gtv** (`src/server/brain/tools.ts`) gọi thẳng vào engine của project. Không có shell, không ghi file, không file session, không đọc `~/.pi`.
 
-1. Chọn LLM — **provider nào cũng được**, đặt `BRAIN_MODEL` dạng `provider/model`:
-   - **endpoint tương thích OpenAI bất kỳ** (CLIProxyAPI, OpenRouter, LiteLLM, vLLM, Ollama…): `BRAIN_BASE_URL` + `BRAIN_API_KEY`, model là `custom/<id>` hoặc chỉ `<id>`. Ví dụ CLIProxyAPI trên máy chủ:
-     ```bash
-     BRAIN_BASE_URL=http://127.0.0.1:8317/v1
-     BRAIN_API_KEY=<key trong access.api-keys của CLIProxyAPI>
-     BRAIN_MODEL=gemini-3.8-flash-high
-     ```
-     Endpoint nói giao thức Anthropic thì thêm `BRAIN_API=anthropic-messages`.
-   - **provider có sẵn trong Pi**: `BRAIN_MODEL=anthropic/<model>`, `openai/<model>`, `openrouter/<hãng>/<model>`, `google/<model>`… với key của provider đó (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`…). Tên model sai thì job báo `unknown model …`.
-2. Đổi model lúc chạy: dashboard **Brain** (danh sách = model của `BRAIN_BASE_URL/models` dạng `custom/<id>` + model của các provider có sẵn đã có key). Lựa chọn lưu trong `hub.db`, ghi đè `BRAIN_MODEL`.
-3. Kiểm tra: `curl -s http://127.0.0.1:7390/health` → `brain: { backend: "pi", ok: true, detail: "pi → …" }`. Với `custom`, `ok` nghĩa là `GET BRAIN_BASE_URL/models` trả 200 với key đã đặt.
-4. Lưu ý điều khoản của gói subscription khi dùng cho server cả nhóm — xem SPEC §7.2.1.
-5. Model chậm hoặc bị rate limit: gtv cắt job sau `BRAIN_TIMEOUT_MS` (180 s); câu hỏi đã quá `qa.ask_wait_s` thì vẫn được trả lời sau, qua hộp thư của agent.
+Mọi xác thực LLM đi qua Pi: key nhập trên dashboard nằm trong `CredentialStore` của Pi (`src/server/brain/credentials.ts`, bảng `brain_credentials` của `hub.db`, **mã hoá AES-256-GCM bằng `GTV_SECRET_KEY`**). Khi chưa có key lưu, Pi dùng biến môi trường quen thuộc của từng provider.
+
+1. **Kết nối provider** — dashboard **Brain › Providers** (chỉ admin):
+   - **Provider có sẵn trong Pi** (Anthropic, OpenAI, Google, OpenRouter, Groq, DeepSeek, xAI…): chọn provider, dán API key. Với Claude, dán được cả API key `sk-ant-api…` lẫn token của `claude setup-token` (`sk-ant-oat…`): Pi tự nhận ra token gói Claude.
+   - **Endpoint tương thích OpenAI** (CLIProxyAPI, OpenRouter, LiteLLM, vLLM, Ollama…): id (vd `cliproxy`), base URL (vd `http://127.0.0.1:8317/v1`), giao thức (OpenAI hoặc Anthropic), key nếu có. Thêm được nhiều endpoint.
+   - Nút **Kiểm tra** gửi một request nhỏ ("Reply with exactly: OK") để biết ngay key và model có chạy không.
+   - API không bao giờ trả key ra: dashboard chỉ hiện `…a1b2` và nguồn của key (`stored credential`, `ANTHROPIC_API_KEY`…).
+2. **Chọn model** dạng `provider/model` (vd `anthropic/claude-sonnet-5-5`, `cliproxy/gemini-3-flash`) và **mức suy nghĩ** (`off` mặc định, nhanh nhất; `low`/`medium`/`high` thì Pi đổi thành tham số tương ứng của provider, với Claude là `effort`). Danh sách model = `/models` của từng endpoint + model của các provider có sẵn đã có key. Tên model sai bị từ chối ngay khi lưu.
+3. **Biến môi trường** (tùy chọn, làm mặc định cho cài đặt bằng script): `BRAIN_MODEL`, `BRAIN_THINKING`, `BRAIN_BASE_URL` + `BRAIN_API_KEY` (+ `BRAIN_API=anthropic-messages`) thành endpoint `custom` chỉ-đọc trên dashboard (model `custom/<id>` hoặc chỉ `<id>`), và key của provider có sẵn (`ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, `OPENAI_API_KEY`…). Lựa chọn trên dashboard ghi đè biến môi trường.
+4. **`GTV_SECRET_KEY`** (compose bắt buộc): đổi khoá thì key cũ không mở được nữa (log báo, job báo `No API key for provider …`), nhập lại trên dashboard. Không đặt (chạy không docker) thì key lưu dạng rõ và dashboard cảnh báo. Dashboard chạy HTTP: nhập key từ máy khác thì đặt dashboard sau HTTPS (reverse proxy, Cloudflare Tunnel).
+5. Kiểm tra: `curl -s http://127.0.0.1:7390/health` → `brain: { backend: "pi", ok: true, detail: "pi → anthropic (stored credential)" }`.
+6. Lưu ý điều khoản của gói subscription khi dùng cho server cả nhóm — xem SPEC §7.2.1.
+7. Model chậm hoặc bị rate limit: gtv cắt job sau `BRAIN_TIMEOUT_MS` (180 s); câu hỏi đã quá `qa.ask_wait_s` thì vẫn được trả lời sau, qua hộp thư của agent. Đo trên self-test RealWorld: Sonnet 5.5 (suy nghĩ off) 12–44 s/job; gemini-3.8-flash-high 24–114 s/job.
 
 Cách gtv gọi Pi (`src/server/brain/pi.ts`): Pi không ép schema JSON nên schema nằm trong prompt và gtv tự kiểm JSON (sai thì nhắc lại một lần, giữ nguyên lịch sử). Chỉ lượt kết thúc bằng `stop` + JSON hợp lệ mới tính là thành công. Lỗi tạm thời (429/5xx, mất kết nối, quá giờ) thành `BrainUnavailable`: tính năng bỏ qua (fail-open) mà không làm nhảy cầu dao. Lỗi khác (key sai, model sai) là lỗi thật và hiện trên dashboard.
 
@@ -105,7 +105,7 @@ Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashbo
 
 ## Backup và nâng cấp
 
-- Backup: volume `gtv-data` (`hub.db`, `projects/*`). Ví dụ:
+- Backup: volume `gtv-data` (`hub.db`, `projects/*`) — key LLM trong `hub.db` chỉ mở được với cùng `GTV_SECRET_KEY`. Ví dụ:
   `docker run --rm -v docker_gtv-data:/d -v "$PWD":/b alpine tar czf /b/gtv-data.tgz -C /d .`
 - Nâng cấp: `git pull` → `docker compose … up -d --build`. Schema dùng `CREATE TABLE IF NOT EXISTS`, bảng mới tự tạo; đổi cột cần script migrate riêng.
 - Reset hoàn toàn dữ liệu Operator: `docker volume rm docker_gtv-data` (mất project, token, lịch sử).

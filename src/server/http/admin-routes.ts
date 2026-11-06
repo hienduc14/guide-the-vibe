@@ -165,6 +165,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     }
     return c.json({
       open_mode: openMode(hub),
+      commit: process.env.GTV_COMMIT || null, // the deployed git commit (docker/auto-deploy.sh)
       brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...brainHealth },
       brain_stats: hub.brainStats({ days: 7 }),
       projects,

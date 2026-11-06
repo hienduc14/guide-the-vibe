@@ -20,5 +20,8 @@ COPY src ./src
 COPY bin ./bin
 COPY --from=web /web/dist ./web/dist
 ENV GTV_DATA=/data GTV_PORT=7390 GTV_HOST=0.0.0.0 GTV_WEB_DIR=/app/web/dist
+# Set by docker/auto-deploy.sh (docker compose build --build-arg GTV_COMMIT=…); shown on the dashboard.
+ARG GTV_COMMIT=""
+ENV GTV_COMMIT=$GTV_COMMIT
 EXPOSE 7390
 CMD ["node", "src/server/main.ts"]

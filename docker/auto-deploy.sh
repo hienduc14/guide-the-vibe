@@ -15,6 +15,8 @@ compose+=(--env-file docker/.env -p "${GTV_DEPLOY_PROJECT:-gtv}")
 [ "$(id -u)" = 0 ] || compose=(sudo -n "${compose[@]}")
 failed_file="$(git rev-parse --git-dir)/gtv-deploy-failed"
 log() { echo "[deploy] $*"; }
+# Build with the commit baked in (sudo drops the caller's environment, so a build arg, not an env var).
+up() { "${compose[@]}" build -q --build-arg GTV_COMMIT="$(git rev-parse HEAD)" && "${compose[@]}" up -d; }
 
 target=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
 current=$(git rev-parse HEAD)
@@ -45,7 +47,7 @@ healthy() {
 log "deploying ${current:0:7} -> ${target:0:7}"
 git fetch -q origin "$BRANCH"
 git merge -q --ff-only "$target"
-if "${compose[@]}" up -d --build && healthy; then
+if up && healthy; then
   log "deployed ${target:0:7}: $(git log -1 --format=%s)"
   exit 0
 fi
@@ -53,5 +55,5 @@ fi
 log "${target:0:7} is unhealthy, rolling back to ${current:0:7}"
 echo "$target" >"$failed_file"
 git reset -q --hard "$current"
-"${compose[@]}" up -d --build && healthy && log "rolled back to ${current:0:7}" || log "ROLLBACK FAILED: check docker logs"
+up && healthy && log "rolled back to ${current:0:7}" || log "ROLLBACK FAILED: check docker logs"
 exit 1

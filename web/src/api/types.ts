@@ -75,6 +75,7 @@ export interface Dev {
 
 export interface Overview {
   open_mode: boolean;
+  commit: string | null;
   brain: { backend: string; model: string | null; ok: boolean; detail?: string };
   brain_stats: BrainStats;
   projects: ProjectEntry[];

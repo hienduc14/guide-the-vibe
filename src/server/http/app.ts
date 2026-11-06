@@ -27,6 +27,7 @@ export function buildApp(hub: Hub): Hono {
       ok: true,
       brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()) },
       projects: hub.records().map((p) => p.id),
+      commit: process.env.GTV_COMMIT || null,
     });
   });
 

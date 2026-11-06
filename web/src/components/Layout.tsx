@@ -67,6 +67,17 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
 
       <div className="spacer" />
       <div className="sidebar-foot">
+        {data?.commit && (
+          <a
+            className="xs muted"
+            href={`https://github.com/hienduc14/guide-the-vibe/commit/${data.commit}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Commit đang chạy trên server. Bấm để xem trên GitHub."
+          >
+            Bản đang chạy <span className="mono">{data.commit.slice(0, 7)}</span>
+          </a>
+        )}
         {data?.open_mode && (
           <Badge tone="danger-outline" title="Không có admin token và chưa có developer nào: mọi người đều truy cập được">
             open dev mode

@@ -19,13 +19,16 @@ export function buildApp(hub: Hub): Hono {
   const app = new Hono();
   app.onError((err, c) => c.json({ error: err.message }, /unknown project/.test(err.message) ? 404 : 400));
 
-  app.get("/health", async (c) =>
-    c.json({
+  app.get("/health", async (c) => {
+    // Daemons ping /health every 15 s with their token: that is what keeps a developer's "last seen" current.
+    const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
+    if (token) hub.devForToken(token);
+    return c.json({
       ok: true,
       brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()) },
       projects: hub.records().map((p) => p.id),
-    }),
-  );
+    });
+  });
 
   // Invite links: the code is the credential. /j/:code is what a browser shows if someone opens the link.
   app.post("/v1/join", async (c) => c.json(hub.redeemInvite(String(((await c.req.json()) as { code?: string }).code ?? ""))));

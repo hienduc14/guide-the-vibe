@@ -69,6 +69,9 @@ test("admin API requires the admin token; dev tokens are issued and checked", as
     ["shop", "billing"],
   );
   assert.equal((await call("/api/overview", { token: issued.json.token })).status, 401, "a dev token is not an admin token");
+  srv.hub.db.run(`UPDATE devs SET last_seen = NULL WHERE name = 'alice'`);
+  await call("/health", { token: issued.json.token }); // the daemon's 15 s ping keeps "last seen" current
+  assert.ok(srv.hub.devs().find((d) => d.name === "alice")?.last_seen);
 });
 
 test("invite links: one use, then the dev's token works; expired links fail", async () => {

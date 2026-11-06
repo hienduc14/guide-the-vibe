@@ -3,9 +3,20 @@
 Mọi agent nói với **daemon local** của dev (`gtv daemon`, mặc định `127.0.0.1:7391`), không nói thẳng với server.
 Daemon tự biết repo thuộc project nào: file `.git/gtv-project` (`gtv link <project>`) hoặc so remote URL với server.
 
+Cách thường dùng: admin bấm **Tạo lệnh mời** trên dashboard, dev chạy lệnh đó trong thư mục repo (cần Node ≥ 20):
+
+```bash
+npx guide-the-vibe join https://<server>/j/<code>   # token, project, hook/MCP/skill, daemon nền
+npx guide-the-vibe install                          # thêm repo khác
+```
+
+Daemon chạy nền (log `~/.gtv/daemon.log`). Nếu nó tắt, phiên agent kế tiếp tự bật lại: `gtv mcp` kiểm tra `/health` khi khởi động và trước lời gọi tool lỗi. Daemon đang chạy với dev/server khác config thì bị tắt và bật lại.
+
+Từng bước bằng tay (trong repo gtv, `node bin/gtv.mjs` = `gtv`):
+
 ```bash
 node bin/gtv.mjs init --dev alice --server http://<server>:7390 --token <dev token>
-node bin/gtv.mjs daemon                      # giữ chạy
+node bin/gtv.mjs daemon                      # chạy trong terminal này
 node bin/gtv.mjs install claude [dir]        # hoặc: install codex [dir]
 node bin/gtv.mjs link <project> [dir]        # khi remote của clone không khớp repo_url của project
 ```

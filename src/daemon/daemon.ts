@@ -354,6 +354,7 @@ export class Daemon {
     app.get("/health", (c) =>
       c.json({
         ok: true,
+        pid: process.pid,
         dev: this.cfg.dev,
         server: this.cfg.server,
         reachable: this.serverReachable,

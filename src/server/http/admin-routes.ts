@@ -237,6 +237,10 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     const { name } = (await c.req.json()) as { name: string };
     return c.json({ name, token: hub.issueToken(name) });
   });
+  app.post("/devs/invite", async (c) => {
+    const { name } = (await c.req.json()) as { name: string };
+    return c.json({ name, ...hub.createInvite(name) });
+  });
   app.delete("/devs/:name", (c) => {
     hub.removeDev(c.req.param("name"));
     return c.json({ ok: true });

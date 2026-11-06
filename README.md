@@ -52,7 +52,13 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 
 Mở dashboard **http://127.0.0.1:7390** (nhập `GTV_ADMIN_TOKEN`) → **Brain › Providers**: dán API key của một provider có sẵn (Anthropic, OpenAI, Google, OpenRouter…; với Claude dán được cả token `claude setup-token`), hoặc thêm một endpoint tương thích OpenAI (CLIProxyAPI, LiteLLM, Ollama…) → **Kiểm tra** → chọn model (vd `anthropic/claude-sonnet-5-5`) và mức suy nghĩ. Key được mã hoá bằng `GTV_SECRET_KEY`.
 
-Cũng trên dashboard: tạo project (repo URL), cấp token cho dev. Chi tiết Brain: [docs/operations.md](docs/operations.md#brain-pi).
+Cũng trên dashboard: tạo project (repo URL), rồi **Developers › Tạo lệnh mời**. Dev chỉ cần chạy lệnh đó trong thư mục repo (Node ≥ 20):
+
+```bash
+npx guide-the-vibe join https://<server>/j/<code>
+```
+
+Lệnh lưu token, nối repo với project, hỏi dùng Claude Code hay Codex, cài hook/MCP/skill và bật daemon nền. Repo khác: `npx guide-the-vibe install`. Chi tiết Brain: [docs/operations.md](docs/operations.md#brain-pi).
 
 Hoặc bằng CLI (trong Git Bash phải tắt chuyển đường dẫn MSYS, nếu không `/repos/...` thành `C:/Program Files/Git/repos/...`):
 

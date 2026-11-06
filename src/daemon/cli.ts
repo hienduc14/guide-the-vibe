@@ -62,10 +62,12 @@ const inProject = async (path: string) => `/v1/p/${await project()}${path}`;
 
 const HELP = `gtv — Project Operator client
 
-Setup
-  gtv init --dev <name> --server <url> [--token <t>] [--port 7391]
-  gtv daemon                         run the local daemon (keep it open)
-  gtv install claude|codex [dir] [--daemon <url>]   wire hooks + MCP + skill into a project (default: cwd;
+Setup (npx guide-the-vibe <command> works the same as gtv <command>)
+  gtv join <invite link>             one-step setup from the link on the dashboard (Developers › Invite)
+  gtv install                        set up another repo: link it, wire the agents, start the daemon
+  gtv init --dev <name> --server <url> [--token <t>] [--port 7391]   manual setup with a dev token
+  gtv daemon                         run the local daemon in this terminal (it normally runs in the background)
+  gtv install claude|codex [dir] [--daemon <url>]   only wire hooks + MCP + skill into a project (default: cwd;
                                      --daemon when several daemons share a machine)
 
 Projects (one per repo)
@@ -154,7 +156,18 @@ async function main(): Promise<void> {
       console.log(`Saved ${CONFIG_FILE}: dev=${cfg.dev} server=${cfg.server} port=${cfg.port}`);
       return;
     }
+    case "join": {
+      if (!rest[0]) throw new Error("usage: gtv join <invite link>");
+      const { join } = await import("./join.ts");
+      await join(rest[0]);
+      return;
+    }
     case "install": {
+      if (!rest[0] || rest[0].startsWith("--")) {
+        const { setupRepo } = await import("./join.ts");
+        await setupRepo(process.cwd());
+        return;
+      }
       const { installClaude, installCodex } = await import("./install.ts");
       const dir = rest[1] && !rest[1].startsWith("--") ? rest[1] : process.cwd();
       const d = flag("daemon");
@@ -245,4 +258,7 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+await main().catch((e: Error) => {
+  console.error(`gtv: ${e.message}`);
+  process.exit(1);
+});

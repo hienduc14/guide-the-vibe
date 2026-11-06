@@ -170,7 +170,7 @@ export class Hub {
 
   /** Create or rotate a developer token. Returns the plain token (shown once). */
   issueToken(name: string): string {
-    if (!/^[a-zA-Z0-9._-]{1,40}$/.test(name)) throw new Error("dev name: letters, digits, . _ -");
+    checkDevName(name);
     const token = `gtv_${randomBytes(18).toString("base64url")}`;
     this.db.run(
       `INSERT INTO devs (name, token_hash, created_at) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET token_hash = excluded.token_hash`,
@@ -179,6 +179,24 @@ export class Hub {
       nowIso(),
     );
     return token;
+  }
+
+  /** A one-time code for `gtv join`, valid for 24 hours. */
+  createInvite(name: string): { code: string; expires_at: string } {
+    checkDevName(name);
+    const code = randomBytes(18).toString("base64url");
+    const expires_at = new Date(Date.now() + 24 * 3600_000).toISOString();
+    this.db.run(`DELETE FROM invites WHERE expires_at < ?`, nowIso());
+    this.db.run(`INSERT INTO invites (code_hash, dev, expires_at, created_at) VALUES (?,?,?,?)`, hashToken(code), name, expires_at, nowIso());
+    return { code, expires_at };
+  }
+
+  /** Uses up the invite and issues (or rotates) the dev's token. */
+  redeemInvite(code: string): { dev: string; token: string } {
+    const row = this.db.get<{ dev: string; expires_at: string }>(`SELECT dev, expires_at FROM invites WHERE code_hash = ?`, hashToken(code));
+    this.db.run(`DELETE FROM invites WHERE code_hash = ?`, hashToken(code));
+    if (!row || row.expires_at < nowIso()) throw new Error("invite link is invalid, used or expired: ask for a new one");
+    return { dev: row.dev, token: this.issueToken(row.dev) };
   }
 
   removeDev(name: string): void {
@@ -248,4 +266,8 @@ function rowToRecord(r: Record<string, unknown>): ProjectRecord {
     policy: { critical_paths: [], modules: {}, ...parseJson<Partial<Policy>>(r.policy, {}) },
     archived: !!r.archived,
   };
+}
+
+function checkDevName(name: string): void {
+  if (!/^[a-zA-Z0-9._-]{1,40}$/.test(name)) throw new Error("dev name: letters, digits, . _ -");
 }

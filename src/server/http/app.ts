@@ -1,5 +1,6 @@
 // Assembles the HTTP surface:
 //   /health                    liveness + brain status
+//   /v1/join, /j/:code         invite links (gtv join), no token needed
 //   /v1/projects, /v1/resolve  project discovery for daemons
 //   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard with admin token)
 //   /api/*                     dashboard API
@@ -25,6 +26,10 @@ export function buildApp(hub: Hub): Hono {
       projects: hub.records().map((p) => p.id),
     }),
   );
+
+  // Invite links: the code is the credential. /j/:code is what a browser shows if someone opens the link.
+  app.post("/v1/join", async (c) => c.json(hub.redeemInvite(String(((await c.req.json()) as { code?: string }).code ?? ""))));
+  app.get("/j/:code", (c) => c.text(`Run this in your project's folder:\n\n  npx guide-the-vibe join ${c.req.url}\n`));
 
   // Developers (and the dashboard with the admin token).
   const dev = new Hono<{ Variables: AuthVars }>();

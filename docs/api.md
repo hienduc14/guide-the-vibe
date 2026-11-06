@@ -15,10 +15,12 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 
 ## Khám phá project (dev)
 
-| Method | Path                       | Mô tả                                                                             |
-| ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| GET    | `/v1/projects`             | `[{ id, name, repo_url (che token), main_branch }]`                               |
-| GET    | `/v1/resolve?remote=<url>` | Project khớp remote URL (so `owner/repo`, kèm `aliases`): `{ id, name }` hoặc 404 |
+| Method | Path                       | Mô tả                                                                                  |
+| ------ | -------------------------- | -------------------------------------------------------------------------------------- |
+| GET    | `/v1/projects`             | `[{ id, name, repo_url (che token), main_branch }]`                                    |
+| GET    | `/v1/resolve?remote=<url>` | Project khớp remote URL (so `owner/repo`, kèm `aliases`): `{ id, name }` hoặc 404      |
+| POST   | `/v1/join`                 | **Không cần token**: `{ code }` của link mời → `{ dev, token }`; link dùng một lần     |
+| GET    | `/j/:code`                 | Trang chữ cho người lỡ mở link mời trong trình duyệt: lệnh `npx guide-the-vibe join …` |
 
 ## Project API — `/v1/p/:project`
 
@@ -108,6 +110,7 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 | GET                  | `/projects/:id/activity?type=&limit=`      | event log (bỏ `prompt`)                                                                                                                                  |
 | POST                 | `/projects/:id/messages`                   | `{ to_dev, body }` → ghi chú vào agent của dev                                                                                                           |
 | GET / POST / DELETE  | `/devs`, `/devs/:name`                     | liệt kê / cấp hoặc xoay token `{ name }` → `{ name, token }` (hiện 1 lần) / xóa                                                                          |
+| POST                 | `/devs/invite`                             | `{ name }` → `{ name, code, expires_at }`: link mời `<server>/j/<code>`, dùng 1 lần, hết hạn sau 24 giờ; dùng link = cấp (xoay) token cho dev đó         |
 | GET / PUT            | `/brain`                                   | `{ backend, model, thinking, health, models, stats }` / `{ model?, thinking? }` (lưu vào settings; model lạ → 400)                                       |
 | GET                  | `/brain/providers`                         | `{ secrets_encrypted, providers: [{ id, name, kind: endpoint\|builtin, configured, source, key_hint, base_url?, api?, env? }] }` — không bao giờ trả key |
 | PUT / DELETE         | `/brain/providers/:id/key`                 | `{ key }` → lưu key (mã hoá bằng `GTV_SECRET_KEY`) / xoá key đã lưu                                                                                      |

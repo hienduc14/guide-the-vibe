@@ -11,7 +11,7 @@ import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
-import { IssuedToken, forgetIssued, lastIssued, rememberIssued } from "./IssuedToken";
+import { InviteLink, IssuedToken, forgetIssued, lastIssued, rememberIssued } from "./IssuedToken";
 
 export function DevsPage() {
   const { data, error, reload } = usePoll(api.devs.list, [], 10_000);
@@ -20,11 +20,21 @@ export function DevsPage() {
   const [name, setName] = useState("");
   const [issued, setIssued] = useState(lastIssued());
   const [ack, setAck] = useState(false);
+  const [invite, setInvite] = useState<{ name: string; code: string }>();
   // Issuing the first developer ends open dev mode; without an admin token the dashboard then locks.
   const firstInOpenMode = !!overview?.open_mode && (data?.length ?? 0) === 0;
 
-  const create = async (e: FormEvent) => {
+  const inviteDev = async (e: FormEvent) => {
     e.preventDefault();
+    const res = await run(() => api.devs.invite(name.trim()), "Đã tạo lệnh mời");
+    if (res) {
+      setInvite(res);
+      setName("");
+    }
+  };
+
+  const create = async () => {
+    if (!name.trim()) return;
     const res = await run(() => api.devs.issue(name.trim()), "Đã cấp token");
     if (res) {
       rememberIssued(res);
@@ -36,15 +46,15 @@ export function DevsPage() {
 
   return (
     <>
-      <PageHead title="Developers" subtitle="Mỗi developer có một token riêng cho daemon và CLI. Cấp lại token sẽ vô hiệu token cũ." />
-      <Card title="Cấp token">
-        <form className="stack" onSubmit={create}>
+      <PageHead title="Developers" subtitle="Mời developer bằng một lệnh npx. Mỗi developer có một token riêng; cấp lại token sẽ vô hiệu token cũ." />
+      <Card title="Mời developer">
+        <form className="stack" onSubmit={inviteDev}>
           {firstInOpenMode && (
             <div className="notice error stack tight">
               <b>Server đang ở open dev mode.</b>
               <span>
-                Cấp token cho developer đầu tiên sẽ tắt open mode. Nếu server chưa đặt <code>GTV_ADMIN_TOKEN</code>, dashboard sẽ khoá và cần admin token để vào
-                lại.
+                Developer đầu tiên nhận token (cấp tay hoặc qua lệnh mời) sẽ tắt open mode. Nếu server chưa đặt <code>GTV_ADMIN_TOKEN</code>, dashboard sẽ khoá
+                và cần admin token để vào lại.
               </span>
               <label className="row small">
                 <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> Tôi hiểu, server đã có GTV_ADMIN_TOKEN
@@ -56,10 +66,18 @@ export function DevsPage() {
               <input className="input" required pattern="[a-zA-Z0-9._\-]{1,40}" value={name} onChange={(e) => setName(e.target.value)} placeholder="alice" />
             </Field>
             <button className="btn primary" type="submit" disabled={firstInOpenMode && !ack}>
-              Cấp / cấp lại
+              Tạo lệnh mời
+            </button>
+            <button className="btn" type="button" disabled={firstInOpenMode && !ack} onClick={() => void create()}>
+              Chỉ cấp token
             </button>
           </div>
         </form>
+        {invite && (
+          <div style={{ marginTop: 16 }}>
+            <InviteLink {...invite} onDismiss={() => setInvite(undefined)} />
+          </div>
+        )}
         {issued && (
           <div style={{ marginTop: 16 }}>
             <IssuedToken

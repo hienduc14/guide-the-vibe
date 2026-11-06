@@ -88,6 +88,7 @@ export const api = {
   devs: {
     list: () => get<Dev[]>("/api/devs"),
     issue: (name: string) => post<{ name: string; token: string }>("/api/devs", { name }),
+    invite: (name: string) => post<{ name: string; code: string; expires_at: string }>("/api/devs/invite", { name }),
     remove: (name: string) => del<{ ok: boolean }>(`/api/devs/${encodeURIComponent(name)}`),
   },
 

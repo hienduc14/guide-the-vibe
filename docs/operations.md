@@ -75,7 +75,8 @@ l3: { daily_budget: 60 }
 
 ## Token
 
-- Cấp token dev: dashboard **Developers** hoặc `POST /api/devs {name}` → token hiện **một lần**; dev chạy `gtv init --token …`.
+- Mời dev: dashboard **Developers › Tạo lệnh mời** → gửi dev lệnh `npx guide-the-vibe join <server>/j/<code>` (dùng một lần, hết hạn sau 24 giờ). Dev chạy trong thư mục repo: lệnh lưu token, nối repo với project, cài hook/MCP/skill và bật daemon nền.
+- Cấp token tay: **Chỉ cấp token** hoặc `POST /api/devs {name}` → token hiện **một lần**; dev chạy `npx guide-the-vibe init --dev … --server … --token …` rồi `npx guide-the-vibe install`.
 - Xoay token = cấp lại cùng tên.
 - Quy tắc mở (`src/server/http/auth.ts`):
   - `/v1/*` mở (tin `X-Gtv-Dev`) khi `GTV_AUTH=open`, hoặc **chưa có admin token và chưa có dev nào**. Có dev đầu tiên ⇒ phải dùng token.

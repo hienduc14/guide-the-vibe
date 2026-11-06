@@ -19,6 +19,7 @@
     "web:install": "npm --prefix web install",
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
+    "build:npm": "node scripts/build-npm.mjs",
     "selftest:realworld": "node scripts/selftest/realworld.ts",
     "sandbox": "node scripts/sandbox.ts",
     "format": "prettier --write .",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "esbuild": "^0.25.12",
     "prettier": "3.9.10",
     "typescript": "^7.0.2"
   }

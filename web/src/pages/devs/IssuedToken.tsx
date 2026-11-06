@@ -30,7 +30,7 @@ export function forgetIssued(): void {
 
 export function IssuedToken({ name, token, onDismiss }: { name: string; token: string; onDismiss?: () => void }) {
   const toast = useToast();
-  const cmd = `node bin/gtv.mjs init --dev ${name} --server ${window.location.origin} --token ${token}`;
+  const cmd = `npx guide-the-vibe init --dev ${name} --server ${window.location.origin} --token ${token} && npx guide-the-vibe install`;
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -57,12 +57,45 @@ export function IssuedToken({ name, token, onDismiss }: { name: string; token: s
           Copy
         </button>
       </div>
-      <span className="xs muted">Trên máy của {name}:</span>
+      <span className="xs muted">Trên máy của {name}, trong thư mục repo:</span>
       <div className="row">
         <code className="xs wrap-anywhere" style={{ flex: 1 }}>
           {cmd}
         </code>
         <button className="btn sm" type="button" onClick={() => copy(cmd)}>
+          Copy
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The one-time `gtv join` command for an invite. */
+export function InviteLink({ name, code, onDismiss }: { name: string; code: string; onDismiss: () => void }) {
+  const toast = useToast();
+  const cmd = `npx guide-the-vibe join ${window.location.origin}/j/${code}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(cmd);
+      toast("Đã copy");
+    } catch {
+      toast("Không copy được — hãy chọn và copy tay", true);
+    }
+  };
+  return (
+    <div className="notice stack tight">
+      <div className="row between">
+        <b className="small">Lệnh mời {name}: dùng một lần, hết hạn sau 24 giờ</b>
+        <button className="btn sm ghost" type="button" onClick={onDismiss}>
+          Ẩn
+        </button>
+      </div>
+      <span className="xs muted">Gửi cho {name}, chạy trong thư mục repo (cần Node.js 20+):</span>
+      <div className="row">
+        <code className="xs wrap-anywhere" style={{ flex: 1 }}>
+          {cmd}
+        </code>
+        <button className="btn sm" type="button" onClick={copy}>
           Copy
         </button>
       </div>

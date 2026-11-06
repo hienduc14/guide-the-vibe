@@ -29,6 +29,13 @@ Dashboard dev: `npm run web:dev` → `http://localhost:5173` (proxy về `GTV_SE
 | `web:install`, `web:dev`, `web:build` | dashboard                                           |
 | `sandbox`                             | tạo sandbox mini-shop                               |
 | `selftest:realworld`                  | self-test trên RealWorld ([testing.md](testing.md)) |
+| `build:npm`                           | đóng gói CLI cho dev thành `dist/npm` (xem dưới)    |
+
+### Package npm `guide-the-vibe`
+
+Dev cài bằng `npx guide-the-vibe join <link>`. Package chỉ gồm CLI (daemon, hook, MCP, join): `scripts/build-npm.mjs` dùng esbuild gộp thành **một file** `gtv.mjs` không phụ thuộc gì, chạy trên Node ≥ 20 (Node không chạy TypeScript nằm trong `node_modules`, nên không publish thẳng `src/`). Skill được nhúng vào file. Khi cài, file tự chép sang `~/.gtv/bin/gtv.mjs` và hook/MCP trỏ vào đó, nên xoá cache của npx không làm hỏng gì.
+
+Phát hành: tăng `version` trong `package.json`, rồi `npm run build:npm && npm publish dist/npm`. Dev nhận bản mới khi chạy lại `npx guide-the-vibe@latest install` (chép đè `~/.gtv/bin/gtv.mjs`).
 
 ## Quy ước
 

@@ -3,6 +3,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { startServer, type Running } from "../src/server/main.ts";
+import { parseInvite } from "../src/daemon/join.ts";
 import { loadConfig } from "../src/server/config.ts";
 import { repoKey } from "../src/server/hub/hub.ts";
 import type { Brain, BrainJob, BrainResult } from "../src/server/brain/types.ts";
@@ -68,6 +69,21 @@ test("admin API requires the admin token; dev tokens are issued and checked", as
     ["shop", "billing"],
   );
   assert.equal((await call("/api/overview", { token: issued.json.token })).status, 401, "a dev token is not an admin token");
+});
+
+test("invite links: one use, then the dev's token works; expired links fail", async () => {
+  assert.equal((await call("/api/devs/invite", { method: "POST", body: { name: "carol" } })).status, 401, "only the admin invites");
+  const inv = await call<{ code: string }>("/api/devs/invite", { method: "POST", token: ADMIN, body: { name: "carol" } });
+  const joined = await call<{ dev: string; token: string }>("/v1/join", { method: "POST", body: { code: inv.json.code } });
+  assert.equal(joined.json.dev, "carol");
+  assert.equal((await call("/v1/projects", { token: joined.json.token })).status, 200);
+  assert.equal((await call("/v1/join", { method: "POST", body: { code: inv.json.code } })).status, 400, "a link works once");
+
+  const old = await call<{ code: string }>("/api/devs/invite", { method: "POST", token: ADMIN, body: { name: "dave" } });
+  srv.hub.db.run(`UPDATE invites SET expires_at = '2000-01-01T00:00:00.000Z'`);
+  assert.equal((await call("/v1/join", { method: "POST", body: { code: old.json.code } })).status, 400);
+  assert.ok(!srv.hub.devs().some((d) => d.name === "dave"));
+  assert.deepEqual(parseInvite("https://gtv.example.com/ops/j/abc_D-9"), { server: "https://gtv.example.com/ops", code: "abc_D-9" });
 });
 
 test("remote URLs resolve to projects", async () => {

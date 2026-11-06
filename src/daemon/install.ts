@@ -1,13 +1,57 @@
 // `gtv install <agent>`: wire an agent's hooks, MCP and skill into a project.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, openSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { daemonUrl } from "./config.ts";
+import { CONFIG_DIR, daemonUrl, loadDaemonConfig } from "./config.ts";
+
+// Set by scripts/build-npm.mjs: the npm package is one bundled file with the skill inlined.
+declare const __GTV_SKILL__: string | undefined;
+const BUNDLED = typeof __GTV_SKILL__ === "string";
 
 export const GTV_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const GTV_BIN = join(GTV_ROOT, "bin", "gtv.mjs").replace(/\\/g, "/");
-const SKILL = join(GTV_ROOT, "src", "adapters", "skill", "SKILL.md");
+/** What hooks and MCP run. The npm build copies itself to ~/.gtv/bin, so npx's cache can be cleared. */
+export const GTV_BIN = (BUNDLED ? join(CONFIG_DIR, "bin", "gtv.mjs") : join(GTV_ROOT, "bin", "gtv.mjs")).replace(/\\/g, "/");
+const skillText = () => (BUNDLED ? __GTV_SKILL__! : readFileSync(join(GTV_ROOT, "src", "adapters", "skill", "SKILL.md"), "utf8"));
+
+function ensureBin(): void {
+  if (!BUNDLED) return;
+  mkdirSync(dirname(GTV_BIN), { recursive: true });
+  const self = fileURLToPath(import.meta.url);
+  if (resolve(self) !== resolve(GTV_BIN)) copyFileSync(self, GTV_BIN);
+}
+
+/**
+ * Starts the daemon in the background unless one already runs with the current config
+ * (one running with another dev or server is stopped first). Returns false if it did not come up.
+ */
+export async function ensureDaemon(daemon = daemonUrl()): Promise<boolean> {
+  const cfg = loadDaemonConfig();
+  const health = () =>
+    fetch(`${daemon}/health`, { signal: AbortSignal.timeout(1000) })
+      .then((r) => r.json() as Promise<{ pid?: number; dev: string; server: string }>)
+      .catch(() => undefined);
+  const h = await health();
+  if (h && h.dev === cfg.dev && h.server === cfg.server) return true;
+  if (h?.pid) {
+    try {
+      process.kill(h.pid);
+    } catch {
+      return false; // someone else's daemon on this port
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  ensureBin();
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  const logFd = openSync(join(CONFIG_DIR, "daemon.log"), "a");
+  spawn(process.execPath, [GTV_BIN, "daemon"], { detached: true, stdio: ["ignore", logFd, logFd], windowsHide: true }).unref();
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (await health()) return true;
+  }
+  return false;
+}
 
 /** Every command carries the daemon URL explicitly, so several devs/daemons can share one machine. */
 const cmd = (daemon: string, ...args: string[]) => `node "${GTV_BIN}" ${args.join(" ")} --daemon ${daemon}`;
@@ -31,11 +75,12 @@ function mergeHooks(existing: Record<string, any[]> | undefined, add: Record<str
 
 function installSkill(dir: string): string {
   mkdirSync(dir, { recursive: true });
-  copyFileSync(SKILL, join(dir, "SKILL.md"));
+  writeFileSync(join(dir, "SKILL.md"), skillText());
   return join(dir, "SKILL.md");
 }
 
 export function installClaude(project: string, daemon = daemonUrl()): string[] {
+  ensureBin();
   const http = (timeout: number) => ({ type: "http", url: `${daemon}/hook/claude`, timeout });
   const settingsPath = join(project, ".claude", "settings.local.json");
   const settings = readJson(settingsPath);
@@ -61,6 +106,7 @@ export function installClaude(project: string, daemon = daemonUrl()): string[] {
 }
 
 export function installCodex(project: string, daemon = daemonUrl()): string[] {
+  ensureBin();
   const hook = (timeout: number) => ({ type: "command", command: cmd(daemon, "hook", "codex"), timeout });
   const hooksPath = join(project, ".codex", "hooks.json");
   const hooks = readJson(hooksPath);

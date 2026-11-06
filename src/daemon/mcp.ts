@@ -26,19 +26,32 @@ export function detectAgent(arg: string | undefined): AgentKind {
 export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<void> {
   const agent = detectAgent(agentArg);
   const cwd = process.env.GTV_CWD ?? process.cwd();
+  // Every agent session starts this process, so it is where a stopped daemon gets started again.
+  const autostart = daemon === daemonUrl() && !process.env.GTV_NO_AUTOSTART;
+  const startDaemon = () => import("./install.ts").then((m) => m.ensureDaemon(daemon)).catch(() => false);
+  if (autostart) void startDaemon();
   const server = new McpServer({ name: "gtv", version: "0.1.0" });
 
+  const post = (tool: string, args: Record<string, unknown>) =>
+    fetch(`${daemon}/api/${tool}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ agent, cwd, args }) });
   const call = async (tool: string, args: Record<string, unknown>) => {
     try {
-      const res = await fetch(`${daemon}/api/${tool}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ agent, cwd, args }),
+      const res = await post(tool, args).catch(async (e) => {
+        if (autostart && (await startDaemon())) return post(tool, args);
+        throw e;
       });
       const json = (await res.json()) as { text?: string; error?: string };
       return { content: [{ type: "text" as const, text: json.text ?? `gtv error: ${json.error}` }], isError: !res.ok };
     } catch (e) {
-      return { content: [{ type: "text" as const, text: `gtv daemon is not reachable (${(e as Error).message}). Start it with: gtv daemon` }], isError: true };
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `gtv daemon is not reachable (${(e as Error).message}). Its log is ~/.gtv/daemon.log; run \`npx guide-the-vibe daemon\` to see errors.`,
+          },
+        ],
+        isError: true,
+      };
     }
   };
 

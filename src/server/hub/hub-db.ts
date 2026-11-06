@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS devs (
   name TEXT PRIMARY KEY, token_hash TEXT NOT NULL, created_at TEXT NOT NULL, last_seen TEXT
 );
+-- One-time invite links (gtv join): redeeming one issues the dev's token.
+CREATE TABLE IF NOT EXISTS invites (code_hash TEXT PRIMARY KEY, dev TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS brain_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, project TEXT NOT NULL, kind TEXT NOT NULL,
   backend TEXT NOT NULL, model TEXT, ms INTEGER NOT NULL, ok INTEGER NOT NULL, error TEXT

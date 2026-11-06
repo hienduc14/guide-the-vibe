@@ -44,6 +44,20 @@ Kịch bản và các check:
 - bob thêm `getCommentAuthors()` gọi chữ ký cũ, sửa cùng dòng page size, và sửa độc lập `tag.service.ts`.
 - 21 check: briefing; không có cảnh báo critical nhầm; phản hồi khi đăng ký (trước khi có code); cảnh báo scope; không báo nhầm sửa độc lập; L2 high chỉ trỏ dòng bob viết; L1 text; Claude `ask` / Codex `deny` 1 lần; tin chèn vào agent; Brain trả lời bậc 1 có nguồn; Brain chuyển câu hỏi quyết định cho alice; câu trả lời quay lại bob; L1 tự hết sau khi phối hợp; task alice tự đóng sau merge; WIP bob merge sạch với master mới.
 
+## Benchmark conflict: `npm run bench:conflicts`
+
+`scripts/bench/conflicts.ts`: 8 cặp task trên RealWorld (`scripts/bench/scenarios.ts`), mỗi cặp làm theo 3 cách rồi merge (A trước, B sau):
+
+- **none**: không điều phối;
+- **lock**: chỉ giữ chỗ file;
+- **gtv**: Operator thật chạy trong tiến trình + 2 daemon thật, hook đúng định dạng Claude Code / Codex, **Brain tắt** (không tốn quota).
+
+Khi được cảnh báo trước lúc merge, B dùng bản sửa "đã điều chỉnh" soạn sẵn. Đúng sai được đo bằng `git merge-tree` (conflict, số dòng bị đè) và `tsc` trên cây đã merge (lỗi type mới = conflict logic).
+
+Không cần docker. Lần đầu clone repo nguồn (mặc định `hienduc14/realworld-gtv-bench`, đổi bằng `BENCH_REPO`) vào `sandbox/bench/`. Chạy vài cặp: `BENCH_ONLY=S1,S2`.
+
+Thêm cặp mới: thêm vào `SCENARIOS`, có `truth` (`text` / `logic` / `none`) và bản `adapted` của B.
+
 ## Đọc báo cáo — `docs/reports/`
 
 `docs/reports/selftest-realworld.md` được ghi đè mỗi lần chạy (đừng sửa tay). Gồm: tổng số check pass, số job Brain và p50, bảng check, timeline theo giây, trích câu trả lời của Brain, trạng thái từng layer sau khi chạy. Dữ liệu thô: `sandbox/realworld/selftest.json`.

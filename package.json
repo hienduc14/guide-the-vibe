@@ -21,6 +21,7 @@
     "web:build": "npm --prefix web run build",
     "build:npm": "node scripts/build-npm.mjs",
     "selftest:realworld": "node scripts/selftest/realworld.ts",
+    "bench:conflicts": "node scripts/bench/conflicts.ts",
     "sandbox": "node scripts/sandbox.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

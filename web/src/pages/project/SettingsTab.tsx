@@ -41,6 +41,7 @@ export function SettingsTab() {
     aliases: r.aliases.join(", "),
     critical: r.policy.critical_paths.join("\n"),
     modules: modulesToText(r.policy.modules),
+    repo_url: "",
   });
   const [note, setNote] = useState({ to_dev: "", body: "" });
   const [syncing, setSyncing] = useState(false);
@@ -50,6 +51,8 @@ export function SettingsTab() {
     await run(
       () =>
         api.projects.update(id, {
+          // Blank keeps the current URL (the API only shows it with its token masked).
+          ...(f.repo_url.trim() ? { repo_url: f.repo_url.trim() } : {}),
           name: f.name.trim(),
           description: f.description.trim(),
           main_branch: f.main_branch.trim(),
@@ -67,6 +70,7 @@ export function SettingsTab() {
         }),
       "Đã lưu cài đặt",
     );
+    setF((x) => ({ ...x, repo_url: "" }));
     void reload();
     void reloadOverview();
   };
@@ -91,6 +95,25 @@ export function SettingsTab() {
               <input className="input" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
             </Field>
           </div>
+          <Field
+            label="Đổi URL repo"
+            hint={
+              <>
+                Đang dùng <span className="mono">{detail.repo_url}</span>. Repo private: dán URL kèm token chỉ đọc, ví dụ{" "}
+                <span className="mono">https://x-access-token:&lt;token&gt;@github.com/org/repo.git</span>. Token không bao giờ hiện lại. Để trống thì giữ
+                nguyên.
+              </>
+            }
+          >
+            <input
+              id="repo-url"
+              className="input mono"
+              type="password"
+              autoComplete="off"
+              value={f.repo_url}
+              onChange={(e) => setF({ ...f, repo_url: e.target.value })}
+            />
+          </Field>
           <div className="form-grid">
             <Field label="Critical paths" hint="mỗi dòng một glob — hai người cùng chạm → conflict CRITICAL">
               <textarea
@@ -115,7 +138,6 @@ export function SettingsTab() {
             <button className="btn primary" type="submit">
               Lưu
             </button>
-            <span className="xs faint mono wrap-anywhere">repo: {detail.repo_url}</span>
           </div>
         </form>
       </Card>

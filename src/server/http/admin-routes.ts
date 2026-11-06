@@ -9,6 +9,7 @@ import { openMode } from "./auth.ts";
 import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
+import { PiBrain } from "../brain/pi.ts";
 
 type Env = { Variables: AuthVars };
 
@@ -249,18 +250,51 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({
       backend: b.name,
       model: b.model ?? null,
+      thinking: b instanceof PiBrain ? b.thinking : null,
       health: await b.health(),
       models,
       stats: hub.brainStats({ days: Number(c.req.query("days") ?? 7) }),
     });
   });
 
+  // Providers (Pi only): keys and endpoints entered here are stored in hub.db, sealed with GTV_SECRET_KEY.
+  const pi = () => {
+    if (!(hub.brain instanceof PiBrain)) throw new Error("the active brain backend has no provider settings (BRAIN_BACKEND=pi)");
+    return hub.brain;
+  };
+  app.get("/brain/providers", async (c) => c.json({ secrets_encrypted: pi().secretsEncrypted, providers: await pi().providers() }));
+  app.put("/brain/providers/:id/key", async (c) => {
+    const { key } = (await c.req.json()) as { key?: string };
+    await pi().setKey(c.req.param("id"), key ?? "");
+    return c.json({ ok: true });
+  });
+  app.delete("/brain/providers/:id/key", async (c) => {
+    await pi().clearKey(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+  app.post("/brain/providers/:id/test", async (c) => {
+    const { model } = (await c.req.json().catch(() => ({}))) as { model?: string };
+    return c.json(await pi().test(c.req.param("id"), model || undefined));
+  });
+  app.post("/brain/endpoints", async (c) => c.json(await pi().addEndpoint(await c.req.json())));
+  app.delete("/brain/endpoints/:id", async (c) => {
+    await pi().removeEndpoint(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
   app.put("/brain", async (c) => {
-    const { model } = (await c.req.json()) as { model: string | null };
+    const body = (await c.req.json()) as { model?: string | null; thinking?: string | null };
     if (!hub.brain.setModel) throw new Error("the active brain backend has no model setting");
-    hub.brain.setModel(model ?? undefined);
-    hub.setSetting("brain.model", model);
-    return c.json({ model: hub.brain.model ?? null });
+    if ("model" in body) {
+      if (body.model && hub.brain instanceof PiBrain) hub.brain.resolveModel(body.model); // typo or unknown provider → 400 now, not at the next job
+      hub.brain.setModel(body.model ?? undefined);
+      hub.setSetting("brain.model", body.model ?? null);
+    }
+    if ("thinking" in body) {
+      pi().setThinking(body.thinking ?? undefined);
+      hub.setSetting("brain.thinking", body.thinking ?? null);
+    }
+    return c.json({ model: hub.brain.model ?? null, thinking: hub.brain instanceof PiBrain ? hub.brain.thinking : null });
   });
 
   return app;

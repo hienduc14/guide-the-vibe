@@ -27,6 +27,10 @@ export interface ServerConfig {
     baseUrl?: string;
     apiKey?: string;
     api?: "openai-completions" | "anthropic-messages";
+    /** GTV_SECRET_KEY: encrypts LLM keys entered on the dashboard. */
+    secretKey?: string;
+    /** BRAIN_THINKING: off | low | medium | high (dashboard overrides). */
+    thinking?: "off" | "low" | "medium" | "high";
     concurrency: number;
     timeoutMs: number;
   };
@@ -77,6 +81,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       baseUrl: env.BRAIN_BASE_URL || undefined,
       apiKey: env.BRAIN_API_KEY || undefined,
       api: env.BRAIN_API === "anthropic-messages" ? "anthropic-messages" : "openai-completions",
+      secretKey: env.GTV_SECRET_KEY || undefined,
+      thinking: (["off", "low", "medium", "high"] as const).find((l) => l === env.BRAIN_THINKING),
       concurrency: Number(env.BRAIN_CONCURRENCY ?? 2),
       timeoutMs: Number(env.BRAIN_TIMEOUT_MS ?? 180_000),
     },

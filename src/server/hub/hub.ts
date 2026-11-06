@@ -7,6 +7,7 @@ import { Db, parseJson } from "../../shared/db.ts";
 import { HUB_SCHEMA } from "./hub-db.ts";
 import { ProjectRuntime, type ProjectRecord } from "../project/runtime.ts";
 import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
+import { PiBrain } from "../brain/pi.ts";
 import type { ServerConfig } from "../config.ts";
 import type { Policy } from "../../shared/types.ts";
 import { log, nowIso } from "../../shared/util.ts";
@@ -59,8 +60,11 @@ export class Hub {
     if (this.cfg.repoUrl && !this.records(true).length) {
       this.saveRecord({ id: this.cfg.defaultProject, repo_url: this.cfg.repoUrl, main_branch: this.cfg.mainBranch, name: this.cfg.defaultProject });
     }
+    this.brain.init?.(this.db);
     const model = this.setting("brain.model");
     if (model) this.brain.setModel?.(model);
+    const thinking = this.setting("brain.thinking");
+    if (thinking && this.brain instanceof PiBrain) this.brain.setThinking(thinking);
     for (const r of this.records()) {
       await this.runtime(r.id).catch((e) => log("hub", `project ${r.id} failed to open: ${(e as Error).message}`));
     }

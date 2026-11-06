@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { startServer, type Running } from "../src/server/main.ts";
 import { loadConfig } from "../src/server/config.ts";
 import { PiBrain, parseJsonReply } from "../src/server/brain/pi.ts";
+import { Sealer } from "../src/server/brain/credentials.ts";
 import { BrainUnavailable, type BrainJob } from "../src/server/brain/types.ts";
 import { makeOrigin, tempDir, type Origin } from "./helpers.ts";
 import type { Ticket } from "../src/shared/types.ts";
@@ -204,6 +205,101 @@ test("end to end: a tier-1 question goes through Pi, which calls the project's r
     // The old brain MCP endpoints are gone: nothing on the published port serves the code to the brain.
     assert.equal((await srv.app.request("/mcp", { method: "POST" })).status, 404);
   } finally {
+    await m.close();
+  }
+});
+
+test("credentials: sealed with GTV_SECRET_KEY; another key cannot open them", () => {
+  const a = new Sealer("secret-a");
+  const sealed = a.seal('{"type":"api_key","key":"sk-test"}');
+  assert.match(sealed, /^v1:/);
+  assert.ok(!sealed.includes("sk-test"));
+  assert.equal(a.open(sealed), '{"type":"api_key","key":"sk-test"}');
+  assert.equal(new Sealer("secret-b").open(sealed), undefined);
+  assert.equal(new Sealer().open(sealed), undefined);
+  assert.equal(new Sealer().open(new Sealer().seal("x")), "x", "no key: stored as plain text (the dashboard warns)");
+});
+
+test("providers on the dashboard: endpoint + key, model choice, nothing secret leaks, survives a restart", async () => {
+  const m = fakeModel(() => ({ text: '{"answer":"via proxy"}' }));
+  const url = await m.listen();
+  const data = tempDir();
+  const ADMIN = "admin-secret";
+  const boot = (secret: string) => {
+    const cfg = loadConfig({
+      GTV_DATA: data,
+      GTV_POLL_MS: "3600000",
+      GTV_ADMIN_TOKEN: ADMIN,
+      GTV_SECRET_KEY: secret,
+      BRAIN_BACKEND: "pi",
+    } as NodeJS.ProcessEnv);
+    return startServer(cfg, { listen: false });
+  };
+  const call = async (s: Running, method: string, path: string, body?: unknown) => {
+    const res = await s.app.request(path, {
+      method,
+      headers: { "content-type": "application/json", authorization: `Bearer ${ADMIN}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, text: await res.text() };
+  };
+  let s = await boot("secret-1");
+  try {
+    assert.equal((await call(s, "POST", "/api/brain/endpoints", { id: "proxy", name: "Fake proxy", base_url: url, key: KEY })).status, 200);
+    const list = await call(s, "GET", "/api/brain/providers");
+    assert.ok(!list.text.includes(KEY), "the key never leaves the server");
+    const body = JSON.parse(list.text);
+    assert.equal(body.secrets_encrypted, true);
+    const proxy = body.providers.find((p: any) => p.id === "proxy");
+    assert.deepEqual([proxy.kind, proxy.key_hint, proxy.source], ["endpoint", "…cdef", "stored credential"]);
+    assert.ok(body.providers.some((p: any) => p.id === "anthropic" && p.kind === "builtin"));
+    const raw = s.hub.db.all<{ data: string }>(`SELECT data FROM brain_credentials`);
+    assert.ok(raw.length === 1 && !raw[0].data.includes(KEY), "encrypted at rest");
+
+    assert.equal((await call(s, "PUT", "/api/brain", { model: "nope/x" })).status, 400, "unknown model is refused when saved");
+    assert.equal((await call(s, "PUT", "/api/brain", { model: "proxy/flash-1" })).status, 200);
+    assert.equal(JSON.parse((await call(s, "GET", "/api/brain")).text).thinking, "off", "default: no thinking (fastest)");
+    assert.equal((await call(s, "PUT", "/api/brain", { thinking: "high" })).status, 200);
+    assert.equal(JSON.parse((await call(s, "GET", "/api/brain")).text).model, "proxy/flash-1", "setting thinking keeps the model");
+    assert.equal((await call(s, "PUT", "/api/brain", { thinking: "ultra" })).status, 400);
+    assert.ok(JSON.parse((await call(s, "GET", "/api/brain")).text).models.includes("proxy/flash-1"));
+    const t = JSON.parse((await call(s, "POST", "/api/brain/providers/proxy/test", {})).text);
+    assert.equal(t.ok, true, t.detail);
+    assert.equal((await s.hub.brain.run<{ answer: string }>(job)).output.answer, "via proxy");
+
+    // A built-in provider's key: stored, shown as a hint, removable.
+    assert.equal((await call(s, "PUT", "/api/brain/providers/anthropic/key", { key: "sk-ant-api03-test-9876" })).status, 200);
+    let anthropic = JSON.parse((await call(s, "GET", "/api/brain/providers")).text).providers.find((p: any) => p.id === "anthropic");
+    assert.deepEqual([anthropic.configured, anthropic.source, anthropic.key_hint], [true, "stored credential", "…9876"]);
+    assert.equal((await call(s, "DELETE", "/api/brain/providers/anthropic/key")).status, 200);
+    anthropic = JSON.parse((await call(s, "GET", "/api/brain/providers")).text).providers.find((p: any) => p.id === "anthropic");
+    assert.equal(anthropic.key_hint, undefined);
+    assert.equal((await call(s, "PUT", "/api/brain/providers/nope/key", { key: "x" })).status, 400);
+    assert.equal((await call(s, "POST", "/api/brain/endpoints", { id: "openai", base_url: url })).status, 400, "built-in ids are taken");
+    assert.equal((await call(s, "POST", "/api/brain/endpoints", { id: "x1", base_url: "file:///etc/passwd" })).status, 400);
+    assert.equal((await s.app.request("/api/brain/providers")).status, 401, "admin only");
+  } finally {
+    await s.close();
+  }
+
+  // Restart with the same secret: endpoint, key and model are still there.
+  s = await boot("secret-1");
+  try {
+    assert.equal(s.hub.brain.model, "proxy/flash-1");
+    assert.equal((s.hub.brain as PiBrain).thinking, "high");
+    assert.equal((await s.hub.brain.run<{ answer: string }>(job)).output.answer, "via proxy");
+  } finally {
+    await s.close();
+  }
+  // Another secret: the stored key cannot be read → a clear error ("enter the key again"), not silence.
+  s = await boot("secret-2");
+  try {
+    assert.equal((await s.hub.brain.health()).ok, false);
+    await assert.rejects(s.hub.brain.run(job), (e: Error) => !(e instanceof BrainUnavailable) && /No API key for provider: proxy/.test(e.message));
+    assert.equal((await call(s, "DELETE", "/api/brain/endpoints/proxy")).status, 200);
+    assert.ok(!JSON.parse((await call(s, "GET", "/api/brain/providers")).text).providers.some((p: any) => p.id === "proxy"));
+  } finally {
+    await s.close();
     await m.close();
   }
 });

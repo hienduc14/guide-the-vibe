@@ -13,13 +13,16 @@ services:
       GTV_TOKENS: ${GTV_TOKENS:-}
       GTV_POLL_MS: ${GTV_POLL_MS:-15000}
       GTV_CONFIG: /config/gtv.config.yml
-      # Brain: see docker/.env.example
+      # Brain: providers and model are set on the dashboard (Brain page); env vars below are optional defaults.
+      # Keys entered on the dashboard are encrypted with GTV_SECRET_KEY.
+      GTV_SECRET_KEY: ${GTV_SECRET_KEY:?set GTV_SECRET_KEY in docker/.env}
       BRAIN_BACKEND: ${BRAIN_BACKEND:-pi}
       BRAIN_MODEL: ${BRAIN_MODEL:-}
       BRAIN_BASE_URL: ${BRAIN_BASE_URL:-}
       BRAIN_API_KEY: ${BRAIN_API_KEY:-}
       BRAIN_API: ${BRAIN_API:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_OAUTH_TOKEN: ${ANTHROPIC_OAUTH_TOKEN:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

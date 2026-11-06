@@ -9,6 +9,7 @@ import { BarChart, HBars, lastDays } from "../../components/Charts";
 import { Field } from "../../components/Field";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { BrainJobsTable } from "./BrainJobsTable";
+import { ProvidersCard } from "./ProvidersCard";
 import { ms } from "../../lib/format";
 
 export function BrainPage() {
@@ -16,8 +17,12 @@ export function BrainPage() {
   const { data, error, reload } = usePoll(() => api.brain.info(Number(days)), [days], 10_000);
   const run = useAction();
   const [model, setModel] = useState("");
+  const [thinking, setThinking] = useState("");
   useEffect(() => {
-    if (data) setModel((m) => m || data.model || "");
+    if (data) {
+      setModel((m) => m || data.model || "");
+      setThinking((t) => t || data.thinking || "off");
+    }
   }, [data]);
 
   if (error && !data) return <ErrorNotice error={error} />;
@@ -56,17 +61,17 @@ export function BrainPage() {
               className="stack tight"
               onSubmit={async (e) => {
                 e.preventDefault();
-                await run(() => api.brain.setModel(model.trim() || null), "Đã đổi model");
+                await run(() => api.brain.setModel(model.trim() || null, data.thinking === null ? undefined : thinking), "Đã lưu");
                 void reload();
               }}
             >
-              <Field label="Model" hint="provider/model — custom/<id> cho BRAIN_BASE_URL, hoặc provider có sẵn của Pi (anthropic/…, openai/…)">
+              <Field label="Model" hint="provider/model — chọn trong danh sách của các provider đã kết nối bên dưới">
                 <input
                   className="input mono"
                   list="gtv-models"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="custom/gemini-3.8-flash-high"
+                  placeholder="anthropic/claude-sonnet-5-5"
                 />
                 <datalist id="gtv-models">
                   {data.models.map((m) => (
@@ -74,11 +79,24 @@ export function BrainPage() {
                   ))}
                 </datalist>
               </Field>
+              {data.thinking !== null && (
+                <Field label="Mức suy nghĩ" hint="off nhanh nhất; cao hơn thì chậm và tốn hơn nhưng suy luận kỹ hơn (Claude: effort)">
+                  <select className="select" value={thinking} onChange={(e) => setThinking(e.target.value)}>
+                    <option value="off">off</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </Field>
+              )}
               <div className="row">
                 <button className="btn primary" type="submit" disabled={data.backend === "null"}>
-                  Lưu model
+                  Lưu
                 </button>
-                <span className="xs faint">Hiện tại: {data.model ?? "mặc định của backend"}</span>
+                <span className="xs faint">
+                  Hiện tại: {data.model ?? "chưa chọn"}
+                  {data.thinking && data.thinking !== "off" ? ` · suy nghĩ ${data.thinking}` : ""}
+                </span>
               </div>
             </form>
           </div>
@@ -91,6 +109,8 @@ export function BrainPage() {
           <Stat label="p95" value={ms(s.totals.p95_ms)} />
         </div>
       </div>
+
+      <ProvidersCard onChange={() => void reload()} />
 
       <div className="split">
         <Card title="Job theo ngày">

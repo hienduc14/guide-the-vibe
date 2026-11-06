@@ -298,9 +298,22 @@ export interface CallerHit {
   confidence: "local" | "import" | "name";
 }
 
+export interface BrainProvider {
+  id: string;
+  name: string;
+  kind: "endpoint" | "builtin";
+  configured: boolean;
+  source?: string;
+  key_hint?: string;
+  base_url?: string;
+  api?: string;
+  env?: boolean;
+}
+
 export interface BrainInfo {
   backend: string;
   model: string | null;
+  thinking: string | null;
   health: { ok: boolean; detail?: string };
   models: string[];
   stats: BrainStats;

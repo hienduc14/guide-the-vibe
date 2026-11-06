@@ -4,6 +4,7 @@ import { del, get, patch, post, put } from "./client";
 import type {
   ActivityEvent,
   BrainInfo,
+  BrainProvider,
   CallerHit,
   Conflict,
   Dev,
@@ -92,6 +93,13 @@ export const api = {
 
   brain: {
     info: (days: number) => get<BrainInfo>(`/api/brain?days=${days}`),
-    setModel: (model: string | null) => put<{ model: string | null }>("/api/brain", { model }),
+    setModel: (model: string | null, thinking?: string) => put<{ model: string | null; thinking: string | null }>("/api/brain", { model, thinking }),
+    providers: () => get<{ secrets_encrypted: boolean; providers: BrainProvider[] }>("/api/brain/providers"),
+    setKey: (id: string, key: string) => put<{ ok: boolean }>(`/api/brain/providers/${encodeURIComponent(id)}/key`, { key }),
+    clearKey: (id: string) => del<{ ok: boolean }>(`/api/brain/providers/${encodeURIComponent(id)}/key`),
+    testProvider: (id: string, model?: string) =>
+      post<{ ok: boolean; model?: string; ms: number; detail: string }>(`/api/brain/providers/${encodeURIComponent(id)}/test`, { model }),
+    addEndpoint: (e: { id: string; name?: string; base_url: string; api?: string; key?: string }) => post<{ id: string }>("/api/brain/endpoints", e),
+    removeEndpoint: (id: string) => del<{ ok: boolean }>(`/api/brain/endpoints/${encodeURIComponent(id)}`),
   },
 };

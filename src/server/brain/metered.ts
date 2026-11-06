@@ -7,6 +7,8 @@ import type { Engine } from "../project/engine.ts";
 import { nowIso } from "../../shared/util.ts";
 
 export interface ProjectScopedBackend extends Brain {
+  /** Optional: called once by the hub with its database (stored providers and keys). */
+  init?(hubDb: Db): void;
   readonly model?: string;
   /** Optional: model choice from the dashboard ("provider/model"). */
   setModel?(model: string | undefined): void;

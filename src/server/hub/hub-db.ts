@@ -1,4 +1,4 @@
-// Hub database (data/hub.db): projects, developers + tokens, brain job metering, global settings.
+// Hub database (data/hub.db): projects, developers + tokens, brain job metering and providers, global settings.
 
 export const HUB_SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -17,4 +17,7 @@ CREATE TABLE IF NOT EXISTS brain_jobs (
 CREATE INDEX IF NOT EXISTS brain_jobs_ts ON brain_jobs(ts);
 CREATE INDEX IF NOT EXISTS brain_jobs_project ON brain_jobs(project, ts);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- LLM providers entered on the dashboard (brain/credentials.ts): data is sealed with GTV_SECRET_KEY.
+CREATE TABLE IF NOT EXISTS brain_credentials (provider TEXT PRIMARY KEY, type TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS brain_endpoints (id TEXT PRIMARY KEY, name TEXT NOT NULL, base_url TEXT NOT NULL, api TEXT NOT NULL, created_at TEXT NOT NULL);
 `;

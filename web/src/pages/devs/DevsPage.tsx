@@ -13,6 +13,9 @@ import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { InviteLink, IssuedToken, forgetIssued, lastIssued, rememberIssued } from "./IssuedToken";
 
+/** The daemon talks to the server constantly; seen in the last 5 minutes = connected. */
+const online = (at: string | null) => !!at && Date.now() - new Date(at).getTime() < 5 * 60_000;
+
 export function DevsPage() {
   const { data, error, reload } = usePoll(api.devs.list, [], 10_000);
   const { data: overview } = useOverview();
@@ -26,7 +29,10 @@ export function DevsPage() {
 
   const inviteDev = async (e: FormEvent) => {
     e.preventDefault();
-    const res = await run(() => api.devs.invite(name.trim()), "Đã tạo lệnh mời");
+    await inviteName(name.trim());
+  };
+  const inviteName = async (who: string) => {
+    const res = await run(() => api.devs.invite(who), "Đã tạo lệnh mời");
     if (res) {
       setInvite(res);
       setName("");
@@ -46,8 +52,15 @@ export function DevsPage() {
 
   return (
     <>
-      <PageHead title="Developers" subtitle="Mời developer bằng một lệnh npx. Mỗi developer có một token riêng; cấp lại token sẽ vô hiệu token cũ." />
-      <Card title="Mời developer">
+      <PageHead title="Developers" subtitle="Mỗi developer có một token riêng cho daemon trên máy họ. Mời bằng một lệnh, không cần gửi token qua chat." />
+      <Card
+        title={
+          <div>
+            <h3>Mời developer</h3>
+            <div className="sub">Tạo lệnh, gửi cho dev, dev chạy trong thư mục repo của họ. Mở Claude Code hoặc Codex là dùng được.</div>
+          </div>
+        }
+      >
         <form className="stack" onSubmit={inviteDev}>
           {firstInOpenMode && (
             <div className="notice error stack tight">
@@ -98,23 +111,45 @@ export function DevsPage() {
           <Table<Dev>
             rows={data}
             rowKey={(d) => d.name}
-            empty="Chưa có developer — server đang ở open dev mode (tin header X-Gtv-Dev)"
+            empty="Chưa có developer nào. Tạo lệnh mời ở trên cho người đầu tiên."
             columns={[
-              { key: "n", title: "Tên", render: (d) => <b>{d.name}</b> },
-              { key: "c", title: "Tạo", render: (d) => <span className="xs muted">{ago(d.created_at)}</span> },
-              { key: "s", title: "Hoạt động", render: (d) => <span className="xs muted">{ago(d.last_seen)}</span> },
+              {
+                key: "n",
+                title: "Tên",
+                render: (d) => (
+                  <span className="row" style={{ gap: 8 }}>
+                    <span
+                      className={`dot${online(d.last_seen) ? " on" : ""}`}
+                      title={online(d.last_seen) ? "Daemon đang kết nối" : "Chưa thấy kết nối gần đây"}
+                    />
+                    <b>{d.name}</b>
+                  </span>
+                ),
+              },
+              { key: "s", title: "Kết nối lần cuối", render: (d) => <span className="xs muted">{d.last_seen ? ago(d.last_seen) : "chưa bao giờ"}</span> },
+              { key: "c", title: "Thêm vào", render: (d) => <span className="xs muted">{ago(d.created_at)}</span> },
               {
                 key: "a",
                 title: "",
                 render: (d) => (
-                  <ConfirmButton
-                    onConfirm={async () => {
-                      await run(() => api.devs.remove(d.name), "Đã xoá");
-                      void reload();
-                    }}
-                  >
-                    Xoá
-                  </ConfirmButton>
+                  <div className="row" style={{ justifyContent: "flex-end" }}>
+                    <button
+                      className="btn sm"
+                      type="button"
+                      onClick={() => void inviteName(d.name)}
+                      title="Tạo lệnh mời mới cho máy khác hoặc khi mất token. Token cũ sẽ hết hiệu lực khi lệnh được dùng."
+                    >
+                      Mời lại
+                    </button>
+                    <ConfirmButton
+                      onConfirm={async () => {
+                        await run(() => api.devs.remove(d.name), "Đã xoá");
+                        void reload();
+                      }}
+                    >
+                      Xoá
+                    </ConfirmButton>
+                  </div>
                 ),
               },
             ]}

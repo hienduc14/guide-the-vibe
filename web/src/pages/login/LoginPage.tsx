@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { Field } from "../../components/Field";
+import { BrandMark } from "../../components/Layout";
 import { IssuedToken, forgetIssued, lastIssued } from "../devs/IssuedToken";
 
 export function LoginPage() {
@@ -17,16 +18,25 @@ export function LoginPage() {
   return (
     <div className="login">
       <form className="card" onSubmit={submit}>
-        <div className="card-head">
-          <div className="brand" style={{ padding: 0 }}>
-            <span className="brand-mark">g</span>
-            <span>gtv Operator</span>
-          </div>
-        </div>
         <div className="card-body stack">
-          <p className="small muted">Dashboard cần admin token (biến môi trường GTV_ADMIN_TOKEN của server).</p>
+          <div className="brand" style={{ padding: 0 }}>
+            <BrandMark />
+            <span>
+              gtv
+              <small>Điều phối agent cho cả nhóm</small>
+            </span>
+          </div>
+          <p className="small muted">Dashboard dành cho admin. Nhập admin token của server (biến GTV_ADMIN_TOKEN trong file .env lúc triển khai).</p>
           <Field label="Admin token">
-            <input className="input mono" type="password" autoFocus value={token} onChange={(e) => setToken(e.target.value)} placeholder="••••••••" />
+            <input
+              id="admin-token"
+              className="input mono"
+              type="password"
+              autoFocus
+              autoComplete="current-password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
           </Field>
           <button className="btn primary" type="submit" disabled={!token.trim()}>
             Đăng nhập

@@ -26,10 +26,10 @@ function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" |
       <div className="stack tight" style={{ minWidth: 0 }}>
         <div className="row">
           <LevelBadge level={c.level} />
-          <StatusBadge status={c.status} />
+          {c.status !== "open" && <StatusBadge status={c.status} />}
           <Badge mono>{c.kind}</Badge>
           <span className="xs faint">
-            {c.dev_a} ↔ {c.dev_b} · {ago(c.updated_at)}
+            <b className="muted">{c.dev_a}</b> và <b className="muted">{c.dev_b}</b>, {ago(c.updated_at)}
           </span>
         </div>
         <span className="small wrap-anywhere">{c.message}</span>
@@ -38,8 +38,8 @@ function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" |
       </div>
       <div className="row" style={{ alignSelf: "start" }}>
         {c.status === "open" && (
-          <button className="btn sm" type="button" onClick={() => onAct("ack")}>
-            Ack
+          <button className="btn sm" type="button" onClick={() => onAct("ack")} title="Hai bên đã biết và đang phối hợp">
+            Đã biết
           </button>
         )}
         {open && (
@@ -64,7 +64,7 @@ export function ConflictsTab() {
   const run = useAction();
 
   const act = async (c: Conflict, action: "ack" | "dismiss" | "reopen") => {
-    await run(() => api.conflicts.act(id, c.id, action), action === "ack" ? "Đã ack" : action === "dismiss" ? "Đã bỏ qua" : "Đã mở lại");
+    await run(() => api.conflicts.act(id, c.id, action), action === "ack" ? "Đã đánh dấu là đã biết" : action === "dismiss" ? "Đã bỏ qua" : "Đã mở lại");
     void reload();
     void reloadProject();
   };
@@ -76,8 +76,7 @@ export function ConflictsTab() {
     <div className="stack">
       <div className="row between">
         <p className="small muted">
-          Conflict do các layer phát hiện giữa các workspace. Ack khi hai bên đã phối hợp; bỏ qua nếu là báo nhầm (sẽ không báo lại tới khi bằng chứng thay
-          đổi).
+          Chỗ hai người đang đụng nhau. Bấm “Đã biết” khi hai bên đã phối hợp; bỏ qua nếu là báo nhầm (sẽ không báo lại tới khi bằng chứng thay đổi).
         </p>
         <Segmented
           options={[

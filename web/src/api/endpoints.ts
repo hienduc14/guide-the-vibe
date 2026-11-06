@@ -22,6 +22,7 @@ import type {
   SymbolRow,
   TeamState,
   Ticket,
+  OAuthSession,
 } from "./types";
 
 const p = (id: string) => `/v1/p/${encodeURIComponent(id)}`;
@@ -102,5 +103,9 @@ export const api = {
       post<{ ok: boolean; model?: string; ms: number; detail: string }>(`/api/brain/providers/${encodeURIComponent(id)}/test`, { model }),
     addEndpoint: (e: { id: string; name?: string; base_url: string; api?: string; key?: string }) => post<{ id: string }>("/api/brain/endpoints", e),
     removeEndpoint: (id: string) => del<{ ok: boolean }>(`/api/brain/endpoints/${encodeURIComponent(id)}`),
+    oauthStart: (provider: string) => post<OAuthSession>(`/api/brain/oauth/${encodeURIComponent(provider)}/start`, {}),
+    oauthStatus: (id: string) => get<OAuthSession>(`/api/brain/oauth/sessions/${encodeURIComponent(id)}`),
+    oauthInput: (id: string, value: string) => post<OAuthSession>(`/api/brain/oauth/sessions/${encodeURIComponent(id)}/input`, { value }),
+    oauthCancel: (id: string) => del<{ ok: boolean }>(`/api/brain/oauth/sessions/${encodeURIComponent(id)}`),
   },
 };

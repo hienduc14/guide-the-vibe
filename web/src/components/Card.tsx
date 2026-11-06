@@ -14,12 +14,12 @@ export function Card({ title, actions, children, flush }: { title?: ReactNode; a
   );
 }
 
+/** One number in a summary line: "<b>12</b> label". Put several in a .grid.stats (or .summary) row. */
 export function Stat({ label, value, hint, alert }: { label: string; value: ReactNode; hint?: ReactNode; alert?: boolean }) {
   return (
-    <div className="stat">
-      <div className="label-caps">{label}</div>
-      <div className={`stat-value${alert ? " alert" : ""}`}>{value}</div>
-      {hint && <div className="xs muted">{hint}</div>}
-    </div>
+    <span className={`chip${alert ? " alert" : ""}`}>
+      <b>{value}</b> {label}
+      {hint && <span className="xs">{hint}</span>}
+    </span>
   );
 }

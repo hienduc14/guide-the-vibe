@@ -12,19 +12,29 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
   return (
     <aside className={`sidebar${open ? " open" : ""}`} onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate()}>
       <div className="brand">
-        <span className="brand-mark">g</span>
-        <span>gtv Operator</span>
+        <BrandMark />
+        <span>
+          gtv
+          <small>Điều phối agent cho cả nhóm</small>
+        </span>
       </div>
 
       <nav className="nav">
         <NavLink to="/" end className={link}>
+          <Icon d="M3 4h10M3 8h7M3 12h10" />
           Tổng quan
         </NavLink>
         <NavLink to="/brain" className={link}>
-          <span className={`dot${data?.brain.ok ? " on" : data ? " bad" : ""}`} />
+          <Icon d="M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM8 5v3l2 1.5" />
           Brain
+          <span
+            className={`dot${data?.brain.ok ? " on" : data ? " bad" : ""}`}
+            style={{ marginLeft: "auto" }}
+            title={data?.brain.ok ? "Brain sẵn sàng" : "Brain chưa sẵn sàng"}
+          />
         </NavLink>
         <NavLink to="/devs" className={link}>
+          <Icon d="M5.5 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM2 13c0-2 1.6-3.5 3.5-3.5S9 11 9 13M11 7.5a1.7 1.7 0 1 0 0-3.4M12 9.6c1.2.4 2 1.6 2 3.4" />
           Developers
         </NavLink>
       </nav>
@@ -34,22 +44,29 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         {data?.projects.map((p) => {
           const active = isLoaded(p) && p.counts.people_active > 0;
           const hot = isLoaded(p) && p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical > 0;
+          const open = isLoaded(p) ? p.counts.conflicts_open : 0;
           return (
-            <NavLink key={p.id} to={`/p/${p.id}`} className={link}>
-              <span className={`dot${hot ? " bad" : active ? " on" : ""}`} />
+            <NavLink
+              key={p.id}
+              to={`/p/${p.id}`}
+              className={link}
+              title={active ? `${isLoaded(p) ? p.counts.people_active : 0} người đang làm` : "Không ai đang làm"}
+            >
+              <span className={`dot${!isLoaded(p) ? " bad" : active ? " on" : ""}`} />
               <span className="truncate">{p.name}</span>
+              {open > 0 && <span className={`count${hot ? " alert" : ""}`}>{open}</span>}
             </NavLink>
           );
         })}
         {data && data.projects.length === 0 && (
-          <span className="xs faint" style={{ padding: "0 8px" }}>
-            Chưa có project
+          <span className="xs muted" style={{ padding: "0 8px" }}>
+            Chưa có project. Thêm ở trang Tổng quan.
           </span>
         )}
       </nav>
 
       <div className="spacer" />
-      <div className="stack tight" style={{ padding: "0 8px" }}>
+      <div className="sidebar-foot">
         {data?.open_mode && (
           <Badge tone="danger-outline" title="Không có admin token và chưa có developer nào: mọi người đều truy cập được">
             open dev mode
@@ -65,6 +82,33 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
   );
 }
 
+export function BrandMark() {
+  return (
+    <span className="brand-mark" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+function Icon({ d }: { d: string }) {
+  return (
+    <svg
+      className="nav-icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
 export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -76,7 +120,7 @@ export function Layout() {
           ☰
         </button>
         <span className="brand">
-          <span className="brand-mark">g</span> gtv
+          <BrandMark /> gtv
         </span>
       </div>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}

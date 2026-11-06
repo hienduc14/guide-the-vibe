@@ -308,6 +308,25 @@ export interface BrainProvider {
   base_url?: string;
   api?: string;
   env?: boolean;
+  auth_type?: "api_key" | "oauth";
+  api_key?: boolean;
+  oauth?: "device" | "redirect";
+  models?: number;
+}
+
+/** One "log in with your account" attempt; never carries a token. */
+export interface OAuthSession {
+  id: string;
+  provider: string;
+  status: "pending" | "waiting_input" | "done" | "error";
+  url?: string;
+  instructions?: string;
+  user_code?: string;
+  verification_uri?: string;
+  prompt?: { message: string; placeholder?: string };
+  progress?: string;
+  error?: string;
+  expires_at: string;
 }
 
 export interface BrainInfo {

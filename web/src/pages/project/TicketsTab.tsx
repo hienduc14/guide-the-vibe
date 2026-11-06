@@ -146,7 +146,15 @@ export function TicketsTab() {
               { key: "from", title: "Từ", render: (t) => t.from_dev },
               { key: "tier", title: "Bậc", render: (t) => <span className="mono">{t.tier}</span> },
               { key: "st", title: "Trạng thái", render: (t) => <StatusBadge status={t.status} /> },
-              { key: "at", title: "", render: (t) => <span className="xs faint">{ago(t.created_at)}</span> },
+              {
+                key: "at",
+                title: "",
+                render: (t) => (
+                  <span className="xs faint" style={{ whiteSpace: "nowrap" }}>
+                    {ago(t.created_at)}
+                  </span>
+                ),
+              },
             ]}
           />
         </Card>

@@ -28,7 +28,7 @@ function DocView({ docId, onChanged }: { docId: string; onChanged: () => void })
       title={<h3 className="wrap-anywhere">{data.title}</h3>}
       actions={
         <>
-          <StatusBadge status={data.status} />
+          <StatusBadge doc status={data.status} />
           {data.status === "unverified" && (
             <>
               <button className="btn sm primary" type="button" onClick={() => review("confirm")}>
@@ -182,7 +182,7 @@ export function KnowledgeTab() {
                   <span className="row">
                     <b className="small">{h.section}</b>
                     <Badge>{h.type}</Badge>
-                    {h.status !== "active" && <StatusBadge status={h.status} />}
+                    {h.status !== "active" && <StatusBadge doc status={h.status} />}
                   </span>
                   <span className="xs muted">{h.snippet}</span>
                 </button>
@@ -221,7 +221,7 @@ export function KnowledgeTab() {
               columns={[
                 { key: "t", title: "Tiêu đề", render: (d) => <span className="small">{d.title}</span> },
                 { key: "type", title: "Loại", render: (d) => <Badge>{d.type}</Badge> },
-                { key: "st", title: "Trạng thái", render: (d) => <StatusBadge status={d.status} /> },
+                { key: "st", title: "Trạng thái", render: (d) => <StatusBadge doc status={d.status} /> },
                 { key: "src", title: "Nguồn", render: (d) => <span className="xs muted">{d.source}</span> },
               ]}
             />

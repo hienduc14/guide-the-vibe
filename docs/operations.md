@@ -110,6 +110,30 @@ Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashbo
 - Backup: volume `gtv-data` (`hub.db`, `projects/*`) — key LLM trong `hub.db` chỉ mở được với cùng `GTV_SECRET_KEY`. Ví dụ:
   `docker run --rm -v docker_gtv-data:/d -v "$PWD":/b alpine tar czf /b/gtv-data.tgz -C /d .`
 - Nâng cấp: `git pull` → `docker compose … up -d --build`. Schema dùng `CREATE TABLE IF NOT EXISTS`, bảng mới tự tạo; đổi cột cần script migrate riêng.
+- Tự deploy (CD): `docker/auto-deploy.sh` chạy mỗi phút bằng systemd timer trên máy server. Khi `main` có commit mới và **mọi check của GitHub trên commit đó đã xanh**, script fast-forward bản checkout, `docker compose … up -d --build`, rồi chờ `/health`. Không lên trong 60 giây thì quay về commit cũ, nhớ commit hỏng và chờ commit tiếp theo. Máy server chỉ đọc GitHub, không cần mở cổng hay SSH key. Cài (sửa đường dẫn cho đúng chỗ clone):
+
+  ```ini
+  # /etc/systemd/system/gtv-deploy.service
+  [Unit]
+  Description=gtv: deploy new green commits of main
+  After=network-online.target docker.service
+
+  [Service]
+  Type=oneshot
+  User=ubuntu
+  ExecStart=/path/to/guide-the-vibe/docker/auto-deploy.sh
+
+  # /etc/systemd/system/gtv-deploy.timer
+  [Timer]
+  OnBootSec=2min
+  OnUnitActiveSec=1min
+
+  [Install]
+  WantedBy=timers.target
+  ```
+
+  `sudo systemctl enable --now gtv-deploy.timer`; log: `journalctl -u gtv-deploy -f`. Biến tuỳ chọn: `GTV_DEPLOY_BRANCH`, `GTV_DEPLOY_REPO`, `GTV_DEPLOY_HEALTH`, `GTV_DEPLOY_PROJECT`. File `docker/compose.local.yml` (nếu có, ví dụ chỉ nghe ở 127.0.0.1) được dùng kèm.
+
 - Reset hoàn toàn dữ liệu Operator: `docker volume rm docker_gtv-data` (mất project, token, lịch sử).
 
 ## Sự cố thường gặp

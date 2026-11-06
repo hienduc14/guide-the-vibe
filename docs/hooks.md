@@ -53,15 +53,15 @@ SSE và giữ trong bộ nhớ, nên hook trả lời trong vài chục ms. Even
 
 Daemon xử lý từng kind (`src/daemon/daemon.ts`, `decide()`):
 
-| Kind            | Daemon làm tại chỗ                                                                                                         | Event gửi server                     | Agent nhận lại                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `session_start` | Tạo session (nếu mới) → lấy **briefing**; rút hộp thư                                                                      | `session_start` (khi session mới)    | `additionalContext` = briefing + tin chờ                                                                 |
-| `prompt`        | Rút hộp thư                                                                                                                | `prompt` (cắt 500 ký tự, chỉ để log) | `additionalContext` = tin chờ (nếu có)                                                                   |
-| `plan`          | Rút hộp thư                                                                                                                | `plan` (toàn văn)                    | `additionalContext` = tin chờ; luôn **allow**                                                            |
-| `pre_edit`      | Đổi `paths` thành đường dẫn trong repo (bỏ file ngoài repo); `decidePreEdit()` → allow / ask / deny + ghi chú; rút hộp thư | `edit` `phase: "pre"`                | Claude/Codex: `permissionDecision` (chỉ khi ask/deny) + `permissionDecisionReason` + `additionalContext` |
-| `post_tool`     | Nếu có file bị sửa: hẹn **snapshot** sau `GTV_SNAPSHOT_DEBOUNCE_MS` (20 s, mỗi lần sửa đặt lại hẹn); rút hộp thư           | `edit` `phase: "post"` (khi có file) | `additionalContext` = tin chờ                                                                            |
-| `stop`          | Hẹn snapshot sau 2 s                                                                                                       | —                                    | không gì (Claude: waiter `hook-wait` bắt đầu chờ tin)                                                    |
-| `session_end`   | Hẹn snapshot sau 1 s                                                                                                       | `session_end`                        | không gì                                                                                                 |
+| Kind            | Daemon làm tại chỗ                                                                                                          | Event gửi server                     | Agent nhận lại                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `session_start` | Tạo session (nếu mới) → lấy **briefing**; rút hộp thư                                                                       | `session_start` (khi session mới)    | `additionalContext` = briefing + tin chờ                                                                 |
+| `prompt`        | Rút hộp thư                                                                                                                 | `prompt` (cắt 500 ký tự, chỉ để log) | `additionalContext` = tin chờ (nếu có)                                                                   |
+| `plan`          | Rút hộp thư                                                                                                                 | `plan` (toàn văn)                    | `additionalContext` = tin chờ; luôn **allow**                                                            |
+| `pre_edit`      | Đổi `paths` thành đường dẫn trong repo (bỏ file ngoài repo); `decidePreEdit()` → allow / ask / deny + ghi chú; rút hộp thư  | `edit` `phase: "pre"`                | Claude/Codex: `permissionDecision` (chỉ khi ask/deny) + `permissionDecisionReason` + `additionalContext` |
+| `post_tool`     | Nếu có file bị sửa: hẹn **snapshot** sau `GTV_SNAPSHOT_DEBOUNCE_MS` (mặc định 5 phút, mỗi lần sửa đặt lại hẹn); rút hộp thư | `edit` `phase: "post"` (khi có file) | `additionalContext` = tin chờ                                                                            |
+| `stop`          | Hẹn snapshot sau 2 s                                                                                                        | —                                    | không gì (Claude: waiter `hook-wait` bắt đầu chờ tin)                                                    |
+| `session_end`   | Hẹn snapshot sau 1 s                                                                                                        | `session_end`                        | không gì                                                                                                 |
 
 ### `decidePreEdit()` — quyết định trước khi sửa
 
@@ -187,7 +187,7 @@ sequenceDiagram
   D-)S: edit pre
   A->>D: PostToolUse
   D-)S: edit post → footprint, L0, drift
-  D->>D: hẹn snapshot 20 s (đặt lại sau mỗi lần sửa)
+  D->>D: hẹn snapshot 5 phút (đặt lại sau mỗi lần sửa)
   D->>G: push refs/gtv/bob/{ws} (index tạm + commit-tree)
   D-)S: snapshot {sha}
   S->>G: fetch
@@ -248,13 +248,13 @@ Clone chỉ `git pull` mà chưa sửa gì (không có footprint) thì **không*
 
 ## 7. Thời gian
 
-| Bước                              | Thời gian                                                     |
-| --------------------------------- | ------------------------------------------------------------- |
-| Hook Claude (HTTP) / Codex (shim) | ~100–150 ms / ~270 ms (phần lớn là khởi động Node)            |
-| Quyết định của daemon             | < 10 ms (từ cache)                                            |
-| Sửa → snapshot                    | 20 s sau lần sửa cuối (`GTV_SNAPSHOT_DEBOUNCE_MS`); Stop: 2 s |
-| Snapshot → L1/L2 → tin            | vài giây sau snapshot (≈ 20–25 s sau lần sửa)                 |
-| Đăng ký + L3                      | L0 ngay; L3 chờ tối đa `registration.wait_s` (30 s)           |
-| `gtv_ask` bậc 1                   | 10–35 s tùy model; chờ tối đa `qa.ask_wait_s` (45 s)          |
-| Bậc 2 → bậc 3 → hết hạn           | 15 phút → 4 giờ                                               |
-| Poller server                     | `GTV_POLL_MS` (15 s trong compose, 30 s mặc định)             |
+| Bước                              | Thời gian                                                       |
+| --------------------------------- | --------------------------------------------------------------- |
+| Hook Claude (HTTP) / Codex (shim) | ~100–150 ms / ~270 ms (phần lớn là khởi động Node)              |
+| Quyết định của daemon             | < 10 ms (từ cache)                                              |
+| Sửa → snapshot                    | 5 phút sau lần sửa cuối (`GTV_SNAPSHOT_DEBOUNCE_MS`); Stop: 2 s |
+| Snapshot → L1/L2 → tin            | vài giây sau snapshot (≈ 20–25 s sau lần sửa)                   |
+| Đăng ký + L3                      | L0 ngay; L3 chờ tối đa `registration.wait_s` (30 s)             |
+| `gtv_ask` bậc 1                   | 10–35 s tùy model; chờ tối đa `qa.ask_wait_s` (45 s)            |
+| Bậc 2 → bậc 3 → hết hạn           | 15 phút → 4 giờ                                                 |
+| Poller server                     | `GTV_POLL_MS` (15 s trong compose, 30 s mặc định)               |

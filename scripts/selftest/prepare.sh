@@ -46,5 +46,5 @@ for d in alice bob; do
   GTV_HOME="$ROOT/sandbox/.home-$d" node bin/gtv.mjs init --dev $d --server http://127.0.0.1:7390 --port $port --token "$token" > /dev/null
 done
 echo "Ready. Start the daemons (one terminal each), then: GTV_ADMIN_TOKEN=... node scripts/selftest/realworld.ts"
-echo "  GTV_HOME=$ROOT/sandbox/.home-alice node bin/gtv.mjs daemon"
-echo "  GTV_HOME=$ROOT/sandbox/.home-bob node bin/gtv.mjs daemon"
+echo "  GTV_SNAPSHOT_DEBOUNCE_MS=20000 GTV_HOME=$ROOT/sandbox/.home-alice node bin/gtv.mjs daemon"
+echo "  GTV_SNAPSHOT_DEBOUNCE_MS=20000 GTV_HOME=$ROOT/sandbox/.home-bob node bin/gtv.mjs daemon"

@@ -733,7 +733,7 @@ NP-Bench, Claim Plane, MPAC, CooperBench, STALE, MCP Agent Mail, Crystal/Palant�
 |---|---|
 | Hook Claude (HTTP → daemon), gồm khởi động `curl` | ~115–150 ms |
 | Hook Codex (shim `node bin/gtv.mjs hook`) | ~270 ms (khởi động Node ~160 ms) |
-| Edit → snapshot → server Docker → conflict L2 | ≤ 25 s (debounce 20 s) |
+| Edit → snapshot → server Docker → conflict L2 | ≤ 25 s (selftest đặt debounce 20 s; mặc định 5 phút) |
 
 ### 21.4 Chưa làm
 - Embedding + `sqlite-vec` cho KB (hiện chỉ có BM25).
@@ -759,7 +759,7 @@ NP-Bench, Claim Plane, MPAC, CooperBench, STALE, MCP Agent Mail, Crystal/Palant�
 
 ### 22.2 Tự kiểm thử trên repo thật
 Repo `gothinkster/node-express-realworld-example-app`, 2 dev (Claude/Codex giả lập bằng payload hook thật, daemon/git/Operator/Brain thật).
-Kết quả lần cuối: **21/21 check**, 3 job Brain (p50 ≈ 9,7 s), L2 phát hiện sau khoảng 23 s kể từ lần sửa (debounce snapshot 20 s). Báo cáo: `docs/reports/selftest-realworld.md`.
+Kết quả lần cuối: **21/21 check**, 3 job Brain (p50 ≈ 9,7 s), L2 phát hiện sau khoảng 23 s kể từ lần sửa (selftest đặt debounce snapshot 20 s). Báo cáo: `docs/reports/selftest-realworld.md`.
 
 Bug do self-test tìm ra và đã sửa:
 | Bug | Hậu quả | Sửa |

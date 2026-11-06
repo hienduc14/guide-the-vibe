@@ -57,7 +57,7 @@ Giới hạn: glob–glob khi một bên không có tiền tố tĩnh (vd `**/mi
 ### L1 — `detect.l1_merge` (`src/server/detect/l1.ts`)
 
 `git merge-tree --write-tree --name-only -z` giữa snapshot của mọi cặp workspace và giữa snapshot với `main` (kind `main`, warning, chỉ báo cho chủ snapshot). Dựa vào exit code (0 sạch, 1 conflict). Kết quả cache theo cặp sha.
-Giới hạn: chỉ thấy code đã được snapshot (daemon debounce 20 s; agent không có hook ⇒ không có snapshot).
+Giới hạn: chỉ thấy code đã được snapshot (daemon gửi khi agent Stop, hoặc 5 phút sau lần sửa cuối; agent không có hook ⇒ không có snapshot).
 
 ### L2 — `detect.l2_symbol` (`src/server/detect/l2.ts`, `src/codeintel/*`)
 

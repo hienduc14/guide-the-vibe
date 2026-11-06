@@ -24,7 +24,7 @@ export function loadDaemonConfig(): DaemonConfig {
     token: process.env.GTV_TOKEN ?? file.token,
     port: Number(process.env.GTV_DAEMON_PORT ?? file.port ?? 7391),
     remote: process.env.GTV_REMOTE ?? file.remote ?? "origin",
-    snapshotDebounceMs: Number(process.env.GTV_SNAPSHOT_DEBOUNCE_MS ?? file.snapshotDebounceMs ?? 20_000),
+    snapshotDebounceMs: Number(process.env.GTV_SNAPSHOT_DEBOUNCE_MS ?? file.snapshotDebounceMs ?? 300_000),
   };
 }
 

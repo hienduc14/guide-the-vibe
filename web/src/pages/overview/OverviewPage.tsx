@@ -89,7 +89,7 @@ export function OverviewPage() {
         title="Tổng quan"
         subtitle="Ai đang làm ở project nào, chỗ nào đang đụng nhau, và câu hỏi nào đang chờ người trả lời."
         actions={
-          <button className="btn primary" type="button" onClick={() => setAdding((v) => !v)}>
+          <button className="btn primary admin-only" type="button" onClick={() => setAdding((v) => !v)}>
             {adding ? "Đóng" : "Thêm project"}
           </button>
         }

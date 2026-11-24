@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { Db, parseJson } from "../../shared/db.ts";
 import { HUB_SCHEMA } from "./hub-db.ts";
+import { Accounts } from "./accounts.ts";
 import { ProjectRuntime, type ProjectRecord } from "../project/runtime.ts";
 import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
 import { PiBrain } from "../brain/pi.ts";
@@ -42,6 +43,7 @@ export class Hub {
   readonly db: Db;
   readonly cfg: ServerConfig;
   readonly brain: ProjectScopedBackend;
+  readonly accounts: Accounts;
   private runtimes = new Map<string, ProjectRuntime>();
   private opening = new Map<string, Promise<ProjectRuntime>>();
 
@@ -49,6 +51,7 @@ export class Hub {
     this.cfg = cfg;
     this.brain = brain;
     this.db = new Db(cfg.dataDir === ":memory:" ? ":memory:" : join(cfg.dataDir, "hub.db"), HUB_SCHEMA);
+    this.accounts = new Accounts(this.db);
   }
 
   async init(): Promise<void> {

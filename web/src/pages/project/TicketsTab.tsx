@@ -69,7 +69,7 @@ function Detail({ t, onReplied }: { t: Ticket; onReplied: () => void }) {
         )}
         {canReply && (
           <form
-            className="stack tight"
+            className="stack tight manage-only"
             onSubmit={async (e) => {
               e.preventDefault();
               const ok = await run(() => api.tickets.reply(id, t.id, answer.trim(), as.trim() || "admin"), "Đã gửi câu trả lời");

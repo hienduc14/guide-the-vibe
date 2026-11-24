@@ -58,7 +58,7 @@ function LayerRow({ l, blockedBy, onSet }: { l: Layer; blockedBy: string[]; onSe
         </div>
         {l.tripped && <span className="xs danger-text">Cầu dao: {l.tripped}. Đặt lại chế độ để bật lại.</span>}
       </div>
-      <div className="stack tight" style={{ alignItems: "flex-end" }}>
+      <div className="stack tight manage-only" style={{ alignItems: "flex-end" }}>
         <Segmented<FeatureMode>
           options={[
             { value: "off", label: "off", title: "Không chạy" },

@@ -23,6 +23,10 @@ import type {
   TeamState,
   Ticket,
   OAuthSession,
+  Me,
+  Role,
+  ShareLink,
+  User,
 } from "./types";
 
 const p = (id: string) => `/v1/p/${encodeURIComponent(id)}`;
@@ -40,6 +44,24 @@ export interface ProjectInput {
 
 export const api = {
   overview: () => get<Overview>("/api/overview"),
+
+  auth: {
+    me: () => get<Me>("/api/me"),
+    login: (name: string, password: string) => post<{ token: string; name: string; role: Role; expires_at: string }>("/api/login", { name, password }),
+    logout: () => post<{ ok: boolean }>("/api/logout"),
+  },
+
+  users: {
+    list: () => get<User[]>("/api/users"),
+    save: (name: string, input: { role?: Role; password?: string }) => put<User>(`/api/users/${encodeURIComponent(name)}`, input),
+    remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
+  },
+
+  shareLinks: {
+    list: (id: string) => get<ShareLink[]>(`${a(id)}/share-links`),
+    create: (id: string, label: string, days?: number) => post<ShareLink & { code: string }>(`${a(id)}/share-links`, { label, days }),
+    revoke: (id: string, linkId: string) => del<{ ok: boolean }>(`${a(id)}/share-links/${encodeURIComponent(linkId)}`),
+  },
 
   projects: {
     create: (input: ProjectInput) => post<ProjectSummary>("/api/projects", input),

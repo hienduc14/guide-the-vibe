@@ -5,7 +5,8 @@ import { Hono } from "hono";
 import type { Hub } from "../hub/hub.ts";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
-import { openMode } from "./auth.ts";
+import { bearer, openMode } from "./auth.ts";
+import type { Role } from "../hub/accounts.ts";
 import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
@@ -156,8 +157,55 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   const app = new Hono<Env>();
   const rt = (id: string) => hub.runtime(id);
 
+  // ---- dashboard accounts -------------------------------------------------------------
+
+  app.post("/login", async (c) => {
+    const { name, password } = (await c.req.json()) as { name?: string; password?: string };
+    const res = hub.accounts.login(String(name ?? ""), String(password ?? ""));
+    return c.json({ token: res.token, expires_at: res.expires_at, name: res.user.name, role: res.user.role });
+  });
+  app.post("/logout", (c) => {
+    const t = bearer(c);
+    if (t) hub.accounts.logout(t);
+    return c.json({ ok: true });
+  });
+  app.get("/me", (c) => {
+    const p = c.get("principal")!;
+    return c.json({ name: p.name, role: p.role, kind: p.kind, project: p.project ?? null, open_mode: openMode(hub), has_users: hub.accounts.hasUsers() });
+  });
+
+  app.get("/users", (c) => c.json(hub.accounts.users()));
+  app.put("/users/:name", async (c) => {
+    const body = (await c.req.json()) as { role?: Role; password?: string };
+    // Without GTV_ADMIN_TOKEN the first account is what locks the dashboard: it must be able to administer it.
+    if (!hub.cfg.adminToken && !hub.accounts.hasUsers() && body.role !== "admin")
+      throw new Error("the first account must be an admin (the server has no GTV_ADMIN_TOKEN)");
+    const me = c.get("principal")!;
+    if (me.kind === "user" && me.name === c.req.param("name") && body.role && body.role !== "admin") throw new Error("you cannot lower your own role");
+    return c.json(hub.accounts.saveUser(c.req.param("name"), body));
+  });
+  app.delete("/users/:name", (c) => {
+    const me = c.get("principal")!;
+    if (me.kind === "user" && me.name === c.req.param("name")) throw new Error("you cannot delete your own account");
+    hub.accounts.removeUser(c.req.param("name"));
+    return c.json({ ok: true });
+  });
+
   app.get("/overview", async (c) => {
+    const me = c.get("principal");
     const brainHealth = await hub.brain.health();
+    if (me?.kind === "share") {
+      // A share link sees its project and nothing about the server, developers' tokens or the brain's usage.
+      const live = hub.live(me.project!);
+      return c.json({
+        open_mode: false,
+        commit: null,
+        brain: { backend: hub.brain.name, model: null, ok: brainHealth.ok, detail: "" },
+        brain_stats: hub.brainStats({ project: "-", days: 1 }),
+        projects: live ? [summarize(live)] : [],
+        devs: [],
+      });
+    }
     const projects = [];
     for (const r of hub.records()) {
       const live = hub.live(r.id);
@@ -205,6 +253,18 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     const p = await rt(c.req.param("id"));
     await p.sync();
     return c.json({ last_sync: p.lastSync, main: p.engine.mainSha });
+  });
+
+  // Read-only links for showing a project to people outside the team.
+  app.get("/projects/:id/share-links", (c) => c.json(hub.accounts.shareLinks(c.req.param("id"))));
+  app.post("/projects/:id/share-links", async (c) => {
+    await rt(c.req.param("id"));
+    const body = (await c.req.json().catch(() => ({}))) as { label?: string; days?: number };
+    return c.json(hub.accounts.createShareLink(c.req.param("id"), { label: body.label, days: body.days, by: c.get("dev") }));
+  });
+  app.delete("/projects/:id/share-links/:link", (c) => {
+    hub.accounts.revokeShareLink(c.req.param("link"));
+    return c.json({ ok: true });
   });
 
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));

@@ -1,0 +1,43 @@
+/*
+ * Manager view (v0.8): role-gated controls, members, charter, task board, agent conversations, "needs attention".
+ * Built on the same tokens as the dispatch board.
+ */
+
+/* Controls a role may not use are hidden; the server refuses them anyway. */
+body:not([data-role="admin"]) .admin-only,
+body[data-role="viewer"] .manage-only {
+  display: none !important;
+}
+
+.input.sm,
+.select.sm {
+  min-height: 30px;
+  padding: 4px 8px;
+  width: auto;
+  font-size: var(--text-sm);
+}
+
+.share-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s4);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  margin-bottom: var(--s4);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--radius);
+  background: var(--sunken);
+  font-size: var(--text-xs);
+}
+.who b {
+  font-size: var(--text-sm);
+}

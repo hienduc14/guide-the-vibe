@@ -2,7 +2,7 @@
 //   /health                    liveness + brain status
 //   /v1/join, /j/:code         invite links (gtv join), no token needed
 //   /v1/projects, /v1/resolve  project discovery for daemons
-//   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard with admin token)
+//   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard callers by role)
 //   /api/*                     dashboard API
 //   /*                         dashboard (web/dist)
 
@@ -11,7 +11,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { Hub } from "../hub/hub.ts";
-import { adminAuth, devAuth, type AuthVars } from "./auth.ts";
+import { adminAuth, v1Auth, type AuthVars } from "./auth.ts";
 import { agentRoutes, type ProjectEnv } from "./agent-routes.ts";
 import { adminRoutes } from "./admin-routes.ts";
 
@@ -37,15 +37,7 @@ export function buildApp(hub: Hub): Hono {
 
   // Developers (and the dashboard with the admin token).
   const dev = new Hono<{ Variables: AuthVars }>();
-  dev.use("*", async (c, next) => {
-    const t = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") || c.req.query("token");
-    if (hub.cfg.adminToken && t === hub.cfg.adminToken) {
-      c.set("dev", c.req.header("x-gtv-dev") || "admin");
-      c.set("admin", true);
-      return next();
-    }
-    return devAuth(hub)(c, next);
-  });
+  dev.use("*", v1Auth(hub));
   dev.get("/projects", (c) =>
     c.json(hub.records().map((p) => ({ id: p.id, name: p.name, repo_url: p.repo_url.replace(/\/\/[^@/]+@/, "//***@"), main_branch: p.main_branch }))),
   );

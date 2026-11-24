@@ -338,3 +338,34 @@ export interface BrainInfo {
   models: string[];
   stats: BrainStats;
 }
+
+// ---- dashboard accounts -----------------------------------------------------------------
+
+export type Role = "admin" | "manager" | "viewer";
+
+export interface Me {
+  name: string;
+  role: Role;
+  kind: "admin_token" | "user" | "share" | "open";
+  project: string | null;
+  open_mode: boolean;
+  has_users: boolean;
+}
+
+export interface User {
+  name: string;
+  role: Role;
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface ShareLink {
+  id: string;
+  project: string;
+  label: string | null;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+  last_used: string | null;
+  code?: string;
+}

@@ -31,10 +31,10 @@ function DocView({ docId, onChanged }: { docId: string; onChanged: () => void })
           <StatusBadge doc status={data.status} />
           {data.status === "unverified" && (
             <>
-              <button className="btn sm primary" type="button" onClick={() => review("confirm")}>
+              <button className="btn sm primary manage-only" type="button" onClick={() => review("confirm")}>
                 Xác nhận
               </button>
-              <button className="btn sm danger" type="button" onClick={() => review("reject")}>
+              <button className="btn sm danger manage-only" type="button" onClick={() => review("reject")}>
                 Loại bỏ
               </button>
             </>
@@ -141,7 +141,7 @@ export function KnowledgeTab() {
             </button>
           )}
         </form>
-        <button className="btn" type="button" onClick={() => setAdding((v) => !v)}>
+        <button className="btn manage-only" type="button" onClick={() => setAdding((v) => !v)}>
           {adding ? "Đóng" : "Thêm tài liệu"}
         </button>
       </div>

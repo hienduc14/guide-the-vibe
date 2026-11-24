@@ -4,10 +4,11 @@ import { useOverview } from "../hooks/useOverview";
 import { useAuth } from "../hooks/useAuth";
 import { isLoaded } from "../api/types";
 import { Badge } from "./Badge";
+import { RoleBadge } from "../pages/users/UsersPage";
 
 function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const { data } = useOverview();
-  const { token, logout } = useAuth();
+  const { token, logout, me, can, shared } = useAuth();
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
   return (
     <aside className={`sidebar${open ? " open" : ""}`} onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate()}>
@@ -24,7 +25,7 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
           <Icon d="M3 4h10M3 8h7M3 12h10" />
           Tổng quan
         </NavLink>
-        <NavLink to="/brain" className={link}>
+        <NavLink to="/brain" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
           <Icon d="M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM8 5v3l2 1.5" />
           Brain
           <span
@@ -33,9 +34,13 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
             title={data?.brain.ok ? "Brain sẵn sàng" : "Brain chưa sẵn sàng"}
           />
         </NavLink>
-        <NavLink to="/devs" className={link}>
+        <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
           <Icon d="M5.5 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM2 13c0-2 1.6-3.5 3.5-3.5S9 11 9 13M11 7.5a1.7 1.7 0 1 0 0-3.4M12 9.6c1.2.4 2 1.6 2 3.4" />
           Developers
+        </NavLink>
+        <NavLink to="/users" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+          <Icon d="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4l5-2Z" />
+          Tài khoản
         </NavLink>
       </nav>
 
@@ -83,11 +88,21 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
             open dev mode
           </Badge>
         )}
-        {token && (
+        {me && me.kind !== "open" && (
+          <div className="who">
+            <span className="row" style={{ gap: 6 }}>
+              <b className="truncate">{me.name}</b>
+              <RoleBadge role={me.role} />
+            </span>
+            {shared && <span className="muted">Link xem chỉ đọc</span>}
+          </div>
+        )}
+        {token && !shared && (
           <button type="button" className="btn sm ghost" onClick={logout} style={{ alignSelf: "flex-start", paddingLeft: 0 }}>
             Đăng xuất
           </button>
         )}
+        {!can("admin") && me && !shared && <span className="xs faint">Brain, developer và tài khoản chỉ admin thấy.</span>}
       </div>
     </aside>
   );
@@ -120,6 +135,20 @@ function Icon({ d }: { d: string }) {
   );
 }
 
+function ShareBar() {
+  const { shared, leaveShare } = useAuth();
+  if (!shared) return null;
+  return (
+    <div className="share-bar">
+      <span>Bạn đang xem project qua link chia sẻ: chỉ đọc, không thay đổi được gì.</span>
+      <span className="spacer" />
+      <button type="button" className="btn sm" onClick={leaveShare}>
+        Thoát
+      </button>
+    </div>
+  );
+}
+
 export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -138,6 +167,7 @@ export function Layout() {
       <Sidebar open={open} onNavigate={() => setOpen(false)} />
       <main className="main">
         <div className="main-inner">
+          <ShareBar />
           <Outlet />
         </div>
       </main>

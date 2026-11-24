@@ -58,7 +58,7 @@ export function ProjectLayout() {
           { to: `/p/${id}/knowledge`, label: "Knowledge", count: c.kb_unverified },
           { to: `/p/${id}/graph`, label: "Code graph" },
           { to: `/p/${id}/stats`, label: "Thống kê" },
-          { to: `/p/${id}/settings`, label: "Cài đặt" },
+          { to: `/p/${id}/settings`, label: "Cài đặt", className: "manage-only" },
         ]}
       />
       <Outlet />

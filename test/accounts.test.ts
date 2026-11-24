@@ -1,0 +1,99 @@
+// Dashboard accounts (admin / manager / viewer) and read-only share links.
+
+import { test, after } from "node:test";
+import assert from "node:assert/strict";
+import { startServer, type Running } from "../src/server/main.ts";
+import { loadConfig } from "../src/server/config.ts";
+import { NullBrain } from "../src/server/brain/types.ts";
+import { makeOrigin, tempDir, type Origin } from "./helpers.ts";
+
+process.env.GTV_QUIET = "1";
+
+let srv: Running;
+let a: Origin;
+let b: Origin;
+const ADMIN = "admin-secret";
+
+async function call<T = any>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<{ status: number; json: T }> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (init.token) headers.authorization = `Bearer ${init.token}`;
+  const res = await srv.app.request(path, { method: init.method ?? "GET", headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
+  return { status: res.status, json: (await res.json()) as T };
+}
+
+const login = async (name: string, password: string) =>
+  (await call<{ token: string; role: string }>("/api/login", { method: "POST", body: { name, password } })).json;
+
+test("setup", async () => {
+  a = await makeOrigin({ "src/a.ts": "export const a = 1\n" });
+  b = await makeOrigin({ "src/b.ts": "export const b = 1\n" });
+  const cfg = loadConfig({ GTV_DATA: tempDir(), GTV_POLL_MS: "3600000", GTV_ADMIN_TOKEN: ADMIN } as NodeJS.ProcessEnv);
+  srv = await startServer(cfg, { brain: new NullBrain(), listen: false });
+  for (const [id, origin] of [
+    ["shop", a],
+    ["blog", b],
+  ] as const)
+    assert.equal((await call("/api/projects", { method: "POST", token: ADMIN, body: { id, repo_url: origin.bare } })).status, 200);
+});
+
+after(async () => {
+  await srv?.close();
+  a?.cleanup();
+  b?.cleanup();
+});
+
+test("users log in with a password and act by role", async () => {
+  assert.equal((await call("/api/users/mia", { method: "PUT", token: ADMIN, body: { role: "manager", password: "manager-pass" } })).status, 200);
+  assert.equal((await call("/api/users/vic", { method: "PUT", token: ADMIN, body: { role: "viewer", password: "viewer-pass" } })).status, 200);
+  assert.equal((await call("/api/login", { method: "POST", body: { name: "mia", password: "nope-nope" } })).status, 400);
+
+  const mia = await login("mia", "manager-pass");
+  const vic = await login("vic", "viewer-pass");
+  assert.match(mia.token, /^gtvs_/);
+  assert.equal((await call<any>("/api/me", { token: mia.token })).json.role, "manager");
+
+  // Everyone reads.
+  assert.equal((await call("/api/overview", { token: vic.token })).status, 200);
+  assert.equal((await call("/v1/p/shop/conflicts", { token: vic.token })).status, 200);
+  // Viewers change nothing; managers change project content; only admins manage the server.
+  assert.equal((await call("/api/projects/shop", { method: "PATCH", token: vic.token, body: { name: "x" } })).status, 403);
+  assert.equal((await call("/v1/p/shop/features", { method: "PUT", token: vic.token, body: { feature: "detect.l1_merge", mode: "off" } })).status, 403);
+  assert.equal((await call("/api/projects/shop", { method: "PATCH", token: mia.token, body: { name: "Shop" } })).status, 200);
+  assert.equal((await call("/v1/p/shop/features", { method: "PUT", token: mia.token, body: { feature: "detect.l1_merge", mode: "shadow" } })).status, 200);
+  assert.equal((await call("/api/devs", { method: "POST", token: mia.token, body: { name: "eve" } })).status, 403);
+  assert.equal((await call("/api/users", { token: mia.token })).status, 403);
+  assert.equal((await call("/api/brain/providers", { token: mia.token })).status, 403);
+  assert.equal((await call("/api/projects", { method: "POST", token: mia.token, body: { id: "x1", repo_url: a.bare } })).status, 403);
+
+  // Logout and password change end sessions.
+  await call("/api/logout", { method: "POST", token: vic.token });
+  assert.equal((await call("/api/overview", { token: vic.token })).status, 401);
+  await call("/api/users/mia", { method: "PUT", token: ADMIN, body: { password: "another-pass" } });
+  assert.equal((await call("/api/overview", { token: mia.token })).status, 401);
+  assert.equal((await call("/api/overview")).status, 401, "no token, no dashboard");
+});
+
+test("share links read one project and nothing else", async () => {
+  const link = await call<{ code: string; id: string }>("/api/projects/shop/share-links", { method: "POST", token: ADMIN, body: { label: "demo" } });
+  const code = link.json.code;
+  assert.match(code, /^gtvl_/);
+  const me = await call<any>("/api/me", { token: code });
+  assert.deepEqual([me.json.role, me.json.project], ["viewer", "shop"]);
+
+  const o = await call<any>("/api/overview", { token: code });
+  assert.deepEqual(
+    o.json.projects.map((p: any) => p.id),
+    ["shop"],
+  );
+  assert.deepEqual(o.json.devs, []);
+  assert.equal((await call("/api/projects/shop", { token: code })).status, 200);
+  assert.equal((await call("/v1/p/shop/state", { token: code })).status, 200);
+  assert.equal((await call("/api/projects/blog", { token: code })).status, 403);
+  assert.equal((await call("/v1/p/blog/state", { token: code })).status, 403);
+  assert.equal((await call("/api/devs", { token: code })).status, 403);
+  assert.equal((await call("/api/projects/shop/share-links", { token: code })).status, 403);
+  assert.equal((await call("/v1/p/shop/conflicts/x/ack", { method: "POST", token: code })).status, 403);
+
+  await call(`/api/projects/shop/share-links/${link.json.id}`, { method: "DELETE", token: ADMIN });
+  assert.equal((await call("/api/me", { token: code })).status, 401, "revoked");
+});

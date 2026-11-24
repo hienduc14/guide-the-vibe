@@ -7,6 +7,7 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { ShareLinksCard } from "./ShareLinksCard";
 
 /** "name: glob, glob" per line ⇄ { name: [glob, glob] } */
 const modulesToText = (m: Record<string, string[]>) =>
@@ -142,6 +143,8 @@ export function SettingsTab() {
         </form>
       </Card>
 
+      <ShareLinksCard id={id} />
+
       <div className="split">
         <Card title="Gửi ghi chú cho developer">
           <form
@@ -196,8 +199,8 @@ export function SettingsTab() {
                 {syncing ? "Đang sync…" : "Sync now"}
               </button>
             </div>
-            <hr className="sep" style={{ margin: 0 }} />
-            <div className="row between">
+            <hr className="sep admin-only" style={{ margin: 0 }} />
+            <div className="row between admin-only">
               <span className="small">Lưu trữ project: dừng theo dõi repo (dữ liệu vẫn giữ trên server).</span>
               <ConfirmButton
                 onConfirm={async () => {

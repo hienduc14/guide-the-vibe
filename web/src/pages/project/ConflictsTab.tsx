@@ -38,17 +38,17 @@ function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" |
       </div>
       <div className="row" style={{ alignSelf: "start" }}>
         {c.status === "open" && (
-          <button className="btn sm" type="button" onClick={() => onAct("ack")} title="Hai bên đã biết và đang phối hợp">
+          <button className="btn sm manage-only" type="button" onClick={() => onAct("ack")} title="Hai bên đã biết và đang phối hợp">
             Đã biết
           </button>
         )}
         {open && (
-          <button className="btn sm" type="button" onClick={() => onAct("dismiss")}>
+          <button className="btn sm manage-only" type="button" onClick={() => onAct("dismiss")}>
             Bỏ qua
           </button>
         )}
         {!open || c.status === "acked" ? (
-          <button className="btn sm ghost" type="button" onClick={() => onAct("reopen")}>
+          <button className="btn sm ghost manage-only" type="button" onClick={() => onAct("reopen")}>
             Mở lại
           </button>
         ) : null}

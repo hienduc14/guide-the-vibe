@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { api } from "../../api/endpoints";
-import { setToken } from "../../api/client";
+import { setShareToken, setToken } from "../../api/client";
 import { Field } from "../../components/Field";
 import { BrandMark } from "../../components/Layout";
 import { Segmented } from "../../components/Segmented";
@@ -30,7 +30,8 @@ export function LoginPage() {
     }
     setBusy(true);
     try {
-      setToken(null); // a stale token must not ride along with the login call
+      setToken(null); // stale tokens must not ride along with the login call
+      setShareToken(null);
       const res = await api.auth.login(name.trim(), password);
       login(res.token);
       window.location.reload();

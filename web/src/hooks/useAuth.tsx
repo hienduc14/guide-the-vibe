@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [me]);
 
   const login = useCallback((t: string) => {
+    setShareToken(null); // a share link's token would otherwise keep winning over the new login
     setToken(t);
     setTok(t);
     setNeedsLogin(false);

@@ -18,6 +18,7 @@
 | `qa.tier2_relay`              | on                         |                        | `tickets` (bậc 2)                     |
 | `qa.tier3_human`              | on                         |                        | `tickets` (bậc 3)                     |
 | `policy.ask`                  | on                         |                        |                                       |
+| `coord.priority`              | on                         |                        |                                       |
 | `notify.desktop`              | on                         |                        |                                       |
 | `brain`                       | on                         |                        | — (off khi `BRAIN_BACKEND=null`)      |
 
@@ -80,6 +81,18 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 - **qa.tier1_answer** — Brain trả lời (`ANSWER_SCHEMA`). `confidence: low` không được coi là câu trả lời. `shadow` = chạy Brain, ghi log, nhưng chuyển tiếp như chưa trả lời.
 - **qa.tier2_relay** — chuyển câu hỏi vào agent của `forward_to_dev` (message `ticket_question`).
 - **qa.tier3_human** — `escalate` hoặc quá `qa.tier2_timeout_min` ⇒ hỏi người (`human_request`, thông báo desktop, `gtv answer`); quá `qa.tier3_timeout_h` ⇒ `expired`.
+
+## Góc nhìn manager (v0.8, SPEC mục 25)
+
+- **Tài khoản và role** (`src/server/hub/accounts.ts`) — `admin` / `manager` / `viewer` đăng nhập bằng tên + mật khẩu (trang **Tài khoản**, chỉ admin). **Link xem chỉ đọc** cho một project (Cài đặt › Link xem chỉ đọc) để trình bày cho người ngoài nhóm. Bảng quyền: [api.md](api.md#tài-khoản-dashboard-và-role-v08).
+- **Thành viên** (tab **Thành viên**) — dev tự thành thành viên khi mở agent lần đầu; manager đặt vai trò (backend, tech lead, …) và level (`intern` < `junior` < `mid` < `senior` < `lead`). Agent thấy danh sách nhóm trong briefing.
+- **Tiêu chí project** (thẻ đầu trang Tổng quan) — mục tiêu, người dùng, hạn chót, mức chất lượng, công nghệ, mốc, ràng buộc, ngoài phạm vi. Đưa vào briefing, `gtv_status`, prompt trả lời câu hỏi và prompt L3 (`charterText` trong `src/shared/types.ts`).
+- **Bảng việc** (tab **Việc**, `src/server/project/board.ts`) — việc có ưu tiên (`urgent/high/normal/low`), hạn, ước lượng, người nhận; giao việc ⇒ agent của người nhận có tin. Agent: `gtv_tasks`, `gtv_pick_task`, `gtv_log_work`, skill `/gtv` (Codex: `$gtv`). Đăng ký nối vào việc đã nhận, không có thì tự tạo việc. Trạng thái: đăng ký → _Đang làm_; conflict high/critical chưa ack → _Bị chặn_; `gtv_finish_task` → _Chờ merge_; code vào main → _Xong_. Mọi thay đổi ghi vào nhật ký của việc.
+- **coord.priority** (`src/server/project/coord.ts`) — tin conflict gửi mỗi bên kèm việc của hai bên (ưu tiên, hạn, vai trò, level) và lời khuyên: bên đứng sau (ưu tiên thấp hơn → hạn muộn hơn → level thấp hơn) tạm dừng phần đụng nhau hoặc tìm workaround và hỏi bên kia; bên đứng trước tiếp tục nhưng báo trước khi đổi thứ người kia dùng. Câu hỏi chuyển tiếp ghi việc người hỏi đang làm. **Chỉ là lời khuyên**: không dừng agent nào, high/critical vẫn hỏi người. `shadow` = ghi `priority_advice` vào log, không chèn vào tin.
+- **Trao đổi** (tab **Trao đổi**, `src/server/project/conversations.ts`) — mọi tin vào agent gom thành luồng chat: câu hỏi → chuyển tiếp → trả lời; conflict → tin mỗi bên → ack; giao việc; ghi chú của lead. Manager nhắn thẳng vào agent của người trong luồng.
+- **Cần xử lý** (trang Tổng quan) — conflict high/critical chưa ack, câu hỏi chờ người, câu hỏi chuyển tiếp quá 15 phút chưa ai trả lời, việc quá hạn, bị chặn, việc gấp chưa ai nhận.
+
+Xem thử với dữ liệu mẫu (không gọi LLM): `npm run demo` → `http://localhost:7395`.
 
 ## Hệ thống
 

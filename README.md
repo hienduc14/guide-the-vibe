@@ -122,6 +122,23 @@ Developers keep prompting their agent as before. The agent registers its task, r
 Operator when it needs to. The first time, Claude Code asks to approve the `gtv` MCP server, and Codex asks to trust
 the project and review its hooks.
 
+## For team leads
+
+The dashboard also works as the team's project view:
+
+- **Accounts and roles.** Admins create accounts for managers and viewers. A read-only link shows one project to
+  people outside the team.
+- **Charter.** What the project is for: goal, users, deadline, quality bar, stack and limits. Agents read it and
+  choose solutions that fit.
+- **Task board.** Plan work with priority, due date and assignee. Developers type `/gtv` in their agent to see and
+  pick tasks. Status follows the real work: in progress, blocked by a conflict, waiting for merge, done.
+- **Priority-aware coordination.** When work collides, both agents hear what the other is doing and which task goes
+  first. The lower-priority side is advised to pause or work around. Nobody's agent is stopped.
+- **Conversations and attention.** Agent-to-agent questions and conflict notices read as chat threads. The project
+  page lists what needs a person now.
+
+`npm run demo` starts a local server with sample data, no LLM needed: http://localhost:7395.
+
 ## Try it on one machine
 
 The sandbox creates a sample repository with two clones, `alice` (Claude Code) and `bob` (Codex). Each clone has

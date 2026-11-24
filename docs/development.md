@@ -28,6 +28,7 @@ Dashboard dev: `npm run web:dev` → `http://localhost:5173` (proxy về `GTV_SE
 | `test`, `typecheck`                   |                                                     |
 | `web:install`, `web:dev`, `web:build` | dashboard                                           |
 | `sandbox`                             | tạo sandbox mini-shop                               |
+| `demo`                                | server local có dữ liệu mẫu (port 7395, không LLM)  |
 | `selftest:realworld`                  | self-test trên RealWorld ([testing.md](testing.md)) |
 | `build:npm`                           | đóng gói CLI cho dev thành `dist/npm` (xem dưới)    |
 

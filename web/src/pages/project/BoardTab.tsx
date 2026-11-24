@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/endpoints";
 import type { BoardInput, BoardStatus, BoardView, Priority } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
@@ -143,7 +144,9 @@ export function BoardTab() {
   const { can } = useAuth();
   const { data, reload } = usePoll(() => api.board.list(id, "all"), [id], 5000);
   const [adding, setAdding] = useState(false);
-  const [open, setOpen] = useState<string>();
+  const [params, setParams] = useSearchParams();
+  const open = params.get("task") ?? undefined;
+  const setOpen = (task?: string) => setParams(task ? { task } : {}, { replace: true });
   const [who, setWho] = useState("");
   if (!data) return <Loading />;
 

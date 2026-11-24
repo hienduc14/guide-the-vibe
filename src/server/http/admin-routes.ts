@@ -11,6 +11,7 @@ import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
+import { attention, conversations } from "../project/conversations.ts";
 
 type Env = { Variables: AuthVars };
 
@@ -89,6 +90,8 @@ export function summarize(rt: ProjectRuntime) {
       overdue: items.filter((t) => t.overdue).length,
       blocked: items.filter((t) => t.blocked).length,
     },
+    charter: rt.record.charter ?? {},
+    attention: attention(rt.engine).length,
     members: store.members(),
     people: [...people.values()]
       .map((p) => ({ ...p, agents: [...p.agents], workspaces: [...p.workspaces] }))
@@ -305,6 +308,11 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({ ok: true });
   });
 
+  app.get("/projects/:id/conversations", async (c) =>
+    c.json(conversations((await rt(c.req.param("id"))).engine, Math.min(200, Number(c.req.query("limit") ?? 40)))),
+  );
+  app.get("/projects/:id/attention", async (c) => c.json(attention((await rt(c.req.param("id"))).engine)));
+
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));
   app.get("/projects/:id/stats", async (c) => c.json(stats(hub, await rt(c.req.param("id")), Number(c.req.query("days") ?? 7))));
   app.get("/projects/:id/layers", async (c) => c.json(layers(await rt(c.req.param("id")))));
@@ -322,9 +330,16 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   /** Manual note into a developer's agents (delivered at their next tool call). */
   app.post("/projects/:id/messages", async (c) => {
     const p = await rt(c.req.param("id"));
-    const body = (await c.req.json()) as { to_dev: string; body: string };
+    const body = (await c.req.json()) as { to_dev: string; body: string; ref_id?: string };
     if (!body.to_dev || !body.body?.trim()) throw new Error("to_dev and body are required");
-    const m = p.engine.store.addMessage({ to_dev: body.to_dev, kind: "info", body: `[gtv note from the team lead] ${body.body}` });
+    const by = c.get("dev");
+    const m = p.engine.store.addMessage({
+      to_dev: body.to_dev,
+      kind: "info",
+      from_dev: by,
+      ref_id: body.ref_id,
+      body: `[gtv note from ${by === "admin" ? "the team lead" : `${by} (team lead)`}${body.ref_id ? ` about ${body.ref_id}` : ""}] ${body.body}`,
+    });
     p.engine.store.logEvent("manual_message", "admin", m);
     return c.json(m);
   });

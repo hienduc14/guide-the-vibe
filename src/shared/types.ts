@@ -135,6 +135,8 @@ export interface Ticket {
 
 export interface Message {
   id: string;
+  /** Who it is from: a developer (their agent), "operator" (the brain), "gtv" (detectors), or a dashboard user. */
+  from_dev?: string;
   to_dev: string;
   to_workspace?: string;
   to_session?: string;

@@ -37,6 +37,19 @@ function ProjectRow({ p }: { p: ProjectEntry }) {
           </span>
           {syncFailed ? <span className="danger-text">sync lỗi</span> : p.last_sync && <span>sync {ago(p.last_sync.at)}</span>}
         </div>
+        {p.charter?.goal && <span className="small muted truncate">{p.charter.goal}</span>}
+        {p.board.total > 0 && (
+          <div className="progress-line" title={`${p.board.done}/${p.board.total} việc xong`}>
+            <span className="progress">
+              <i style={{ width: `${Math.round((p.board.done / p.board.total) * 100)}%` }} />
+            </span>
+            <span className="xs muted" style={{ whiteSpace: "nowrap" }}>
+              {p.board.done}/{p.board.total} việc
+              {p.board.overdue > 0 && <span className="danger-text"> · {p.board.overdue} quá hạn</span>}
+              {p.charter?.deadline && <> · hạn {new Date(p.charter.deadline).toLocaleDateString("vi-VN")}</>}
+            </span>
+          </div>
+        )}
       </div>
       <div className="people">
         {active.length === 0 ? (
@@ -64,6 +77,11 @@ function ProjectRow({ p }: { p: ProjectEntry }) {
           ))
         )}
         {p.counts.tickets_waiting > 0 && <Badge tone="warning">{p.counts.tickets_waiting} câu hỏi chờ</Badge>}
+        {p.attention > 0 && (
+          <Badge tone="high" title="Mục cần người xử lý: conflict nghiêm trọng, câu hỏi chờ, việc trễ hoặc bị chặn">
+            {p.attention} cần xử lý
+          </Badge>
+        )}
       </div>
     </Link>
   );

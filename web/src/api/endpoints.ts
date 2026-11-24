@@ -3,6 +3,8 @@
 import { del, get, patch, post, put } from "./client";
 import type {
   ActivityEvent,
+  AttentionItem,
+  Thread,
   BrainInfo,
   BrainProvider,
   CallerHit,
@@ -99,7 +101,9 @@ export const api = {
     layers: (id: string) => get<Layer[]>(`${a(id)}/layers`),
     activity: (id: string, limit = 60, type?: string) =>
       get<ActivityEvent[]>(`${a(id)}/activity?limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),
-    message: (id: string, to_dev: string, body: string) => post(`${a(id)}/messages`, { to_dev, body }),
+    message: (id: string, to_dev: string, body: string, ref_id?: string) => post(`${a(id)}/messages`, { to_dev, body, ref_id }),
+    conversations: (id: string, limit = 40) => get<Thread[]>(`${a(id)}/conversations?limit=${limit}`),
+    attention: (id: string) => get<AttentionItem[]>(`${a(id)}/attention`),
   },
 
   conflicts: {

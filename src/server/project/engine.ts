@@ -53,6 +53,7 @@ export class Engine {
   constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig }) {
     this.db = opts.db;
     opts.db.ensureColumn("tasks", "board_id", "TEXT");
+    opts.db.ensureColumn("messages", "from_dev", "TEXT");
     this.store = new Store(opts.db);
     this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);

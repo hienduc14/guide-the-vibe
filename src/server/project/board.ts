@@ -302,6 +302,7 @@ export class Board {
       to_dev: t.assignee!,
       kind: "info",
       ref_id: t.id,
+      from_dev: by,
       body: `[gtv task ${t.id} assigned to you by ${by} · priority ${t.priority}${t.due_date ? ` · due ${t.due_date}` : ""}] ${t.title}${t.description ? `\n${truncate(t.description, 400)}` : ""}\nWhen you start it, pick it with gtv_pick_task (task_id "${t.id}").`,
     });
   }

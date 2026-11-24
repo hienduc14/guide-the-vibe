@@ -335,7 +335,7 @@ export class Store extends EventEmitter {
   // ---- messages -----------------------------------------------------------------
 
   addMessage(m: Omit<Message, "id" | "created_at">): Message {
-    const msg: Message = { ...m, id: newId("msg"), created_at: nowIso() };
+    const msg: Message = { ...m, from_dev: m.from_dev ?? "gtv", id: newId("msg"), created_at: nowIso() };
     this.db.upsert("messages", msg as unknown as Record<string, unknown>);
     this.emit("message", msg);
     return msg;

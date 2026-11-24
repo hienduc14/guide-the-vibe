@@ -178,3 +178,32 @@ test("conflict notices carry both tasks' priority and tell the lower-priority si
   const plain = pending("bob").find((m) => m.kind === "conflict");
   assert.ok(plain && !/goes first/.test(plain.body));
 });
+
+test("conversations: question, forward and answer read as one thread; leads see what needs attention", async () => {
+  const t = await call<any>("/v1/p/shop/tickets", {
+    method: "POST",
+    dev: "alice",
+    body: { session_id: sessions.alice, question: "Can I change total() to take a Cart?", to_dev: "bob" },
+  });
+  await call(`/v1/p/shop/tickets/${t.json.id}/reply`, { method: "POST", dev: "bob", body: { answer: "Yes, after Friday", session_id: sessions.bob } });
+  await call("/api/projects/shop/messages", { method: "POST", body: { to_dev: "bob", body: "Please review alice's PR" } });
+
+  const threads = (await call<any[]>("/api/projects/shop/conversations")).json;
+  const q = threads.find((x) => x.id === t.json.id);
+  assert.deepEqual(
+    q.entries.map((e: any) => [e.kind, e.from, e.to]),
+    [
+      ["question", "alice", "bob"],
+      ["forward", "alice", "bob"],
+      ["answer", "bob", "alice"],
+    ],
+  );
+  assert.match(q.entries[1].body, /^Can I change total\(\) to take a Cart\?$/);
+  assert.ok(threads.some((x) => x.kind === "conflict" && x.participants.includes("alice") && x.participants.includes("bob")));
+  assert.ok(threads.some((x) => x.kind === "task" && x.title === "Hotfix totals"));
+  const note = threads.find((x) => x.id === "note:bob");
+  assert.equal(note.entries[0].from, "admin");
+
+  const att = (await call<any[]>("/api/projects/shop/attention")).json;
+  assert.ok(att.some((a) => a.kind === "overdue" && /Fix checkout total/.test(a.title)));
+});

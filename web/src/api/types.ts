@@ -54,6 +54,8 @@ export interface ProjectSummary {
     tickets_waiting: number;
     kb_unverified: number;
   };
+  charter: Charter;
+  attention: number;
   board: { total: number; done: number; open: number; in_progress: number; overdue: number; blocked: number };
   members: Member[];
   people: Person[];
@@ -456,4 +458,36 @@ export interface BoardInput {
   assignee?: string | null;
   status?: BoardStatus;
   labels?: string[];
+}
+
+// ---- conversations & attention --------------------------------------------------------------
+
+export interface ChatEntry {
+  id: string;
+  from: string;
+  to: string | null;
+  at: string;
+  kind: string;
+  body: string;
+}
+
+export interface Thread {
+  id: string;
+  kind: "question" | "conflict" | "task" | "note";
+  title: string;
+  status: string;
+  level?: Level;
+  participants: string[];
+  started_at: string;
+  updated_at: string;
+  entries: ChatEntry[];
+}
+
+export interface AttentionItem {
+  kind: "conflict" | "question" | "overdue" | "blocked" | "unassigned" | "stale";
+  level: Level;
+  title: string;
+  detail: string;
+  ref: string;
+  at: string;
 }

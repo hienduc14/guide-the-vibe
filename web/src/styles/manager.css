@@ -328,3 +328,240 @@ body[data-role="viewer"] .manage-only {
     scroll-snap-align: start;
   }
 }
+
+/* ---- conversations ------------------------------------------------------------------------- */
+
+.convo {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: var(--s3);
+  min-height: 520px;
+}
+.convo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.thread-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  min-width: 0;
+}
+.thread-row:hover {
+  background: var(--hover);
+}
+.thread-row.active {
+  background: var(--accent-soft);
+}
+.thread-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.kind-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--faint);
+}
+.kind-dot.k-question {
+  background: var(--accent);
+}
+.kind-dot.k-task {
+  background: var(--ok);
+}
+.kind-dot.k-conflict {
+  background: var(--warning);
+}
+.kind-dot.lvl-high,
+.kind-dot.lvl-critical {
+  background: var(--high);
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.chat-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--sunken);
+}
+.bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  max-width: 85%;
+}
+.bubble-row.right {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.bubble-row.mid {
+  align-self: center;
+  max-width: 92%;
+}
+.bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--s2) var(--s3);
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.bubble.left {
+  border-bottom-left-radius: 4px;
+}
+.bubble.right {
+  border-bottom-right-radius: 4px;
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+}
+.bubble.mid {
+  border-radius: var(--radius);
+  background: var(--surface);
+  border-style: dashed;
+}
+.bubble.mid.k-conflict {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--line));
+  border-style: solid;
+}
+.bubble.k-human {
+  border-color: var(--high);
+}
+.bubble-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.bubble-meta b {
+  color: var(--fg);
+}
+.bubble-text {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-event {
+  align-self: center;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  padding: 2px var(--s3);
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.chat-compose {
+  display: flex;
+  gap: var(--s2);
+  padding: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.chat-compose .input:not(.sm) {
+  flex: 1;
+}
+
+/* ---- needs attention + project overview ---------------------------------------------------- */
+
+.attention {
+  display: flex;
+  flex-direction: column;
+}
+.attention-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--s3);
+  align-items: start;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.attention-item:last-child {
+  border-bottom: 0;
+}
+.attention-item:hover {
+  background: var(--hover);
+}
+.attention-item .what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.attention-item .what span {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.attention-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s4);
+  color: var(--ok);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.overview-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--s4);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .convo,
+  .overview-cols {
+    grid-template-columns: 1fr;
+  }
+  .convo-list {
+    max-height: 260px;
+  }
+}

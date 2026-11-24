@@ -28,6 +28,7 @@ Dashboard dev: `npm run web:dev` → `http://localhost:5173` (proxy về `GTV_SE
 | `test`, `typecheck`                   |                                                     |
 | `web:install`, `web:dev`, `web:build` | dashboard                                           |
 | `sandbox`                             | tạo sandbox mini-shop                               |
+| `demo`                                | server local có dữ liệu mẫu (port 7395, không LLM)  |
 | `selftest:realworld`                  | self-test trên RealWorld ([testing.md](testing.md)) |
 | `build:npm`                           | đóng gói CLI cho dev thành `dist/npm` (xem dưới)    |
 
@@ -52,7 +53,7 @@ Phát hành: tăng `version` trong `package.json`, rồi `npm run build:npm && n
 
 1. Thêm key vào `FEATURES` trong `src/shared/features.ts` (`default`, `requires?`, `description`).
 2. Kiểm tra mode trong code: `engine.mode("key")` / `isActive(...)`; bọc phần có thể lỗi bằng `engine.guarded("key", fn)` để có cầu dao.
-3. (Tùy) metric trong `layers()` của `src/server/http/admin-routes.ts` và nhãn trong `web/src/pages/project/LayersTab.tsx`.
+3. (Tùy) metric trong `layers()` của `src/server/http/admin-routes.ts` và nhãn trong `web/src/pages/project/LayersTab.tsx` (**Khác › Lớp phát hiện**).
 
 ### Thêm một lớp phát hiện
 

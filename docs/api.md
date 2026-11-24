@@ -13,6 +13,21 @@ Kiểu dữ liệu chung: `src/shared/types.ts`. Dashboard sao chép ở `web/sr
 
 Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](operations.md#token)).
 
+### Tài khoản dashboard và role (v0.8)
+
+Ngoài admin token, dashboard nhận **phiên đăng nhập** `gtvs_…` (`POST /api/login`) và **link chia sẻ** `gtvl_…`
+(`/s/<code>` trên dashboard). Role quyết định quyền (`apiRoleFor` trong `auth.ts`):
+
+| Role      | `/api`                                                                                   | `/v1/p/:project`                         |
+| --------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `viewer`  | mọi `GET`                                                                                | mọi `GET`                                |
+| `manager` | + sửa nội dung project (`PATCH /projects/:id`, members, share-links, messages)           | + mọi thao tác (board, ack, feature, kb) |
+| `admin`   | + `/users`, `/brain/*`, ghi `/devs`, tạo / lưu trữ project                               | như manager                              |
+| link      | chỉ `GET /me`, `GET /overview` (lọc còn 1 project) và `GET /projects/<project>/…` của nó | chỉ `GET` của project đó                 |
+
+Thiếu quyền → 403. Thao tác của người dùng dashboard trên `/v1` được ghi dưới tên của họ (không gửi `X-Gtv-Dev`).
+Không có `GTV_ADMIN_TOKEN`: dashboard mở cho tới khi có tài khoản đầu tiên (phải là admin).
+
 ## Khám phá project (dev)
 
 | Method | Path                       | Mô tả                                                                                  |
@@ -96,7 +111,44 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 | GET    | `/graph/callers?q=&view=`             | `[{ symbol, callers: [{path, line, kind, from_symbol, confidence}] }]`                 |
 | GET    | `/graph/stats`                        | `{ base: {files, symbols, refs}, main }`                                               |
 
+### Bảng task, thành viên (v0.8)
+
+| Method               | Path               | Mô tả                                                                                                                                                                                   |
+| -------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET                  | `/board?scope=`    | `open` (mặc định) \| `all` \| `mine` → `[BoardView]`, gấp nhất trước (bị chặn, quá hạn, ưu tiên, hạn). `BoardView = BoardTask + { work[], conflicts[], blocked, overdue, notes_count }` |
+| POST                 | `/board`           | `{ title, description?, priority?: urgent\|high\|normal\|low, due_date?: YYYY-MM-DD, estimate_h?, assignee?, labels? }`; có `assignee` ⇒ agent của người đó nhận tin                    |
+| GET / PATCH / DELETE | `/board/:id`       | chi tiết `+ { notes[], registrations[] }` / sửa (mọi thay đổi ghi vào nhật ký) / xoá                                                                                                    |
+| POST                 | `/board/:id/notes` | `{ body }` → ghi chú vào nhật ký                                                                                                                                                        |
+| POST                 | `/board/:id/pick`  | `{ session_id }` → agent nhận việc (gán cho dev, `in_progress`); việc đã giao cho người khác → 400                                                                                      |
+| GET                  | `/members`         | `[{ dev, role, level: intern\|junior\|mid\|senior\|lead, note }]`                                                                                                                       |
+
+### Tài liệu, sơ đồ code (v0.8)
+
+| Method         | Path                                             | Mô tả                                                                                                                                                                      |
+| -------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST           | `/kb`                                            | `{ title, body, type?, pinned?, path? }` (≤ 400 000 ký tự)                                                                                                                 |
+| PATCH / DELETE | `/kb/:id`                                        | `{ title?, body?, type?, pinned? }` (tài liệu từ repo: chỉ `type`, `pinned`) / xoá (không xoá được tài liệu từ repo → 400)                                                 |
+| GET            | `/kb?core=1`                                     | tài liệu cốt lõi (không kèm nội dung)                                                                                                                                      |
+| GET            | `/graph/map?view=&level=dir\|file&depth=&focus=` | `{ level, depth, truncated, nodes: [{ id, label, kind, files, symbols, lang?, editing: [dev], scoped: [dev], conflicts: [level] }], edges: [{ source, target, weight }] }` |
+| GET            | `/graph/calls?q=&view=`                          | `{ center, nodes: [{ id, label, kind, path, line, role: center\|caller\|callee, sig? }], edges: [{ source, target, confidence }] }`                                        |
+
+`POST /tasks` nhận thêm `board_id?`. Không có thì nối vào việc phiên này vừa nhận, hoặc tạo việc mới (`source: "agent"`).
+Trạng thái việc đi theo đăng ký: đăng ký → `in_progress`; `gtv_finish_task` → `review`; abandoned → `todo`; code vào main → `done`.
+
 ## Admin API — `/api` (dashboard)
+
+| Method           | Path                                 | Mô tả                                                                                                                                   |
+| ---------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| POST             | `/login`                             | **Không cần token**: `{ name, password }` → `{ token: gtvs_…, name, role, expires_at }` (14 ngày)                                       |
+| POST / GET       | `/logout`, `/me`                     | huỷ phiên / `{ name, role, kind: admin_token\|user\|share\|open, project, open_mode, has_users }`                                       |
+| GET / PUT / DEL  | `/users`, `/users/:name`             | admin: liệt kê / tạo hoặc sửa `{ role?, password? }` (đổi mật khẩu hoặc role ⇒ đăng xuất mọi nơi) / xoá                                 |
+| GET / POST / DEL | `/projects/:id/share-links[/:link]`  | link xem chỉ đọc: liệt kê / tạo `{ label?, days? }` → `{ …, code }` (hiện 1 lần) / thu hồi                                              |
+| GET / PUT / DEL  | `/projects/:id/members[/:dev]`       | thành viên: `{ role?, level?, note? }`                                                                                                  |
+| GET              | `/projects/:id/conversations?limit=` | `[Thread]`: luồng trao đổi (question \| conflict \| task \| note) với `entries: [{ from, to, at, kind, body }]`                         |
+| GET              | `/projects/:id/attention`            | `[{ kind, level, title, detail, ref, at }]`: conflict high/critical chưa ack, câu hỏi chờ người, việc quá hạn / bị chặn / gấp chưa giao |
+
+`PATCH /projects/:id` nhận thêm `charter: { goal?, users?, deadline?, milestones?, stack?: string[], constraints?, non_goals?, quality?: prototype\|mvp\|production, notes? }`.
+`POST /projects/:id/messages` nhận thêm `ref_id?` (gắn tin vào một luồng trao đổi).
 
 | Method               | Path                                       | Mô tả                                                                                                                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -122,7 +174,7 @@ Quy tắc chế độ mở: `src/server/http/auth.ts` (xem [operations.md](opera
 | DELETE               | `/brain/oauth/sessions/:id`                | huỷ đăng nhập → `{ ok: true }`. Đăng xuất = `DELETE /brain/providers/:id/key`                                                                                                                                                                                                                     |
 | POST / DELETE        | `/brain/endpoints`, `/brain/endpoints/:id` | `{ id, name?, base_url, api?: openai-completions\|anthropic-messages, key? }` → thêm / xoá endpoint                                                                                                                                                                                               |
 
-Summary của project: `{ id, name, repo_url, main_branch, main_sha, last_sync, counts: { people_active, sessions_active, tasks_active, conflicts_open, conflicts_by_level, tickets_waiting, kb_unverified }, people: [{ dev, status, agents, workspaces, last_seen, tasks, editing, conflicts }] }`.
+Summary của project: `{ id, name, repo_url, main_branch, main_sha, last_sync, counts: { people_active, sessions_active, tasks_active, conflicts_open, conflicts_by_level, tickets_waiting, kb_unverified }, board: { total, done, open, in_progress, overdue, blocked }, charter, attention, members, people: [{ dev, role, level, status, agents, workspaces, last_seen, tasks, editing, conflicts }] }`.
 
 ## Tool chỉ-đọc của Brain (trong tiến trình, không có endpoint HTTP)
 
@@ -163,14 +215,18 @@ Brain (Pi) gọi các tool này **trực tiếp** trên `Engine` của project �
 
 Phục vụ bởi `gtv mcp` (Claude, Codex); tất cả chuyển tới `POST /api/:tool` của daemon.
 
-| Tool                | Tham số                                              |
-| ------------------- | ---------------------------------------------------- |
-| `gtv_register_task` | `title, goal?, resources[]`                          |
-| `gtv_update_task`   | `title?, goal?, add_resources?, resources?, status?` |
-| `gtv_finish_task`   | `status?: done\|abandoned`                           |
-| `gtv_ask`           | `question, context?, to_dev?`                        |
-| `gtv_reply`         | `ticket_id, answer, escalate?`                       |
-| `gtv_status`        | —                                                    |
-| `gtv_check`         | `paths?, symbols?`                                   |
-| `gtv_inbox`         | —                                                    |
-| `gtv_ack`           | `conflict_id`                                        |
+| Tool                | Tham số                                                   |
+| ------------------- | --------------------------------------------------------- |
+| `gtv_register_task` | `title, goal?, resources[], board_task_id?`               |
+| `gtv_tasks`         | `mine?` — bảng việc đang mở, gấp nhất trước               |
+| `gtv_pick_task`     | `task_id` — nhận việc trên bảng                           |
+| `gtv_log_work`      | `note, task_id?` — ghi nhật ký cho việc đang làm          |
+| `gtv_docs`          | `query?, id?` — tài liệu cốt lõi / tìm / đọc một tài liệu |
+| `gtv_update_task`   | `title?, goal?, add_resources?, resources?, status?`      |
+| `gtv_finish_task`   | `status?: done\|abandoned`                                |
+| `gtv_ask`           | `question, context?, to_dev?`                             |
+| `gtv_reply`         | `ticket_id, answer, escalate?`                            |
+| `gtv_status`        | —                                                         |
+| `gtv_check`         | `paths?, symbols?`                                        |
+| `gtv_inbox`         | —                                                         |
+| `gtv_ack`           | `conflict_id`                                             |

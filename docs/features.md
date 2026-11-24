@@ -1,7 +1,7 @@
 # Feature và layer
 
 Định nghĩa: `src/shared/features.ts`. Mỗi feature có mode `off | shadow | on` (xem [architecture.md](architecture.md#feature-mode-và-cầu-dao)).
-Đổi mode: dashboard (tab **Layers**), `gtv features set <key> <mode|default>`, `PUT /v1/p/:id/features`, hoặc `features:` trong `docker/gtv.config.yml` (áp cho mọi project).
+Đổi mode: dashboard (**Khác › Lớp phát hiện**), `gtv features set <key> <mode|default>`, `PUT /v1/p/:id/features`, hoặc `features:` trong `docker/gtv.config.yml` (áp cho mọi project).
 
 | Key                           | Mặc định                   | Cần                    | Metric trên dashboard                 |
 | ----------------------------- | -------------------------- | ---------------------- | ------------------------------------- |
@@ -18,6 +18,7 @@
 | `qa.tier2_relay`              | on                         |                        | `tickets` (bậc 2)                     |
 | `qa.tier3_human`              | on                         |                        | `tickets` (bậc 3)                     |
 | `policy.ask`                  | on                         |                        |                                       |
+| `coord.priority`              | on                         |                        |                                       |
 | `notify.desktop`              | on                         |                        |                                       |
 | `brain`                       | on                         |                        | — (off khi `BRAIN_BACKEND=null`)      |
 
@@ -80,6 +81,23 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 - **qa.tier1_answer** — Brain trả lời (`ANSWER_SCHEMA`). `confidence: low` không được coi là câu trả lời. `shadow` = chạy Brain, ghi log, nhưng chuyển tiếp như chưa trả lời.
 - **qa.tier2_relay** — chuyển câu hỏi vào agent của `forward_to_dev` (message `ticket_question`).
 - **qa.tier3_human** — `escalate` hoặc quá `qa.tier2_timeout_min` ⇒ hỏi người (`human_request`, thông báo desktop, `gtv answer`); quá `qa.tier3_timeout_h` ⇒ `expired`.
+
+## Góc nhìn manager (v0.8, SPEC mục 25)
+
+- **Tài khoản và role** (`src/server/hub/accounts.ts`) — `admin` / `manager` / `viewer` đăng nhập bằng tên + mật khẩu (trang **Tài khoản**, chỉ admin). **Link xem chỉ đọc** cho một project (Cài đặt › Link xem chỉ đọc) để trình bày cho người ngoài nhóm. Bảng quyền: [api.md](api.md#tài-khoản-dashboard-và-role-v08).
+- **Thành viên** (**Khác › Thành viên**) — dev tự thành thành viên khi mở agent lần đầu; manager đặt vai trò (backend, tech lead, …) và level (`intern` < `junior` < `mid` < `senior` < `lead`). Agent thấy danh sách nhóm trong briefing.
+- **Tiêu chí project** (dải đầu trang Tổng quan, bấm _Chi tiết_ để xem mốc và ràng buộc) — mục tiêu, người dùng, hạn chót, mức chất lượng, công nghệ, mốc, ràng buộc, ngoài phạm vi. Đưa vào briefing, `gtv_status`, prompt trả lời câu hỏi và prompt L3 (`charterText` trong `src/shared/types.ts`).
+- **Bảng việc** (tab **Việc**, `src/server/project/board.ts`) — việc có ưu tiên (`urgent/high/normal/low`), hạn, ước lượng, người nhận; giao việc ⇒ agent của người nhận có tin. Agent: `gtv_tasks`, `gtv_pick_task`, `gtv_log_work`, skill `/gtv` (Codex: `$gtv`). Đăng ký nối vào việc đã nhận, không có thì tự tạo việc. Trạng thái: đăng ký → _Đang làm_; conflict high/critical chưa ack → _Bị chặn_; `gtv_finish_task` → _Chờ merge_; code vào main → _Xong_. Mọi thay đổi ghi vào nhật ký của việc.
+- **coord.priority** (`src/server/project/coord.ts`) — tin conflict gửi mỗi bên kèm việc của hai bên (ưu tiên, hạn, vai trò, level) và lời khuyên: bên đứng sau (ưu tiên thấp hơn → hạn muộn hơn → level thấp hơn) tạm dừng phần đụng nhau hoặc tìm workaround và hỏi bên kia; bên đứng trước tiếp tục nhưng báo trước khi đổi thứ người kia dùng. Câu hỏi chuyển tiếp ghi việc người hỏi đang làm. **Chỉ là lời khuyên**: không dừng agent nào, high/critical vẫn hỏi người. `shadow` = ghi `priority_advice` vào log, không chèn vào tin.
+- **Trao đổi** (tab **Trao đổi**, số trên tab = câu hỏi chờ người, `src/server/project/conversations.ts`) — mọi tin vào agent gom thành luồng chat: câu hỏi → chuyển tiếp → trả lời; conflict → tin mỗi bên → ack; giao việc; ghi chú của lead. Manager nhắn thẳng vào agent của người trong luồng.
+- **Cần xử lý** (trang Tổng quan) — conflict high/critical chưa ack, câu hỏi chờ người, câu hỏi chuyển tiếp quá 15 phút chưa ai trả lời, việc quá hạn, bị chặn, việc gấp chưa ai nhận.
+- **Trang project cho lead** — hàng tab chỉ giữ thứ lead xem hằng ngày: _Tổng quan_ (5 ô số liệu, Cần xử lý, tiến độ, mỗi phiên agent một hàng: avatar + logo agent, file đang sửa, đụng ai), _Việc_, _Trao đổi_, _Conflict_, _Thống kê_. Phần còn lại nằm trong menu **Khác**: Thành viên, Tài liệu, Nhật ký hỏi đáp, Sơ đồ code, Lớp phát hiện, Cài đặt.
+- **Thống kê** (tab **Thống kê**) — tính từ bảng việc, chọn 7/14/30 ngày: tỉ lệ hoàn thành, số việc xong trong kỳ (so với kỳ trước), thời gian làm (trung vị từ lúc bắt đầu tới lúc xong), quá hạn, bị chặn; biểu đồ việc còn lại theo ngày, việc xong mỗi ngày, trạng thái việc theo từng người, việc sắp tới hạn. Số liệu kỹ thuật (Brain, conflict theo layer, hỏi đáp, tài liệu, sự kiện) gập trong mục _Số liệu kỹ thuật_.
+
+- **Tài liệu dự án** (**Khác › Tài liệu**) — kéo thả nhiều file chữ (markdown, txt, JSON, YAML, CSV; Word/PDF cần lưu thành chữ trước) hoặc viết trực tiếp; loại: yêu cầu, nghiệp vụ, quyết định, hướng dẫn, thuật ngữ. Manager sửa / xoá tài liệu tải lên; tài liệu từ repo chỉ đổi loại và dấu cốt lõi (nội dung theo git). **Tài liệu cốt lõi**: nội dung (tối đa ~8 000 ký tự, phần còn lại đọc bằng `kb_get`) nằm trong mọi prompt trả lời và đánh giá đăng ký của Operator, với chỉ dẫn dựa vào đó thay vì chuyển câu hỏi cho người; agent thấy tên trong briefing và đọc bằng `gtv_docs`.
+- **Sơ đồ code** (**Khác › Sơ đồ code**, `src/codeintel/map.ts`) — ba chế độ: _Module_ (thư mục, tự chọn độ sâu để còn ≤ ~40 nút; mũi tên = số import), _File_ (tối đa 150 file nhiều liên kết nhất, hoặc một module và các file nối trực tiếp với nó), _Gọi hàm_ (nơi gọi ← hàm → những gì nó gọi; nét đứt = chỉ khớp tên). Vòng màu cho biết ai đang sửa (xanh), đã đăng ký (vàng), có conflict (đỏ). Import ra ngoài repo (package) không vẽ. Phân giải import theo đường dẫn như L2: alias kiểu tsconfig `paths` chỉ đoán theo đuôi đường dẫn.
+
+Xem thử với dữ liệu mẫu (không gọi LLM): `npm run demo` → `http://localhost:7395`.
 
 ## Hệ thống
 

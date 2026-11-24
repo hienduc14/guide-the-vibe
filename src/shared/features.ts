@@ -23,6 +23,10 @@ export const FEATURES = {
   "qa.tier2_relay": { default: "on", description: "Forward questions to another dev's agent" },
   "qa.tier3_human": { default: "on", description: "Escalate to the human when agents cannot decide" },
   "policy.ask": { default: "on", description: "Ask/deny on high and critical conflicts" },
+  "coord.priority": {
+    default: "on",
+    description: "Conflict notices and forwarded questions carry each side's task, priority and due date, and advise the lower-priority side to give way",
+  },
   "notify.desktop": { default: "on", description: "Desktop notifications on the dev machine" },
   brain: { default: "on", description: "LLM brain (Pi / null)" },
 } satisfies Record<string, FeatureDef>;

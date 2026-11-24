@@ -3,6 +3,10 @@
 import { del, get, patch, post, put } from "./client";
 import type {
   ActivityEvent,
+  CallMap,
+  StructureMap,
+  AttentionItem,
+  Thread,
   BrainInfo,
   BrainProvider,
   CallerHit,
@@ -23,6 +27,18 @@ import type {
   TeamState,
   Ticket,
   OAuthSession,
+  BoardDetail,
+  BoardInput,
+  BoardNote,
+  BoardTask,
+  BoardView,
+  Charter,
+  Me,
+  Member,
+  MemberLevel,
+  Role,
+  ShareLink,
+  User,
 } from "./types";
 
 const p = (id: string) => `/v1/p/${encodeURIComponent(id)}`;
@@ -36,10 +52,45 @@ export interface ProjectInput {
   aliases?: string[];
   description?: string;
   policy?: Partial<Policy>;
+  charter?: Charter;
 }
 
 export const api = {
   overview: () => get<Overview>("/api/overview"),
+
+  auth: {
+    me: () => get<Me>("/api/me"),
+    login: (name: string, password: string) => post<{ token: string; name: string; role: Role; expires_at: string }>("/api/login", { name, password }),
+    logout: () => post<{ ok: boolean }>("/api/logout"),
+  },
+
+  users: {
+    list: () => get<User[]>("/api/users"),
+    save: (name: string, input: { role?: Role; password?: string }) => put<User>(`/api/users/${encodeURIComponent(name)}`, input),
+    remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
+  },
+
+  board: {
+    list: (id: string, scope: "open" | "all" = "all") => get<BoardView[]>(`${p(id)}/board?scope=${scope}`),
+    get: (id: string, taskId: string) => get<BoardDetail>(`${p(id)}/board/${encodeURIComponent(taskId)}`),
+    create: (id: string, input: BoardInput) => post<BoardTask>(`${p(id)}/board`, input),
+    update: (id: string, taskId: string, input: BoardInput) => patch<BoardTask>(`${p(id)}/board/${encodeURIComponent(taskId)}`, input),
+    remove: (id: string, taskId: string) => del<{ ok: boolean }>(`${p(id)}/board/${encodeURIComponent(taskId)}`),
+    note: (id: string, taskId: string, body: string) => post<BoardNote>(`${p(id)}/board/${encodeURIComponent(taskId)}/notes`, { body }),
+  },
+
+  members: {
+    list: (id: string) => get<Member[]>(`${a(id)}/members`),
+    save: (id: string, dev: string, input: { role?: string; level?: MemberLevel; note?: string }) =>
+      put<Member>(`${a(id)}/members/${encodeURIComponent(dev)}`, input),
+    remove: (id: string, dev: string) => del<{ ok: boolean }>(`${a(id)}/members/${encodeURIComponent(dev)}`),
+  },
+
+  shareLinks: {
+    list: (id: string) => get<ShareLink[]>(`${a(id)}/share-links`),
+    create: (id: string, label: string, days?: number) => post<ShareLink & { code: string }>(`${a(id)}/share-links`, { label, days }),
+    revoke: (id: string, linkId: string) => del<{ ok: boolean }>(`${a(id)}/share-links/${encodeURIComponent(linkId)}`),
+  },
 
   projects: {
     create: (input: ProjectInput) => post<ProjectSummary>("/api/projects", input),
@@ -52,7 +103,9 @@ export const api = {
     layers: (id: string) => get<Layer[]>(`${a(id)}/layers`),
     activity: (id: string, limit = 60, type?: string) =>
       get<ActivityEvent[]>(`${a(id)}/activity?limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),
-    message: (id: string, to_dev: string, body: string) => post(`${a(id)}/messages`, { to_dev, body }),
+    message: (id: string, to_dev: string, body: string, ref_id?: string) => post(`${a(id)}/messages`, { to_dev, body, ref_id }),
+    conversations: (id: string, limit = 40) => get<Thread[]>(`${a(id)}/conversations?limit=${limit}`),
+    attention: (id: string) => get<AttentionItem[]>(`${a(id)}/attention`),
   },
 
   conflicts: {
@@ -75,12 +128,18 @@ export const api = {
     list: (id: string) => get<KbListItem[]>(`${p(id)}/kb`),
     search: (id: string, q: string) => get<KbHit[]>(`${p(id)}/kb?q=${encodeURIComponent(q)}&limit=20`),
     get: (id: string, docId: string) => get<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}`),
-    add: (id: string, doc: { title: string; body: string; type: string }) => post<KbDoc>(`${p(id)}/kb`, doc),
+    add: (id: string, doc: { title: string; body: string; type: string; pinned?: boolean; path?: string }) => post<KbDoc>(`${p(id)}/kb`, doc),
+    edit: (id: string, docId: string, changes: { title?: string; body?: string; type?: string; pinned?: boolean }) =>
+      patch<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}`, changes),
+    remove: (id: string, docId: string) => del<{ ok: boolean }>(`${p(id)}/kb/${encodeURIComponent(docId)}`),
     review: (id: string, docId: string, action: "confirm" | "reject") => post<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}/${action}`),
   },
 
   graph: {
     stats: (id: string) => get<{ base: { files: number; symbols: number; refs: number }; main: string | null }>(`${p(id)}/graph/stats`),
+    map: (id: string, view: string, level: "dir" | "file", focus?: string) =>
+      get<StructureMap>(`${p(id)}/graph/map?view=${encodeURIComponent(view)}&level=${level}${focus ? `&focus=${encodeURIComponent(focus)}` : ""}`),
+    calls: (id: string, q: string, view: string) => get<CallMap>(`${p(id)}/graph/calls?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
     symbols: (id: string, q: string, view: string) => get<SymbolRow[]>(`${p(id)}/graph/symbols?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
     callers: (id: string, q: string, view: string) =>
       get<{ symbol: string; callers: CallerHit[] }[]>(`${p(id)}/graph/callers?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),

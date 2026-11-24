@@ -1,0 +1,2 @@
+Agent logos from @lobehub/icons-static-svg 1.106.0 (MIT, https://github.com/lobehub/lobe-icons).
+The marks themselves are trademarks of their owners (Anthropic, OpenAI); used only to identify which agent is running.

@@ -21,5 +21,12 @@ CREATE INDEX IF NOT EXISTS brain_jobs_project ON brain_jobs(project, ts);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- LLM providers entered on the dashboard (brain/credentials.ts): data is sealed with GTV_SECRET_KEY.
 CREATE TABLE IF NOT EXISTS brain_credentials (provider TEXT PRIMARY KEY, type TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+-- Dashboard accounts (admin | manager | viewer), their login sessions and read-only share links (accounts.ts).
+CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, role TEXT NOT NULL, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL, last_login TEXT);
+CREATE TABLE IF NOT EXISTS user_sessions (token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS share_links (
+  id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, project TEXT NOT NULL, label TEXT, created_by TEXT,
+  created_at TEXT NOT NULL, expires_at TEXT, last_used TEXT
+);
 CREATE TABLE IF NOT EXISTS brain_endpoints (id TEXT PRIMARY KEY, name TEXT NOT NULL, base_url TEXT NOT NULL, api TEXT NOT NULL, created_at TEXT NOT NULL);
 `;

@@ -103,7 +103,7 @@ Mọi xác thực LLM đi qua Pi: key nhập trên dashboard nằm trong `Creden
 
 Cách gtv gọi Pi (`src/server/brain/pi.ts`): Pi không ép schema JSON nên schema nằm trong prompt và gtv tự kiểm JSON (sai thì nhắc lại một lần, giữ nguyên lịch sử). Chỉ lượt kết thúc bằng `stop` + JSON hợp lệ mới tính là thành công. Lỗi tạm thời (429/5xx, mất kết nối, quá giờ) thành `BrainUnavailable`: tính năng bỏ qua (fail-open) mà không làm nhảy cầu dao. Lỗi khác (key sai, model sai) là lỗi thật và hiện trên dashboard.
 
-Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashboard **Brain** và tab **Thống kê** của project.
+Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashboard **Brain** và mục _Số liệu kỹ thuật_ cuối tab **Thống kê** của project.
 
 ## Backup và nâng cấp
 
@@ -135,6 +135,47 @@ Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashbo
   `sudo systemctl enable --now gtv-deploy.timer`; log: `journalctl -u gtv-deploy -f`. Repo private: script đọc trạng thái CI bằng `GITHUB_TOKEN` hoặc tài khoản `gh` đã đăng nhập trên máy (user chạy service), còn `git` cần credential đọc được repo. Biến tuỳ chọn: `GTV_DEPLOY_BRANCH`, `GTV_DEPLOY_REPO`, `GTV_DEPLOY_HEALTH`, `GTV_DEPLOY_PROJECT`. File `docker/compose.local.yml` (nếu có, ví dụ chỉ nghe ở 127.0.0.1) được dùng kèm.
 
 - Reset hoàn toàn dữ liệu Operator: `docker volume rm docker_gtv-data` (mất project, token, lịch sử).
+
+## Server của nhóm (gtv.tenantry.site)
+
+Máy `tokyo-lxd` (Ubuntu, Oracle Cloud) chạy Operator cho `https://gtv.tenantry.site`. Container chỉ nghe ở `127.0.0.1:7390` (`docker/compose.local.yml`, không commit); tên miền đi qua Cloudflare Tunnel nên **không SSH được qua tên miền**, phải dùng IP.
+
+| Mục              | Giá trị                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| SSH              | user `ubuntu`, cổng `2222`, key ED25519 riêng (xin chủ server; IP cũng hỏi chủ server)     |
+| Thư mục repo     | `~/Workspace/int3507/guide-the-vibe` (branch `main`)                                       |
+| Compose          | `docker/compose.yml` + `docker/compose.local.yml`, `--env-file docker/.env`, project `gtv` |
+| Docker           | cần `sudo` (user `ubuntu` không thuộc group `docker`; sudo không hỏi mật khẩu)             |
+| Auto-deploy (CD) | `gtv-deploy.timer` có cài nhưng **đang tắt** (từ 23/11/2026): deploy bằng tay qua SSH      |
+
+> Không ghi IP, key hay token vào repo. Mỗi người giữ key trong `~/.ssh` của mình.
+
+### Cài SSH trên máy dev (Windows, một lần)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\ssh-setup.ps1 -HostIp <IP> -KeyPath <file key>
+ssh gtv-hoc
+```
+
+[`scripts/ssh-setup.ps1`](../scripts/ssh-setup.ps1) chép key vào `~/.ssh/gtv-hoc.key` (sửa xuống dòng, thêm newline cuối file — thiếu nó OpenSSH báo `not a key file`), khoá quyền chỉ cho user hiện tại, ghi host key vào `known_hosts`, thêm `Host gtv-hoc` (cổng 2222, user `ubuntu`) vào `~/.ssh/config` rồi thử đăng nhập. Chạy lại an toàn (đổi IP thì chạy lại với IP mới). Linux/macOS: tương đương `ssh -i <key> -p 2222 ubuntu@<IP>` sau `chmod 600 <key>`.
+
+### Deploy qua SSH
+
+Push lên `main` và đợi CI xanh trước, rồi:
+
+```bash
+ssh gtv-hoc
+cd ~/Workspace/int3507/guide-the-vibe
+git pull --ff-only
+C="sudo docker compose -f docker/compose.yml -f docker/compose.local.yml --env-file docker/.env -p gtv"
+$C build --build-arg GTV_COMMIT=$(git rev-parse HEAD) && $C up -d
+curl -s 127.0.0.1:7390/health          # "ok": true và "commit" = commit vừa pull
+```
+
+- Log: `$C logs -f operator`. Kiểm tra từ ngoài: `https://gtv.tenantry.site/health` (trường `commit`).
+- Lỗi thì quay lại commit trước: `git reset --hard <commit cũ>` rồi chạy lại dòng `build … up -d`. Dữ liệu (volume `gtv_gtv-data`) không bị đụng.
+- Đừng `git pull` khi trên server có sửa đổi chưa commit (`git status`); `docker/compose.local.yml` là file riêng của server, để nguyên.
+- Bật lại CD (sau khi thống nhất với chủ server): `sudo systemctl enable --now gtv-deploy.timer`. Script cần đọc được trạng thái CI của repo private: đăng nhập `gh` với `GH_CONFIG_DIR=~/.config/gtv-gh` (drop-in `gtv-deploy.service.d/github.conf`) — hiện chưa đăng nhập.
 
 ## Sự cố thường gặp
 

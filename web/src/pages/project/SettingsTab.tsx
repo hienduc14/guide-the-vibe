@@ -7,6 +7,7 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { ShareLinksCard } from "./ShareLinksCard";
 
 /** "name: glob, glob" per line ⇄ { name: [glob, glob] } */
 const modulesToText = (m: Record<string, string[]>) =>
@@ -142,6 +143,8 @@ export function SettingsTab() {
         </form>
       </Card>
 
+      <ShareLinksCard id={id} />
+
       <div className="split">
         <Card title="Gửi ghi chú cho developer">
           <form
@@ -181,7 +184,7 @@ export function SettingsTab() {
         <Card title="Vận hành">
           <div className="stack">
             <div className="row between">
-              <span className="small">Đồng bộ ngay: fetch repo, cập nhật main, code graph và tài liệu.</span>
+              <span className="small">Đồng bộ repo, code graph và tài liệu ngay.</span>
               <button
                 className="btn"
                 type="button"
@@ -196,9 +199,9 @@ export function SettingsTab() {
                 {syncing ? "Đang sync…" : "Sync now"}
               </button>
             </div>
-            <hr className="sep" style={{ margin: 0 }} />
-            <div className="row between">
-              <span className="small">Lưu trữ project: dừng theo dõi repo (dữ liệu vẫn giữ trên server).</span>
+            <hr className="sep admin-only" style={{ margin: 0 }} />
+            <div className="row between admin-only">
+              <span className="small">Lưu trữ: dừng theo dõi repo, giữ dữ liệu.</span>
               <ConfirmButton
                 onConfirm={async () => {
                   const ok = await run(() => api.projects.archive(id), "Đã lưu trữ project");

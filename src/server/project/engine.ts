@@ -2,6 +2,8 @@
 
 import type { Db } from "../../shared/db.ts";
 import { Store } from "./store.ts";
+import { Board, type BoardView } from "./board.ts";
+import { conflictAdvice, standingOf } from "./coord.ts";
 import type { Repo } from "./repo.ts";
 import { KnowledgeBase, type KbHit } from "../knowledge/kb.ts";
 import { CodeGraph, BASE } from "../../codeintel/graph.ts";
@@ -13,7 +15,7 @@ import { type Brain, BrainUnavailable, Semaphore } from "../brain/types.ts";
 import { REGISTRATION_SCHEMA, registrationPrompt, type RegistrationOutput, INTENT_SCHEMA, intentPrompt } from "../brain/prompts.ts";
 import { CircuitBreaker, resolveFeatures, isActive, type FeatureKey, FEATURE_KEYS } from "../../shared/features.ts";
 import type { Conflict, FeatureMode, GtvEvent, Session, Task, TaskRegistration, Workspace, Level } from "../../shared/types.ts";
-import { LEVEL_RANK } from "../../shared/types.ts";
+import { LEVEL_RANK, charterText } from "../../shared/types.ts";
 import { log, nowIso, truncate } from "../../shared/util.ts";
 
 export interface EngineConfig {
@@ -29,6 +31,7 @@ export interface RegistrationFeedback {
   knowledge: KbHit[];
   advice?: string;
   l3: "done" | "pending" | "off" | "shadow" | "unavailable";
+  board?: BoardView;
 }
 
 export class Engine {
@@ -36,6 +39,7 @@ export class Engine {
   readonly db: Db;
   readonly graph: CodeGraph;
   readonly kb: KnowledgeBase;
+  readonly board: Board;
   readonly repo?: Repo;
   readonly brain: Brain;
   readonly breaker = new CircuitBreaker();
@@ -48,7 +52,10 @@ export class Engine {
 
   constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig }) {
     this.db = opts.db;
+    opts.db.ensureColumn("tasks", "board_id", "TEXT");
+    opts.db.ensureColumn("messages", "from_dev", "TEXT");
     this.store = new Store(opts.db);
+    this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);
     this.kb = new KnowledgeBase(opts.db);
     this.repo = opts.repo;
@@ -115,20 +122,29 @@ export class Engine {
   }
 
   notifyConflicts(conflicts: Conflict[]): void {
+    const coord = this.mode("coord.priority");
     for (const c of conflicts) {
       this.store.logEvent("conflict", undefined, c);
       if (c.level === "info") continue; // visible in status, not pushed into agents
-      for (const [ws, dev] of [
-        [c.workspace_a, c.dev_a],
-        [c.workspace_b, c.dev_b],
-      ] as const) {
+      const sides = [
+        [c.workspace_a, c.dev_a, c.workspace_b, c.dev_b],
+        [c.workspace_b, c.dev_b, c.workspace_a, c.dev_a],
+      ] as const;
+      for (const [ws, dev, otherWs, otherDev] of sides) {
         if (ws === "main") continue;
+        // Each side hears what the other is doing, how urgent both are, and who should give way (SPEC D40).
+        let extra = "";
+        if (coord !== "off" && otherWs !== "main") {
+          const a = conflictAdvice(standingOf(this, ws, dev), standingOf(this, otherWs, otherDev), c.subject);
+          if (coord === "on") extra = `\n${a.header}\n→ ${a.advice}`;
+          else this.store.logEvent("priority_advice", dev, { conflict: c.id, ...a });
+        }
         this.store.addMessage({
           to_dev: dev,
           to_workspace: ws,
           kind: "conflict",
           ref_id: c.id,
-          body: `[gtv ${c.level.toUpperCase()} · ${c.layer}] ${c.message}\n(conflict ${c.id} — after coordinating, acknowledge it with the gtv_ack tool)`,
+          body: `[gtv ${c.level.toUpperCase()} · ${c.layer}] ${c.message}${extra}\n(conflict ${c.id} — after coordinating, acknowledge it with the gtv_ack tool)`,
         });
       }
     }
@@ -141,6 +157,8 @@ export class Engine {
       case "session_start": {
         const session = this.store.upsertSession({ ...ev.session, dev });
         this.store.logEvent("session_start", dev, ev.session);
+        // Everyone who works on the project is a member; a manager sets their role and level on the dashboard.
+        if (!this.store.member(dev)) this.store.saveMember(dev, {});
         return { session, briefing: this.briefing(session) };
       }
       case "session_end":
@@ -166,6 +184,16 @@ export class Engine {
     const mine = state.conflicts.filter((c) => c.workspace_a === session.workspace_id || c.workspace_b === session.workspace_id);
     const waiting = this.store.tickets({ status: ["forwarded", "waiting_human"], to_dev: session.dev });
     const lines = ["gtv Project Operator is active for this repo."];
+    const charter = charterText(this.store.charter);
+    if (charter) lines.push("Project charter — choose technology and solutions that fit it:", charter);
+    const core = this.kb.core();
+    if (core.length)
+      lines.push(
+        `Core project documents (requirements and decisions the team expects you to follow; read them with gtv_docs): ${core.map((d) => `"${d.title}" (${d.id})`).join(", ")}`,
+      );
+    const members = this.store.members();
+    if (members.length > 1 || (members.length === 1 && members[0].dev !== session.dev))
+      lines.push(`Team: ${members.map((m) => `${m.dev}${m.dev === session.dev ? " (you)" : ""} — ${m.role}, ${m.level}`).join("; ")}`);
     if (others.length) {
       lines.push("Teammates' active tasks:");
       for (const t of others) {
@@ -247,7 +275,12 @@ export class Engine {
   // ---- registration ------------------------------------------------------------
 
   async register(session: Session, reg: TaskRegistration): Promise<RegistrationFeedback> {
-    const task = this.store.registerTask(session, reg);
+    const board_id = this.board.resolveFor(session, reg);
+    const previous = this.store.sessionTask(session.id);
+    const task = this.store.registerTask(session, { ...reg, board_id });
+    // The session moved on to other work: its previous item goes back to To do (unless another agent is on it).
+    if (previous?.board_id && previous.board_id !== board_id) this.board.onRegistrationClosed(previous, "abandoned");
+    this.board.onRegistered(task, session);
     this.store.logEvent("register", session.dev, task);
     this.runL0();
 
@@ -296,7 +329,8 @@ export class Engine {
     }
     const worst = overlaps.reduce((m, o) => Math.max(m, LEVEL_RANK[o.level]), -1);
     const status = worst >= LEVEL_RANK.high ? "needs_coordination" : worst >= LEVEL_RANK.warning ? "adjust_suggested" : "ok";
-    return { task, status, overlaps, knowledge, advice, l3 };
+    const item = this.board.get(board_id);
+    return { task, status, overlaps, knowledge, advice, l3, board: item ? this.board.view(item) : undefined };
   }
 
   private l3Budget(): boolean {
@@ -314,6 +348,8 @@ export class Engine {
       const res = await this.brain.run<RegistrationOutput>({
         kind: "judge_registration",
         prompt: registrationPrompt({
+          charter: charterText(this.store.charter),
+          coreDocs: this.kb.coreText(),
           task: brief(task),
           others: others.map(brief),
           evidence: evidence.map((c) => ({ layer: c.layer, level: c.level, subject: c.subject, message: c.message })),
@@ -473,6 +509,7 @@ export class Engine {
     const leftover = this.store.footprints().some((f) => f.workspace_id === ws.id);
     if (!leftover) return; // nothing edited here: a clean checkout of a newer main is a pull, not a merge
     for (const t of tasks) this.store.updateTask(t.id, { status: "done" });
+    this.board.onMerged(tasks, parent);
     this.tasksClosed(tasks.map((t) => t.id));
     this.store.clearFootprints(ws.id);
     this.graph.clearLayer(ws.id);

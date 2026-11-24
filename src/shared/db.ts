@@ -34,6 +34,12 @@ export class Db {
     this.raw.prepare(`INSERT OR REPLACE INTO ${table} (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`).run(...values);
   }
 
+  /** Adds a column to an existing table if it is missing (schemas only CREATE IF NOT EXISTS). */
+  ensureColumn(table: string, column: string, ddl: string): void {
+    const cols = this.all<{ name: string }>(`PRAGMA table_info(${table})`);
+    if (!cols.some((c) => c.name === column)) this.raw.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  }
+
   tx<T>(fn: () => T): T {
     this.raw.exec("BEGIN");
     try {

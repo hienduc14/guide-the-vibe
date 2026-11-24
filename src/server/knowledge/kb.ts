@@ -11,10 +11,12 @@ export type DocStatus = "active" | "unverified" | "superseded";
 
 export interface KbDoc {
   id: string;
-  type: string; // doc | adr | req | qa | glossary
+  type: string; // doc | req | business | adr | guide | glossary | qa
   title: string;
   body: string;
   status: DocStatus;
+  /** Core document: the Operator reads it in every answer and registration judgement, and agents see its title. */
+  pinned?: number;
   source: string; // repo | ticket | manual
   path?: string;
   ticket_id?: string;
@@ -99,11 +101,13 @@ export class KnowledgeBase {
 
   constructor(db: Db) {
     this.db = db;
+    db.ensureColumn("kb_docs", "pinned", "INTEGER NOT NULL DEFAULT 0");
   }
 
   upsert(doc: Omit<KbDoc, "created_at" | "updated_at"> & { created_at?: string }): KbDoc {
     const prev = this.get(doc.id);
-    const full: KbDoc = { ...doc, created_at: prev?.created_at ?? doc.created_at ?? nowIso(), updated_at: nowIso() };
+    // Re-indexing a repo file must not drop the "core" mark someone set on the dashboard.
+    const full: KbDoc = { ...doc, pinned: doc.pinned ?? prev?.pinned ?? 0, created_at: prev?.created_at ?? doc.created_at ?? nowIso(), updated_at: nowIso() };
     this.db.tx(() => {
       this.db.upsert("kb_docs", full as unknown as Record<string, unknown>);
       this.db.run(`DELETE FROM kb_fts WHERE doc_id = ?`, full.id);
@@ -136,9 +140,47 @@ export class KnowledgeBase {
       params.push(filter.status);
     }
     return this.db.all(
-      `SELECT id, type, title, status, source, path, ticket_id, supersedes, created_at, updated_at FROM kb_docs ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY updated_at DESC LIMIT 500`,
+      `SELECT id, type, title, status, source, path, ticket_id, supersedes, pinned, created_at, updated_at, length(body) AS size FROM kb_docs ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY pinned DESC, updated_at DESC LIMIT 500`,
       ...params,
     );
+  }
+
+  /** Change a document. Repo documents only take type and the core mark: their text comes from git. */
+  edit(id: string, patch: { title?: string; body?: string; type?: string; pinned?: boolean }): KbDoc | undefined {
+    const doc = this.get(id);
+    if (!doc) return undefined;
+    const fromRepo = doc.source === "repo";
+    return this.upsert({
+      ...doc,
+      title: !fromRepo && patch.title?.trim() ? patch.title.trim() : doc.title,
+      body: !fromRepo && patch.body?.trim() ? patch.body : doc.body,
+      type: patch.type?.trim() || doc.type,
+      pinned: patch.pinned === undefined ? doc.pinned : patch.pinned ? 1 : 0,
+    });
+  }
+
+  /** Core documents, active only. */
+  core(): KbDoc[] {
+    return this.db.all<KbDoc>(`SELECT * FROM kb_docs WHERE pinned = 1 AND status = 'active' ORDER BY updated_at DESC`);
+  }
+
+  /**
+   * Core documents as prompt text, within a budget: whole documents while they fit, then the start of the rest.
+   * The Operator can still read any document in full with kb_get.
+   */
+  coreText(maxChars = 8000): string {
+    const out: string[] = [];
+    let left = maxChars;
+    for (const d of this.core()) {
+      if (left < 300) {
+        out.push(`- ${d.title} (${d.id}): not included here, read it with kb_get`);
+        continue;
+      }
+      const body = d.body.length > left - 100 ? `${d.body.slice(0, left - 100)}\n… (truncated: read the rest with kb_get "${d.id}")` : d.body;
+      out.push(`### ${d.title} [${d.type}, ${d.id}]\n${body.trim()}`);
+      left -= body.length + d.title.length + 40;
+    }
+    return out.join("\n\n");
   }
 
   setStatus(id: string, status: DocStatus): KbDoc | undefined {

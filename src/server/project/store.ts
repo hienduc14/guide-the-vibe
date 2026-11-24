@@ -5,9 +5,12 @@ import { EventEmitter } from "node:events";
 import { Db, parseJson } from "../../shared/db.ts";
 import type {
   AgentCapabilities,
+  Charter,
   Conflict,
   FeatureMode,
   Footprint,
+  Member,
+  MemberLevel,
   Message,
   Policy,
   Session,
@@ -18,7 +21,7 @@ import type {
   Ticket,
   Workspace,
 } from "../../shared/types.ts";
-import { AGENT_CAPABILITIES, LEVEL_RANK } from "../../shared/types.ts";
+import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_LEVELS } from "../../shared/types.ts";
 import { newId, nowIso, normPath } from "../../shared/util.ts";
 
 const SESSION_IDLE_MS = 5 * 60_000;
@@ -28,6 +31,7 @@ export class Store extends EventEmitter {
   readonly db: Db;
   private version = 0;
   policy: Policy = { critical_paths: [], modules: {} };
+  charter: Charter = {};
   features: () => Record<string, FeatureMode> = () => ({});
 
   constructor(db: Db) {
@@ -152,6 +156,7 @@ export class Store extends EventEmitter {
       goal: reg.goal,
       base_sha: reg.base_sha,
       resources: (reg.resources ?? []).map((r) => ({ ...r, value: r.kind === "path" ? normPath(r.value) : r.value, source: r.source ?? "declared" })),
+      board_id: reg.board_id,
       status: "active",
       created_at: now,
       updated_at: now,
@@ -294,10 +299,43 @@ export class Store extends EventEmitter {
     return { ...c, status };
   }
 
+  // ---- members -------------------------------------------------------------------
+
+  members(): Member[] {
+    return this.db.all<Member>(`SELECT * FROM members ORDER BY dev`);
+  }
+
+  member(dev: string): Member | undefined {
+    return this.db.get<Member>(`SELECT * FROM members WHERE dev = ?`, dev);
+  }
+
+  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string }): Member {
+    if (!/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) throw new Error("dev name: letters, digits, . _ -");
+    if (input.level && !MEMBER_LEVELS.includes(input.level)) throw new Error(`level must be one of ${MEMBER_LEVELS.join(", ")}`);
+    const prev = this.member(dev);
+    const now = nowIso();
+    const m: Member = {
+      dev,
+      role: (input.role ?? prev?.role ?? "developer").trim() || "developer",
+      level: input.level ?? prev?.level ?? "mid",
+      note: input.note ?? prev?.note,
+      created_at: prev?.created_at ?? now,
+      updated_at: now,
+    };
+    this.db.upsert("members", m as unknown as Record<string, unknown>);
+    this.changed();
+    return m;
+  }
+
+  removeMember(dev: string): void {
+    this.db.run(`DELETE FROM members WHERE dev = ?`, dev);
+    this.changed();
+  }
+
   // ---- messages -----------------------------------------------------------------
 
   addMessage(m: Omit<Message, "id" | "created_at">): Message {
-    const msg: Message = { ...m, id: newId("msg"), created_at: nowIso() };
+    const msg: Message = { ...m, from_dev: m.from_dev ?? "gtv", id: newId("msg"), created_at: nowIso() };
     this.db.upsert("messages", msg as unknown as Record<string, unknown>);
     this.emit("message", msg);
     return msg;
@@ -355,6 +393,7 @@ export class Store extends EventEmitter {
       conflicts: this.conflicts("open"),
       features: this.features(),
       policy: this.policy,
+      charter: this.charter,
     };
   }
 }

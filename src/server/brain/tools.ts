@@ -165,7 +165,7 @@ export function brainTools(e: Engine): AgentTool<any>[] {
     "kb_search",
     {
       description: "Search team knowledge: business docs, ADRs (decisions) and past Q&A. Q&A marked unverified is not confirmed by a human.",
-      inputSchema: { query: z.string(), type: z.enum(["doc", "adr", "qa", "req"]).optional() },
+      inputSchema: { query: z.string(), type: z.enum(["doc", "req", "business", "adr", "guide", "glossary", "qa"]).optional() },
     },
     async (e, { query, type }) => text(e.kb.search(query, { limit: 8, types: type ? [type] : undefined })),
   );

@@ -5,11 +5,13 @@ import { Hono } from "hono";
 import type { Hub } from "../hub/hub.ts";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
-import { openMode } from "./auth.ts";
+import { bearer, openMode } from "./auth.ts";
+import type { Role } from "../hub/accounts.ts";
 import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
+import { attention, conversations } from "../project/conversations.ts";
 
 type Env = { Variables: AuthVars };
 
@@ -24,13 +26,27 @@ export function summarize(rt: ProjectRuntime) {
   const sessions = store.sessions(true);
   const byLevel: Record<Level, number> = { info: 0, warning: 0, high: 0, critical: 0 };
   for (const c of state.conflicts) byLevel[c.level]++;
+  const items = rt.engine.board.list().filter((t) => t.status !== "cancelled");
   const people = new Map<
     string,
-    { dev: string; status: string; agents: Set<string>; workspaces: Set<string>; last_seen: string; tasks: string[]; editing: number; conflicts: number }
+    {
+      dev: string;
+      role: string | null;
+      level: string | null;
+      status: string;
+      agents: Set<string>;
+      workspaces: Set<string>;
+      last_seen: string;
+      tasks: string[];
+      editing: number;
+      conflicts: number;
+    }
   >();
   for (const s of sessions) {
     const p = people.get(s.dev) ?? {
       dev: s.dev,
+      role: store.member(s.dev)?.role ?? null,
+      level: store.member(s.dev)?.level ?? null,
       status: "ended",
       agents: new Set(),
       workspaces: new Set(),
@@ -66,6 +82,17 @@ export function summarize(rt: ProjectRuntime) {
       tickets_waiting: store.tickets({ status: ["answering", "forwarded", "waiting_human"] }).length,
       kb_unverified: rt.engine.kb.list({ status: "unverified" }).length,
     },
+    board: {
+      total: items.length,
+      done: items.filter((t) => t.status === "done").length,
+      open: items.filter((t) => t.status !== "done").length,
+      in_progress: items.filter((t) => t.status === "in_progress").length,
+      overdue: items.filter((t) => t.overdue).length,
+      blocked: items.filter((t) => t.blocked).length,
+    },
+    charter: rt.record.charter ?? {},
+    attention: attention(rt.engine).length,
+    members: store.members(),
     people: [...people.values()]
       .map((p) => ({ ...p, agents: [...p.agents], workspaces: [...p.workspaces] }))
       .sort((a, b) => (a.status === b.status ? a.dev.localeCompare(b.dev) : a.status === "active" ? -1 : 1)),
@@ -156,8 +183,55 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   const app = new Hono<Env>();
   const rt = (id: string) => hub.runtime(id);
 
+  // ---- dashboard accounts -------------------------------------------------------------
+
+  app.post("/login", async (c) => {
+    const { name, password } = (await c.req.json()) as { name?: string; password?: string };
+    const res = hub.accounts.login(String(name ?? ""), String(password ?? ""));
+    return c.json({ token: res.token, expires_at: res.expires_at, name: res.user.name, role: res.user.role });
+  });
+  app.post("/logout", (c) => {
+    const t = bearer(c);
+    if (t) hub.accounts.logout(t);
+    return c.json({ ok: true });
+  });
+  app.get("/me", (c) => {
+    const p = c.get("principal")!;
+    return c.json({ name: p.name, role: p.role, kind: p.kind, project: p.project ?? null, open_mode: openMode(hub), has_users: hub.accounts.hasUsers() });
+  });
+
+  app.get("/users", (c) => c.json(hub.accounts.users()));
+  app.put("/users/:name", async (c) => {
+    const body = (await c.req.json()) as { role?: Role; password?: string };
+    // Without GTV_ADMIN_TOKEN the first account is what locks the dashboard: it must be able to administer it.
+    if (!hub.cfg.adminToken && !hub.accounts.hasUsers() && body.role !== "admin")
+      throw new Error("the first account must be an admin (the server has no GTV_ADMIN_TOKEN)");
+    const me = c.get("principal")!;
+    if (me.kind === "user" && me.name === c.req.param("name") && body.role && body.role !== "admin") throw new Error("you cannot lower your own role");
+    return c.json(hub.accounts.saveUser(c.req.param("name"), body));
+  });
+  app.delete("/users/:name", (c) => {
+    const me = c.get("principal")!;
+    if (me.kind === "user" && me.name === c.req.param("name")) throw new Error("you cannot delete your own account");
+    hub.accounts.removeUser(c.req.param("name"));
+    return c.json({ ok: true });
+  });
+
   app.get("/overview", async (c) => {
+    const me = c.get("principal");
     const brainHealth = await hub.brain.health();
+    if (me?.kind === "share") {
+      // A share link sees its project and nothing about the server, developers' tokens or the brain's usage.
+      const live = hub.live(me.project!);
+      return c.json({
+        open_mode: false,
+        commit: null,
+        brain: { backend: hub.brain.name, model: null, ok: brainHealth.ok, detail: "" },
+        brain_stats: hub.brainStats({ project: "-", days: 1 }),
+        projects: live ? [summarize(live)] : [],
+        devs: [],
+      });
+    }
     const projects = [];
     for (const r of hub.records()) {
       const live = hub.live(r.id);
@@ -207,6 +281,38 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({ last_sync: p.lastSync, main: p.engine.mainSha });
   });
 
+  // Team members: role and level per developer in this project.
+  app.get("/projects/:id/members", async (c) => c.json((await rt(c.req.param("id"))).engine.store.members()));
+  app.put("/projects/:id/members/:dev", async (c) => {
+    const p = await rt(c.req.param("id"));
+    const m = p.engine.store.saveMember(c.req.param("dev"), await c.req.json());
+    p.engine.store.logEvent("member_set", c.get("dev"), m);
+    return c.json(m);
+  });
+  app.delete("/projects/:id/members/:dev", async (c) => {
+    const p = await rt(c.req.param("id"));
+    p.engine.store.removeMember(c.req.param("dev"));
+    p.engine.store.logEvent("member_removed", c.get("dev"), { dev: c.req.param("dev") });
+    return c.json({ ok: true });
+  });
+
+  // Read-only links for showing a project to people outside the team.
+  app.get("/projects/:id/share-links", (c) => c.json(hub.accounts.shareLinks(c.req.param("id"))));
+  app.post("/projects/:id/share-links", async (c) => {
+    await rt(c.req.param("id"));
+    const body = (await c.req.json().catch(() => ({}))) as { label?: string; days?: number };
+    return c.json(hub.accounts.createShareLink(c.req.param("id"), { label: body.label, days: body.days, by: c.get("dev") }));
+  });
+  app.delete("/projects/:id/share-links/:link", (c) => {
+    hub.accounts.revokeShareLink(c.req.param("link"));
+    return c.json({ ok: true });
+  });
+
+  app.get("/projects/:id/conversations", async (c) =>
+    c.json(conversations((await rt(c.req.param("id"))).engine, Math.min(200, Number(c.req.query("limit") ?? 40)))),
+  );
+  app.get("/projects/:id/attention", async (c) => c.json(attention((await rt(c.req.param("id"))).engine)));
+
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));
   app.get("/projects/:id/stats", async (c) => c.json(stats(hub, await rt(c.req.param("id")), Number(c.req.query("days") ?? 7))));
   app.get("/projects/:id/layers", async (c) => c.json(layers(await rt(c.req.param("id")))));
@@ -224,9 +330,16 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   /** Manual note into a developer's agents (delivered at their next tool call). */
   app.post("/projects/:id/messages", async (c) => {
     const p = await rt(c.req.param("id"));
-    const body = (await c.req.json()) as { to_dev: string; body: string };
+    const body = (await c.req.json()) as { to_dev: string; body: string; ref_id?: string };
     if (!body.to_dev || !body.body?.trim()) throw new Error("to_dev and body are required");
-    const m = p.engine.store.addMessage({ to_dev: body.to_dev, kind: "info", body: `[gtv note from the team lead] ${body.body}` });
+    const by = c.get("dev");
+    const m = p.engine.store.addMessage({
+      to_dev: body.to_dev,
+      kind: "info",
+      from_dev: by,
+      ref_id: body.ref_id,
+      body: `[gtv note from ${by === "admin" ? "the team lead" : `${by} (team lead)`}${body.ref_id ? ` about ${body.ref_id}` : ""}] ${body.body}`,
+    });
     p.engine.store.logEvent("manual_message", "admin", m);
     return c.json(m);
   });

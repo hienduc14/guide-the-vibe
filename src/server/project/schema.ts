@@ -49,6 +49,22 @@ CREATE TABLE IF NOT EXISTS kb_docs (
   source TEXT NOT NULL, path TEXT, ticket_id TEXT, supersedes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS kb_fts USING fts5(doc_id UNINDEXED, title, body, tokenize = 'unicode61 remove_diacritics 2');
+-- Team members of this project: what they do (role) and how senior they are (level). Level breaks ties
+-- between equally urgent tasks; it never overrides task priority.
+CREATE TABLE IF NOT EXISTS members (
+  dev TEXT PRIMARY KEY, role TEXT NOT NULL, level TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+-- Task board: work people plan and hand out; agents pick items and their registrations link back (board_id).
+CREATE TABLE IF NOT EXISTS board_tasks (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT, priority TEXT NOT NULL, due_date TEXT, estimate_h REAL,
+  assignee TEXT, status TEXT NOT NULL, source TEXT NOT NULL, created_by TEXT NOT NULL, picked_session TEXT,
+  labels TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, done_at TEXT
+);
+-- Work log of a board item: notes from people and agents, and what gtv saw happen (kind = 'system').
+CREATE TABLE IF NOT EXISTS board_notes (
+  id TEXT PRIMARY KEY, board_id TEXT NOT NULL, author TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS board_notes_board ON board_notes(board_id, created_at);
 CREATE TABLE IF NOT EXISTS feature_overrides (feature TEXT PRIMARY KEY, mode TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS event_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, type TEXT NOT NULL, actor TEXT, payload TEXT NOT NULL

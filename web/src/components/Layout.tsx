@@ -4,38 +4,42 @@ import { useOverview } from "../hooks/useOverview";
 import { useAuth } from "../hooks/useAuth";
 import { isLoaded } from "../api/types";
 import { Badge } from "./Badge";
+import { Avatar } from "./Member";
+import { RoleBadge } from "../pages/users/UsersPage";
+import { BrainCircuit, LayoutDashboard, LogOut, Menu, ShieldCheck, Users } from "lucide-react";
 
 function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const { data } = useOverview();
-  const { token, logout } = useAuth();
+  const { token, logout, me, shared } = useAuth();
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
   return (
     <aside className={`sidebar${open ? " open" : ""}`} onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate()}>
       <div className="brand">
         <BrandMark />
-        <span>
-          gtv
-          <small>Điều phối agent cho cả nhóm</small>
-        </span>
+        <span>Guide the Vibe</span>
       </div>
 
       <nav className="nav">
         <NavLink to="/" end className={link}>
-          <Icon d="M3 4h10M3 8h7M3 12h10" />
+          <LayoutDashboard className="nav-icon" />
           Tổng quan
         </NavLink>
-        <NavLink to="/brain" className={link}>
-          <Icon d="M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM8 5v3l2 1.5" />
+        <NavLink to="/brain" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+          <BrainCircuit className="nav-icon" />
           Brain
           <span
-            className={`dot${data?.brain.ok ? " on" : data ? " bad" : ""}`}
+            className={`dot${data?.brain.ok ? " on" : data && data.brain.backend !== "null" ? " bad" : ""}`}
             style={{ marginLeft: "auto" }}
-            title={data?.brain.ok ? "Brain sẵn sàng" : "Brain chưa sẵn sàng"}
+            title={data?.brain.ok ? "Brain sẵn sàng" : data?.brain.backend === "null" ? "Brain đang tắt" : "Brain chưa chạy được"}
           />
         </NavLink>
-        <NavLink to="/devs" className={link}>
-          <Icon d="M5.5 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM2 13c0-2 1.6-3.5 3.5-3.5S9 11 9 13M11 7.5a1.7 1.7 0 1 0 0-3.4M12 9.6c1.2.4 2 1.6 2 3.4" />
+        <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+          <Users className="nav-icon" />
           Developers
+        </NavLink>
+        <NavLink to="/users" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+          <ShieldCheck className="nav-icon" />
+          Tài khoản
         </NavLink>
       </nav>
 
@@ -52,7 +56,10 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
               className={link}
               title={active ? `${isLoaded(p) ? p.counts.people_active : 0} người đang làm` : "Không ai đang làm"}
             >
-              <span className={`dot${!isLoaded(p) ? " bad" : active ? " on" : ""}`} />
+              <span className="project-mark" aria-hidden="true">
+                {p.name.slice(0, 1).toUpperCase()}
+                <span className={`dot${!isLoaded(p) ? " bad" : active ? " on" : ""}`} />
+              </span>
               <span className="truncate">{p.name}</span>
               {open > 0 && <span className={`count${hot ? " alert" : ""}`}>{open}</span>}
             </NavLink>
@@ -83,8 +90,19 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
             open dev mode
           </Badge>
         )}
-        {token && (
-          <button type="button" className="btn sm ghost" onClick={logout} style={{ alignSelf: "flex-start", paddingLeft: 0 }}>
+        {me && me.kind !== "open" && (
+          <div className="who">
+            <span className="row" style={{ gap: 8 }}>
+              <Avatar name={me.name} size={26} />
+              <b className="truncate">{me.name}</b>
+              <RoleBadge role={me.role} />
+            </span>
+            {shared && <span className="muted">Link xem chỉ đọc</span>}
+          </div>
+        )}
+        {token && !shared && (
+          <button type="button" className="btn sm ghost" onClick={logout} style={{ alignSelf: "flex-start" }}>
+            <LogOut size={14} />
             Đăng xuất
           </button>
         )}
@@ -93,30 +111,22 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
   );
 }
 
-export function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <i />
-      <i />
-      <i />
-    </span>
-  );
+/** The gtv mark: web/public/gtv-logo.png, a 128px crop of docs/assets/gtv-symbol-blue-transparent.png. */
+export function BrandMark({ size = 30 }: { size?: number }) {
+  return <img className="gtv-mark" src="/gtv-logo.png" alt="" width={size} height={size} />;
 }
 
-function Icon({ d }: { d: string }) {
+function ShareBar() {
+  const { shared, leaveShare } = useAuth();
+  if (!shared) return null;
   return (
-    <svg
-      className="nav-icon"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={d} />
-    </svg>
+    <div className="share-bar">
+      <span>Đang xem qua link chia sẻ · chỉ đọc</span>
+      <span className="spacer" />
+      <button type="button" className="btn sm" onClick={leaveShare}>
+        Thoát
+      </button>
+    </div>
   );
 }
 
@@ -127,17 +137,18 @@ export function Layout() {
   return (
     <div className="shell">
       <div className="mobile-bar">
-        <button type="button" className="btn sm" onClick={() => setOpen(true)} aria-label="Menu">
-          ☰
+        <button type="button" className="btn menu-btn" onClick={() => setOpen(true)} aria-label="Mở menu">
+          <Menu size={20} />
         </button>
         <span className="brand">
-          <BrandMark /> gtv
+          <BrandMark size={26} /> Guide the Vibe
         </span>
       </div>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <Sidebar open={open} onNavigate={() => setOpen(false)} />
       <main className="main">
         <div className="main-inner">
+          <ShareBar />
           <Outlet />
         </div>
       </main>

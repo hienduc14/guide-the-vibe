@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Phiên bản** | v0.5 — nhiều project, dashboard, tự kiểm thử trên repo thật (mục 22); v0.4: bản cài đặt đầu tiên |
+| **Phiên bản** | v0.8 — mở rộng phạm vi: role, tiêu chí project, bảng task, góc nhìn manager (mục 25); v0.5: nhiều project, dashboard; v0.4: bản cài đặt đầu tiên |
 | **Ngày** | 24/10/2026 |
 | **Loại dự án** | Đồ án môn học |
 | **Tên đề tài** | AI Agent điều phối dự án trong Coding |
@@ -77,7 +77,7 @@ Branch và worktree cô lập code, nhưng cũng **cô lập thông tin**. Khôn
 - **G8 Chứng minh được:** đánh giá conflict + đánh giá hỏi đáp (mục 14).
 
 ### 3.2 Ngoài phạm vi
-- Thay Git, CI hay review; tự resolve conflict; dashboard quản lý tiến độ; tự chia task.
+- Thay Git, CI hay review; tự resolve conflict. ~~Dashboard quản lý tiến độ; tự chia task~~ — **bỏ khỏi danh sách loại trừ từ v0.8** (D36): có bảng task để người giao và agent tự kéo việc; Operator vẫn **không tự chia** task thay người.
 - Operator **không** tự thương lượng thay người khi cần quyết định thật sự. Nó chỉ chuyển câu hỏi và tóm tắt.
 - Operator **không** sửa code. Nó chỉ đọc.
 - Khóa cứng file hay module.
@@ -616,7 +616,7 @@ NP-Bench, Claim Plane, MPAC, CooperBench, STALE, MCP Agent Mail, Crystal/Palant�
 |---|---|---|
 | D1 | Đồ án môn học; GitHub; demo Claude Code, Codex, omp | Người dùng |
 | D2 | **Trung tâm là Project Operator (agent trên server)** với 3 chức năng: đăng ký, hỏi đáp, chuyển câu hỏi | Người dùng (v0.3) |
-| D3 | Phạm vi: conflict + awareness **+ giảm nút thắt giao tiếp**; không review, không chia task | Người dùng (v0.3) |
+| D3 | Phạm vi: conflict + awareness **+ giảm nút thắt giao tiếp**; không review. ~~không chia task~~ → thay bằng D36 (v0.8) | Người dùng (v0.3, sửa ở v0.8) |
 | D4 | Giữ đủ L0–L3, **có L2 tree-sitter** | Người dùng (v0.3) |
 | D5 | Làm đủ tính năng; mỗi lớp có cờ `off/shadow/on` + cầu dao tự ngắt | Người dùng (v0.3) |
 | D6 | Brain dùng nền tảng open-source có sẵn, thay được qua interface; mặc định OpenCode | Người dùng + nghiên cứu |
@@ -869,3 +869,21 @@ Chạy thật (Docker, cấu hình Brain **chỉ qua API của dashboard**, khô
 | gemini-3.8-flash-high (trước) | 21/21 (20/21 lần đầu) | 24–114 s        |
 
 Agent thật với Brain Sonnet 5.5: **Claude Code** (haiku) đăng ký, sửa `profileMapper` và caller, được báo sửa ngoài scope; **Codex 0.163.0** (gemini-3-flash qua CLIProxyAPI) đăng ký → `needs_coordination`, viết `getCommentAuthors` theo chữ ký mới, ack 3 conflict. Mức suy nghĩ `medium` với token gói Claude: job thật chạy đúng (6,4 s).
+
+---
+
+## 25. v0.8 — Mở rộng phạm vi: role, tiêu chí project, bảng task, góc nhìn manager (24/11/2026)
+
+Mục tiêu mới: người giữ vai trò **manager** vào dashboard là hiểu dự án đang ở đâu (ai làm gì, tiến độ, cái gì đang vướng), và nhóm dễ trình bày dự án cho người ngoài. Thay đổi D3 và mục 3.2 theo quyết định của người dùng.
+
+### 25.1 Quyết định
+
+| #   | Quyết định | Lý do |
+| --- | ---------- | ----- |
+| D36 | Có **bảng task** cho từng project: người (manager) tạo việc với độ ưu tiên, hạn, người nhận; agent liệt kê và **tự kéo** việc (`/gtv`, `gtv_tasks`, `gtv_pick_task`). Đăng ký task mà không gắn việc nào thì tự tạo một thẻ trên bảng. Trạng thái thẻ đi theo hoạt động thật của agent (đăng ký → đang làm, conflict high/critical → bị chặn, code vào `main` → xong). Thay phần "không chia task" của D3. | Manager cần một chỗ nhìn tiến độ; gtv đã biết agent đang làm gì nên cập nhật được trạng thái mà không ai phải nhập tay. Operator vẫn không tự chia việc. |
+| D37 | **Tài khoản dashboard theo role**: `admin` (mọi thứ), `manager` (nội dung project: việc, tiêu chí, thành viên, conflict, lớp), `viewer` (chỉ xem). Thêm **link xem chỉ đọc** cho từng project để trình bày. Admin token cũ vẫn dùng được. | Trước đây dashboard chỉ có một mật khẩu admin. |
+| D38 | **Thành viên project** có role (vd backend, frontend, tech lead) và level (`intern` < `junior` < `mid` < `senior` < `lead`). Level chỉ dùng **phá hòa** khi hai việc cùng ưu tiên. | Ưu tiên của việc phản ánh giá trị cho dự án tốt hơn thâm niên. |
+| D39 | **Tiêu chí project** (mục tiêu, người dùng mục tiêu, mốc thời gian, công nghệ, ràng buộc, ngoài phạm vi, mức chất lượng) được đưa vào briefing của agent, `gtv_status` và prompt của Brain. | Agent chọn công nghệ và giải pháp hợp với mục tiêu (vd MVP 2 tháng cho 100 người dùng). |
+| D40 | Tin nhắn giữa agent (conflict, câu hỏi chuyển tiếp) mang **header**: việc của mỗi bên, ưu tiên, hạn, level, và **gợi ý** (bên ưu tiên thấp hơn: tạm dừng phần đụng nhau hoặc tìm workaround). Chỉ là gợi ý / `ask`; **Operator không tự dừng agent** (giữ US6). Cờ `coord.priority` (`off/shadow/on`). | Dừng agent giữa chừng dễ để lại code dở; người vẫn quyết. |
+| D41 | Dashboard có **trang trao đổi dạng chat** (luồng theo câu hỏi / conflict) và trang tổng quan project gom "Cần xử lý": conflict high/critical chưa ack, câu hỏi chờ người, việc quá hạn, việc bị chặn. | Dễ theo dõi, dễ demo. |
+

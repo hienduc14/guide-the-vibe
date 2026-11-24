@@ -25,7 +25,8 @@
     "sandbox": "node scripts/sandbox.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run format:check && npm test"
+    "check": "npm run typecheck && npm run format:check && npm test",
+    "demo": "node scripts/demo.ts"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.5.0",

@@ -6,6 +6,7 @@ import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
 import type { FeatureMode, GtvEvent, Message, Session, TaskRegistration, TaskResource } from "../../shared/types.ts";
 import { BASE } from "../../codeintel/graph.ts";
+import { callMap, structureMap } from "../../codeintel/map.ts";
 import { FEATURES } from "../../shared/features.ts";
 import { globMatch, newId, normPath } from "../../shared/util.ts";
 
@@ -80,7 +81,9 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const body = (await c.req.json()) as { session_id: string } & TaskRegistration;
     const session = sessionOf(c, body.session_id);
     if (!body.title) throw new Error("title is required");
-    return c.json(await engine.register(session, { title: body.title, goal: body.goal, base_sha: body.base_sha, resources: body.resources ?? [] }));
+    return c.json(
+      await engine.register(session, { title: body.title, goal: body.goal, base_sha: body.base_sha, resources: body.resources ?? [], board_id: body.board_id }),
+    );
   });
 
   app.patch("/tasks/:id", async (c) => {
@@ -100,8 +103,45 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const next = engine.store.updateTask(t.id, { title: body.title, goal: body.goal, resources, status: body.status } as never);
     if (body.status === "done" || body.status === "abandoned") engine.tasksClosed([t.id]);
     else engine.runL0();
+    if (body.status && body.status !== t.status) engine.board.onRegistrationClosed(t, body.status);
     return c.json(next);
   });
+
+  // ---- task board ------------------------------------------------------------------------
+
+  app.get("/board", (c) => {
+    const { board } = c.get("rt").engine;
+    const scope = c.req.query("scope"); // open (default) | all | mine
+    if (scope === "mine") return c.json(board.list({ open: true, assignee: c.get("dev") }));
+    return c.json(board.list({ open: scope !== "all" }));
+  });
+  app.post("/board", async (c) => c.json(c.get("rt").engine.board.create(await c.req.json(), c.get("dev"))));
+  app.get("/board/:id", (c) => {
+    const { board } = c.get("rt").engine;
+    const t = board.get(c.req.param("id"));
+    if (!t) return c.json({ error: "not found" }, 404);
+    return c.json({ ...board.view(t), notes: board.notes(t.id), registrations: board.registrations(t.id) });
+  });
+  app.patch("/board/:id", async (c) => c.json(c.get("rt").engine.board.update(c.req.param("id"), await c.req.json(), c.get("dev"))));
+  app.delete("/board/:id", (c) => {
+    c.get("rt").engine.board.remove(c.req.param("id"), c.get("dev"));
+    return c.json({ ok: true });
+  });
+  app.post("/board/:id/notes", async (c) => {
+    const { board } = c.get("rt").engine;
+    const { body } = (await c.req.json()) as { body?: string };
+    if (!board.get(c.req.param("id"))) throw new Error("unknown board task");
+    return c.json(board.note(c.req.param("id"), c.get("dev"), "note", String(body ?? "")));
+  });
+  /** An agent takes an item (gtv_pick_task). */
+  app.post("/board/:id/pick", async (c) => {
+    const { engine } = c.get("rt");
+    const { session_id } = (await c.req.json()) as { session_id: string };
+    const t = engine.board.pick(c.req.param("id"), sessionOf(c, session_id));
+    return c.json({ ...engine.board.view(t), notes: engine.board.notes(t.id) });
+  });
+
+  app.get("/members", (c) => c.json(c.get("rt").engine.store.members()));
 
   app.get("/tasks", (c) => c.json(c.get("rt").engine.store.activeTasks()));
 
@@ -195,23 +235,48 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const { kb } = c.get("rt").engine;
     const q = c.req.query("q");
     if (q) return c.json(kb.search(q, { limit: Number(c.req.query("limit") ?? 8) }));
+    if (c.req.query("core")) return c.json(kb.core().map(({ body, ...d }) => ({ ...d, size: body.length })));
     return c.json(kb.list({ type: c.req.query("type"), status: c.req.query("status") as never }));
   });
 
   app.post("/kb", async (c) => {
-    const body = (await c.req.json()) as { title: string; body: string; type?: string; supersedes?: string };
+    const body = (await c.req.json()) as { title: string; body: string; type?: string; supersedes?: string; pinned?: boolean; path?: string };
     if (!body.title?.trim() || !body.body?.trim()) throw new Error("title and body are required");
-    return c.json(
-      c.get("rt").engine.kb.upsert({
-        id: newId("manual"),
-        type: body.type ?? "doc",
-        title: body.title,
-        body: body.body,
-        status: "active",
-        source: "manual",
-        supersedes: body.supersedes,
-      }),
-    );
+    if (body.body.length > 400_000) throw new Error("document too large (max 400 000 characters): split it");
+    const { engine } = c.get("rt");
+    const doc = engine.kb.upsert({
+      id: newId("manual"),
+      type: body.type ?? "doc",
+      title: body.title.trim(),
+      body: body.body,
+      status: "active",
+      source: "manual",
+      path: body.path, // the uploaded file's name, for reference
+      supersedes: body.supersedes,
+      pinned: body.pinned ? 1 : 0,
+    });
+    engine.store.logEvent("kb_add", c.get("dev"), { id: doc.id, title: doc.title, type: doc.type, pinned: !!doc.pinned });
+    engine.store.changed();
+    return c.json(doc);
+  });
+
+  app.patch("/kb/:id", async (c) => {
+    const { engine } = c.get("rt");
+    const doc = engine.kb.edit(c.req.param("id"), await c.req.json());
+    if (!doc) throw new Error("unknown document");
+    engine.store.logEvent("kb_edit", c.get("dev"), { id: doc.id, pinned: !!doc.pinned });
+    engine.store.changed();
+    return c.json(doc);
+  });
+
+  app.delete("/kb/:id", (c) => {
+    const { engine } = c.get("rt");
+    const doc = engine.kb.get(c.req.param("id"));
+    if (!doc) throw new Error("unknown document");
+    if (doc.source === "repo") throw new Error("this document comes from the repository: delete or change the file in git");
+    engine.kb.remove(doc.id);
+    engine.store.logEvent("kb_delete", c.get("dev"), { id: doc.id, title: doc.title });
+    return c.json({ ok: true });
   });
 
   app.get("/kb/:id", (c) => c.json(c.get("rt").engine.kb.get(c.req.param("id")) ?? { error: "not found" }));
@@ -245,6 +310,39 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const view = c.req.query("view") ?? BASE;
     return c.json(graph.findSymbols(c.req.query("q") ?? "", view, 3).map((t) => ({ symbol: t.id, callers: graph.whoCalls(t, view) })));
   });
+  /**
+   * The code map: modules or files with their imports, and who is working where right now (files being
+   * edited, registered scopes, open conflicts) so the map doubles as a picture of the team's work.
+   */
+  app.get("/graph/map", (c) => {
+    const { engine } = c.get("rt");
+    const level = c.req.query("level") === "file" ? "file" : "dir";
+    const map = structureMap(engine.graph, c.req.query("view") ?? BASE, {
+      level,
+      depth: Number(c.req.query("depth") ?? 0) || undefined,
+      focus: c.req.query("focus") || undefined,
+    });
+    const state = engine.store.teamState();
+    const inNode = (path: string, node: string) =>
+      level === "file" ? path === node : node === "(root)" ? !path.includes("/") : path === node || path.startsWith(`${node}/`);
+    const nodes = map.nodes.map((n) => {
+      const editing = [...new Set(state.footprints.filter((f) => inNode(f.path, n.id)).map((f) => f.dev))];
+      const scoped = [
+        ...new Set(
+          state.tasks
+            .filter((t) =>
+              t.resources.some((r) => r.kind === "path" && (level === "file" ? globMatch(r.value, n.id) : inNode(r.value.replace(/\/?\*.*$/, ""), n.id))),
+            )
+            .map((t) => t.dev),
+        ),
+      ];
+      const conflicts = state.conflicts.filter((x) => inNode(x.subject, n.id)).map((x) => x.level);
+      return { ...n, editing, scoped, conflicts };
+    });
+    return c.json({ ...map, nodes });
+  });
+  app.get("/graph/calls", (c) => c.json(callMap(c.get("rt").engine.graph, c.req.query("q") ?? "", c.req.query("view") ?? BASE)));
+
   app.get("/graph/stats", (c) => {
     const { engine } = c.get("rt");
     return c.json({ base: engine.graph.stats(BASE), main: engine.mainSha });

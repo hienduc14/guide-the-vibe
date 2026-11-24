@@ -8,7 +8,7 @@ import { Engine } from "./engine.ts";
 import { TicketService } from "../qa/tickets.ts";
 import type { Brain } from "../brain/types.ts";
 import type { ServerConfig } from "../config.ts";
-import type { Policy } from "../../shared/types.ts";
+import type { Charter, Policy } from "../../shared/types.ts";
 import { log } from "../../shared/util.ts";
 
 export interface ProjectRecord {
@@ -19,6 +19,7 @@ export interface ProjectRecord {
   aliases: string[]; // extra remote URLs / "owner/repo" names that identify this project
   policy: Policy;
   description?: string;
+  charter: Charter;
   archived: boolean;
   created_at: string;
   updated_at: string;
@@ -69,6 +70,7 @@ export class ProjectRuntime {
       critical_paths: record.policy.critical_paths?.length ? record.policy.critical_paths : (fallback?.critical_paths ?? []),
       modules: Object.keys(record.policy.modules ?? {}).length ? record.policy.modules : (fallback?.modules ?? {}),
     };
+    this.engine.store.charter = record.charter;
     this.engine.store.changed();
   }
 

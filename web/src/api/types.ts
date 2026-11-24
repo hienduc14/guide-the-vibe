@@ -26,6 +26,8 @@ export interface BrainStats {
 
 export interface Person {
   dev: string;
+  role: string | null;
+  level: MemberLevel | null;
   status: SessionStatus;
   agents: string[];
   workspaces: string[];
@@ -52,6 +54,10 @@ export interface ProjectSummary {
     tickets_waiting: number;
     kb_unverified: number;
   };
+  charter: Charter;
+  attention: number;
+  board: { total: number; done: number; open: number; in_progress: number; overdue: number; blocked: number };
+  members: Member[];
   people: Person[];
   error?: undefined;
 }
@@ -95,6 +101,7 @@ export interface ProjectRecord {
   aliases: string[];
   policy: Policy;
   description?: string;
+  charter: Charter;
   archived: boolean;
   created_at: string;
   updated_at: string;
@@ -219,6 +226,8 @@ export interface KbListItem {
   path?: string | null;
   ticket_id?: string | null;
   supersedes?: string | null;
+  pinned?: number;
+  size?: number;
   created_at: string;
   updated_at: string;
 }
@@ -337,4 +346,188 @@ export interface BrainInfo {
   health: { ok: boolean; detail?: string };
   models: string[];
   stats: BrainStats;
+}
+
+// ---- dashboard accounts -----------------------------------------------------------------
+
+export type Role = "admin" | "manager" | "viewer";
+
+export interface Me {
+  name: string;
+  role: Role;
+  kind: "admin_token" | "user" | "share" | "open";
+  project: string | null;
+  open_mode: boolean;
+  has_users: boolean;
+}
+
+export interface User {
+  name: string;
+  role: Role;
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface ShareLink {
+  id: string;
+  project: string;
+  label: string | null;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+  last_used: string | null;
+  code?: string;
+}
+
+// ---- project members --------------------------------------------------------------------
+
+export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";
+
+export interface Member {
+  dev: string;
+  role: string;
+  level: MemberLevel;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---- project charter --------------------------------------------------------------------
+
+export interface Charter {
+  goal?: string;
+  users?: string;
+  deadline?: string;
+  milestones?: string;
+  stack?: string[];
+  constraints?: string;
+  non_goals?: string;
+  quality?: "prototype" | "mvp" | "production";
+  notes?: string;
+}
+
+// ---- task board -----------------------------------------------------------------------------
+
+export type Priority = "urgent" | "high" | "normal" | "low";
+export type BoardStatus = "todo" | "in_progress" | "blocked" | "review" | "done" | "cancelled";
+
+export interface BoardTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: Priority;
+  due_date?: string;
+  estimate_h?: number;
+  assignee?: string;
+  status: BoardStatus;
+  source: "board" | "agent";
+  created_by: string;
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  done_at?: string;
+}
+
+export interface BoardView extends BoardTask {
+  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null }[];
+  conflicts: { id: string; level: Level; status: string; with: string; message: string }[];
+  blocked: boolean;
+  overdue: boolean;
+  notes_count: number;
+}
+
+export interface BoardNote {
+  id: string;
+  board_id: string;
+  author: string;
+  kind: "note" | "system";
+  body: string;
+  created_at: string;
+}
+
+export interface BoardDetail extends BoardView {
+  notes: BoardNote[];
+  registrations: Task[];
+}
+
+export interface BoardInput {
+  title?: string;
+  description?: string;
+  priority?: Priority;
+  due_date?: string | null;
+  estimate_h?: number | null;
+  assignee?: string | null;
+  status?: BoardStatus;
+  labels?: string[];
+}
+
+// ---- conversations & attention --------------------------------------------------------------
+
+export interface ChatEntry {
+  id: string;
+  from: string;
+  to: string | null;
+  at: string;
+  kind: string;
+  body: string;
+}
+
+export interface Thread {
+  id: string;
+  kind: "question" | "conflict" | "task" | "note";
+  title: string;
+  status: string;
+  level?: Level;
+  participants: string[];
+  started_at: string;
+  updated_at: string;
+  entries: ChatEntry[];
+}
+
+export interface AttentionItem {
+  kind: "conflict" | "question" | "overdue" | "blocked" | "unassigned" | "stale";
+  level: Level;
+  title: string;
+  detail: string;
+  ref: string;
+  at: string;
+}
+
+// ---- code map -------------------------------------------------------------------------------
+
+export interface MapNode {
+  id: string;
+  label: string;
+  kind: "dir" | "file";
+  files: number;
+  symbols: number;
+  lang?: string;
+  editing: string[];
+  scoped: string[];
+  conflicts: Level[];
+}
+
+export interface StructureMap {
+  level: "dir" | "file";
+  depth: number;
+  truncated: boolean;
+  nodes: MapNode[];
+  edges: { source: string; target: string; weight: number }[];
+}
+
+export interface CallNode {
+  id: string;
+  label: string;
+  kind: string;
+  path: string;
+  line: number;
+  role: "center" | "caller" | "callee";
+  sig?: string;
+}
+
+export interface CallMap {
+  center?: CallNode;
+  nodes: CallNode[];
+  edges: { source: string; target: string; confidence: "local" | "import" | "name" }[];
 }

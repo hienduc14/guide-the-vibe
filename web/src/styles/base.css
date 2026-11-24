@@ -10,6 +10,10 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font);
+  line-height: 1.55;
+}
+/* The root keeps the browser's (and the OS's) text size so rem tokens scale with it. */
+body {
   font-size: var(--text-md);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;

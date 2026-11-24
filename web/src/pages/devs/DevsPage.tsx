@@ -11,6 +11,8 @@ import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
+import { isLoaded } from "../../api/types";
+import { LevelLadder } from "../../components/Member";
 import { InviteLink, IssuedToken, forgetIssued, lastIssued, rememberIssued } from "./IssuedToken";
 
 /** The daemon talks to the server constantly; seen in the last 5 minutes = connected. */
@@ -25,6 +27,9 @@ export function DevsPage() {
   const [ack, setAck] = useState(false);
   const [invite, setInvite] = useState<{ name: string; code: string }>();
   // Issuing the first developer ends open dev mode; without an admin token the dashboard then locks.
+  // Where each developer works and as what (from each project's members).
+  const roles = (dev: string) =>
+    (overview?.projects ?? []).filter(isLoaded).flatMap((p) => p.members.filter((m) => m.dev === dev).map((m) => ({ project: p.name, m })));
   const firstInOpenMode = !!overview?.open_mode && (data?.length ?? 0) === 0;
 
   const inviteDev = async (e: FormEvent) => {
@@ -52,15 +57,8 @@ export function DevsPage() {
 
   return (
     <>
-      <PageHead title="Developers" subtitle="Mỗi developer có một token riêng cho daemon trên máy họ. Mời bằng một lệnh, không cần gửi token qua chat." />
-      <Card
-        title={
-          <div>
-            <h3>Mời developer</h3>
-            <div className="sub">Tạo lệnh, gửi cho dev, dev chạy trong thư mục repo của họ. Mở Claude Code hoặc Codex là dùng được.</div>
-          </div>
-        }
-      >
+      <PageHead title="Developers" />
+      <Card title="Mời developer">
         <form className="stack" onSubmit={inviteDev}>
           {firstInOpenMode && (
             <div className="notice error stack tight">
@@ -111,7 +109,7 @@ export function DevsPage() {
           <Table<Dev>
             rows={data}
             rowKey={(d) => d.name}
-            empty="Chưa có developer nào. Tạo lệnh mời ở trên cho người đầu tiên."
+            empty="Chưa có developer nào."
             columns={[
               {
                 key: "n",
@@ -124,6 +122,23 @@ export function DevsPage() {
                     />
                     <b>{d.name}</b>
                   </span>
+                ),
+              },
+              {
+                key: "p",
+                title: "Project · vai trò",
+                render: (d) => (
+                  <div className="stack tight" style={{ gap: 4 }}>
+                    {roles(d.name).map(({ project, m }) => (
+                      <span key={project} className="row" style={{ gap: 8 }}>
+                        <span className="small">
+                          <b>{project}</b> · {m.role}
+                        </span>
+                        <LevelLadder level={m.level} />
+                      </span>
+                    ))}
+                    {roles(d.name).length === 0 && <span className="xs faint">chưa thuộc project nào</span>}
+                  </div>
                 ),
               },
               { key: "s", title: "Kết nối lần cuối", render: (d) => <span className="xs muted">{d.last_seen ? ago(d.last_seen) : "chưa bao giờ"}</span> },

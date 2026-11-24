@@ -20,7 +20,10 @@ await build({
   platform: "node",
   format: "esm",
   target: "node20",
-  define: { __GTV_SKILL__: JSON.stringify(readFileSync(new URL("src/adapters/skill/SKILL.md", root), "utf8")) },
+  define: {
+    __GTV_SKILL__: JSON.stringify(readFileSync(new URL("src/adapters/skill/SKILL.md", root), "utf8")),
+    __GTV_TASKS_SKILL__: JSON.stringify(readFileSync(new URL("src/adapters/skill/gtv/SKILL.md", root), "utf8")),
+  },
   // CommonJS dependencies inside an ES module bundle need require().
   banner: { js: "import{createRequire as __cr}from'node:module';const require=__cr(import.meta.url);" },
 });

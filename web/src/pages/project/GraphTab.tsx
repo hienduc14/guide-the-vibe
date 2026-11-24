@@ -8,6 +8,7 @@ import { Badge } from "../../components/Badge";
 import { Table } from "../../components/Table";
 import { Empty, Loading } from "../../components/Empty";
 import { shortSha } from "../../lib/format";
+import { CodeMap } from "./CodeMap";
 
 const CONF_TONE = { local: "solid", import: "strong", name: "default" } as const;
 
@@ -40,6 +41,8 @@ export function GraphTab() {
           }
         />
       </div>
+
+      <CodeMap projectId={id} view={view} />
 
       <Card title="Tra cứu symbol">
         <form

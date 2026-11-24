@@ -8,6 +8,13 @@ description: Work safely alongside teammates' coding agents on this repo through
 Several developers' agents work on this repository at the same time. The gtv Operator knows who is doing what,
 the code graph, the team docs/ADRs and everybody's work in progress. Use it.
 
+## Task board
+
+The team plans work on the gtv task board. When the user asks what to do next, list it with `gtv_tasks`
+(the `/gtv` skill walks through picking one). `gtv_pick_task` takes a task; your next `gtv_register_task`
+links to it. Work you register without picking a task is added to the board for you. Log progress or
+blockers with `gtv_log_work`.
+
 ## Before editing
 
 - Call `gtv_register_task` once you know what you will do: a short title, the goal, and the resources you expect to touch
@@ -17,6 +24,10 @@ the code graph, the team docs/ADRs and everybody's work in progress. Use it.
   and add a new function) or ask the teammate via `gtv_ask` before touching the overlapping parts.
 
 ## While coding — ask instead of guessing
+
+The team keeps requirements, business rules and decisions in gtv. The briefing lists the **core documents**;
+read the ones that touch your task with `gtv_docs` (`id`), or search with `gtv_docs` (`query`) before choosing
+an approach. Follow them; if your task needs to go against one, tell your user.
 
 Call `gtv_ask` when:
 

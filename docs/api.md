@@ -122,6 +122,16 @@ Không có `GTV_ADMIN_TOKEN`: dashboard mở cho tới khi có tài khoản đ�
 | POST                 | `/board/:id/pick`  | `{ session_id }` → agent nhận việc (gán cho dev, `in_progress`); việc đã giao cho người khác → 400                                                                                      |
 | GET                  | `/members`         | `[{ dev, role, level: intern\|junior\|mid\|senior\|lead, note }]`                                                                                                                       |
 
+### Tài liệu, sơ đồ code (v0.8)
+
+| Method         | Path                                             | Mô tả                                                                                                                                                                      |
+| -------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST           | `/kb`                                            | `{ title, body, type?, pinned?, path? }` (≤ 400 000 ký tự)                                                                                                                 |
+| PATCH / DELETE | `/kb/:id`                                        | `{ title?, body?, type?, pinned? }` (tài liệu từ repo: chỉ `type`, `pinned`) / xoá (không xoá được tài liệu từ repo → 400)                                                 |
+| GET            | `/kb?core=1`                                     | tài liệu cốt lõi (không kèm nội dung)                                                                                                                                      |
+| GET            | `/graph/map?view=&level=dir\|file&depth=&focus=` | `{ level, depth, truncated, nodes: [{ id, label, kind, files, symbols, lang?, editing: [dev], scoped: [dev], conflicts: [level] }], edges: [{ source, target, weight }] }` |
+| GET            | `/graph/calls?q=&view=`                          | `{ center, nodes: [{ id, label, kind, path, line, role: center\|caller\|callee, sig? }], edges: [{ source, target, confidence }] }`                                        |
+
 `POST /tasks` nhận thêm `board_id?`. Không có thì nối vào việc phiên này vừa nhận, hoặc tạo việc mới (`source: "agent"`).
 Trạng thái việc đi theo đăng ký: đăng ký → `in_progress`; `gtv_finish_task` → `review`; abandoned → `todo`; code vào main → `done`.
 
@@ -205,17 +215,18 @@ Brain (Pi) gọi các tool này **trực tiếp** trên `Engine` của project �
 
 Phục vụ bởi `gtv mcp` (Claude, Codex); tất cả chuyển tới `POST /api/:tool` của daemon.
 
-| Tool                | Tham số                                              |
-| ------------------- | ---------------------------------------------------- |
-| `gtv_register_task` | `title, goal?, resources[], board_task_id?`          |
-| `gtv_tasks`         | `mine?` — bảng việc đang mở, gấp nhất trước          |
-| `gtv_pick_task`     | `task_id` — nhận việc trên bảng                      |
-| `gtv_log_work`      | `note, task_id?` — ghi nhật ký cho việc đang làm     |
-| `gtv_update_task`   | `title?, goal?, add_resources?, resources?, status?` |
-| `gtv_finish_task`   | `status?: done\|abandoned`                           |
-| `gtv_ask`           | `question, context?, to_dev?`                        |
-| `gtv_reply`         | `ticket_id, answer, escalate?`                       |
-| `gtv_status`        | —                                                    |
-| `gtv_check`         | `paths?, symbols?`                                   |
-| `gtv_inbox`         | —                                                    |
-| `gtv_ack`           | `conflict_id`                                        |
+| Tool                | Tham số                                                   |
+| ------------------- | --------------------------------------------------------- |
+| `gtv_register_task` | `title, goal?, resources[], board_task_id?`               |
+| `gtv_tasks`         | `mine?` — bảng việc đang mở, gấp nhất trước               |
+| `gtv_pick_task`     | `task_id` — nhận việc trên bảng                           |
+| `gtv_log_work`      | `note, task_id?` — ghi nhật ký cho việc đang làm          |
+| `gtv_docs`          | `query?, id?` — tài liệu cốt lõi / tìm / đọc một tài liệu |
+| `gtv_update_task`   | `title?, goal?, add_resources?, resources?, status?`      |
+| `gtv_finish_task`   | `status?: done\|abandoned`                                |
+| `gtv_ask`           | `question, context?, to_dev?`                             |
+| `gtv_reply`         | `ticket_id, answer, escalate?`                            |
+| `gtv_status`        | —                                                         |
+| `gtv_check`         | `paths?, symbols?`                                        |
+| `gtv_inbox`         | —                                                         |
+| `gtv_ack`           | `conflict_id`                                             |

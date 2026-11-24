@@ -92,6 +92,9 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 - **Trao đổi** (tab **Trao đổi**, `src/server/project/conversations.ts`) — mọi tin vào agent gom thành luồng chat: câu hỏi → chuyển tiếp → trả lời; conflict → tin mỗi bên → ack; giao việc; ghi chú của lead. Manager nhắn thẳng vào agent của người trong luồng.
 - **Cần xử lý** (trang Tổng quan) — conflict high/critical chưa ack, câu hỏi chờ người, câu hỏi chuyển tiếp quá 15 phút chưa ai trả lời, việc quá hạn, bị chặn, việc gấp chưa ai nhận.
 
+- **Tài liệu dự án** (tab **Tài liệu**) — kéo thả nhiều file chữ (markdown, txt, JSON, YAML, CSV; Word/PDF cần lưu thành chữ trước) hoặc viết trực tiếp; loại: yêu cầu, nghiệp vụ, quyết định, hướng dẫn, thuật ngữ. Manager sửa / xoá tài liệu tải lên; tài liệu từ repo chỉ đổi loại và dấu cốt lõi (nội dung theo git). **Tài liệu cốt lõi**: nội dung (tối đa ~8 000 ký tự, phần còn lại đọc bằng `kb_get`) nằm trong mọi prompt trả lời và đánh giá đăng ký của Operator, với chỉ dẫn dựa vào đó thay vì chuyển câu hỏi cho người; agent thấy tên trong briefing và đọc bằng `gtv_docs`.
+- **Sơ đồ code** (tab **Code graph**, `src/codeintel/map.ts`) — ba chế độ: _Module_ (thư mục, tự chọn độ sâu để còn ≤ ~40 nút; mũi tên = số import), _File_ (tối đa 150 file nhiều liên kết nhất, hoặc một module và các file nối trực tiếp với nó), _Gọi hàm_ (nơi gọi ← hàm → những gì nó gọi; nét đứt = chỉ khớp tên). Vòng màu cho biết ai đang sửa (xanh), đã đăng ký (vàng), có conflict (đỏ). Import ra ngoài repo (package) không vẽ. Phân giải import theo đường dẫn như L2: alias kiểu tsconfig `paths` chỉ đoán theo đuôi đường dẫn.
+
 Xem thử với dữ liệu mẫu (không gọi LLM): `npm run demo` → `http://localhost:7395`.
 
 ## Hệ thống

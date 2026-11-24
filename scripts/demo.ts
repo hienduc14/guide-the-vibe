@@ -80,6 +80,30 @@ for (const [dev, role, level, note] of [
 ] as const)
   await call(`/api/projects/mini-shop/members/${dev}`, { role, level, note }, { method: "PUT" });
 
+// ---- project documents: the refund policy from the repo and a requirements page, both core ---------
+
+await call(`${P}/kb/${encodeURIComponent("repo:docs/business/refund-policy.md")}`, { pinned: true, type: "business" }, { method: "PATCH" });
+await call(`${P}/kb`, {
+  title: "Yêu cầu MVP",
+  type: "req",
+  pinned: true,
+  path: "yeu-cau-mvp.md",
+  body: [
+    "# Yêu cầu MVP",
+    "",
+    "## Đơn hàng",
+    "- Khách đặt hàng không cần tài khoản; mỗi đơn tối đa 20 sản phẩm.",
+    "- Tổng tiền làm tròn một lần ở cuối, theo kiểu half-up, đơn vị đồng.",
+    "",
+    "## Hoàn tiền",
+    "- Chỉ hoàn tiền cho đơn đã giao, trong vòng 14 ngày (xem refund-policy).",
+    "",
+    "## Không làm trong MVP",
+    "- Ví điện tử, điểm thưởng, nhiều kho hàng.",
+  ].join("\n"),
+});
+await call(`${P}/kb`, { title: "Quy ước đặt tên API", type: "guide", body: "REST, danh từ số nhiều: /api/orders, /api/orders/:id/refund. Lỗi trả { error }." });
+
 // ---- the board ----------------------------------------------------------------------------
 
 const task = (input: Record<string, unknown>) => call<{ id: string }>(`${P}/board`, input, { dev: "minh" });

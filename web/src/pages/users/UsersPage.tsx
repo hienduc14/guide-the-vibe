@@ -49,10 +49,7 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHead
-        title="Tài khoản"
-        subtitle="Ai được vào dashboard và được làm gì. Developer kết nối agent bằng token riêng ở trang Developers, không cần tài khoản."
-      />
+      <PageHead title="Tài khoản" />
       <div className="grid">
         {(["admin", "manager", "viewer"] as Role[]).map((r) => (
           <div key={r} className="card">
@@ -74,7 +71,7 @@ export function UsersPage() {
             <Field label="Tên đăng nhập">
               <input className="input" required pattern="[a-zA-Z0-9._@\-]{1,60}" value={name} onChange={(e) => setName(e.target.value)} placeholder="minh.pm" />
             </Field>
-            <Field label="Mật khẩu" hint="Ít nhất 8 ký tự. Gửi cho người dùng qua kênh riêng.">
+            <Field label="Mật khẩu">
               <input className="input" required minLength={8} type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
             </Field>
             <Field label="Vai trò">
@@ -88,6 +85,7 @@ export function UsersPage() {
               Tạo
             </button>
           </div>
+          <p className="xs muted">Mật khẩu ít nhất 8 ký tự. Gửi cho người dùng qua kênh riêng.</p>
         </form>
       </Card>
       {error && !data && <ErrorNotice error={error} />}
@@ -98,7 +96,7 @@ export function UsersPage() {
           <Table<User>
             rows={data}
             rowKey={(u) => u.name}
-            empty="Chưa có tài khoản nào. Hiện chỉ đăng nhập được bằng admin token."
+            empty="Chưa có tài khoản nào."
             columns={[
               { key: "n", title: "Tên", render: (u) => <b>{u.name}</b> },
               {

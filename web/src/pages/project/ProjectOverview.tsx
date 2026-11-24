@@ -4,7 +4,29 @@ import type { Conflict, Level, Session, TaskResource, TeamState } from "../../ap
 import { usePoll } from "../../hooks/usePoll";
 import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
-import { LevelBadge, agentName, agentTone } from "../../components/Badge";
+import { agentName } from "../../components/Badge";
+import { DevAvatar, EmptyState, Kpi, Ring, StatusDot, type Tone } from "../../components/Visual";
+import {
+  Activity,
+  BellRing,
+  Bot,
+  CalendarClock,
+  ChartNoAxesColumn,
+  CircleCheck,
+  CircleDot,
+  FileCode2,
+  GitBranch,
+  MessageCircleQuestion,
+  MessagesSquare,
+  Moon,
+  Network,
+  OctagonAlert,
+  SquareKanban,
+  UserX,
+  Users,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { ActivityFeed } from "./ActivityFeed";
@@ -101,54 +123,65 @@ function Board({ state, projectId, members }: { state: TeamState; projectId: str
   if (!rows.length)
     return (
       <Card>
-        <div className="empty">
-          <b>Chưa ai làm việc trong project này</b>
-          Khi một dev mở Claude Code hoặc Codex trong repo, phiên của họ hiện ở đây cùng việc họ đăng ký.
-        </div>
+        <EmptyState icon={Bot} title="Chưa ai đang làm">
+          Phiên Claude Code / Codex sẽ hiện ở đây.
+        </EmptyState>
       </Card>
     );
   return (
-    <div className="board">
+    <div className="lanes">
       {rows.map((r) => {
         const worst = r.conflicts[0];
         const alert = worst && RANK[worst.level] >= RANK.high;
+        const m = member.get(r.dev);
         return (
-          <article key={r.key} className={`strip ${agentTone(r.agent)}${alert ? " alert" : ""}`}>
-            <div className="strip-who">
-              <b>{r.dev}</b>
-              {member.get(r.dev) && (
-                <span className="who-role">
-                  {member.get(r.dev)!.role} · {LEVEL_LABEL[member.get(r.dev)!.level]}
-                </span>
-              )}
-              <span>{agentName(r.agent)}</span>
+          <article key={r.key} className={`lane${alert ? " alert" : ""}`}>
+            <div className="lane-who">
+              <DevAvatar name={r.dev} agent={r.agent} size={36} />
+              <div style={{ minWidth: 0 }}>
+                <b className="truncate">{r.dev}</b>
+                <span className="truncate">{m ? `${m.role} · ${LEVEL_LABEL[m.level]}` : agentName(r.agent)}</span>
+              </div>
             </div>
-            <div className="strip-what">
-              {r.title ? <h3>{r.title}</h3> : <h3 className="muted">Chưa đăng ký việc</h3>}
-              {r.goal && <p>{r.goal}</p>}
+            <div className="lane-what">
+              {r.title ? (
+                <h3 className="truncate" title={r.goal}>
+                  {r.title}
+                </h3>
+              ) : (
+                <h3 className="muted">Chưa đăng ký việc</h3>
+              )}
               {r.resources.length > 0 && (
-                <div className="strip-route">
+                <div className="lane-files">
                   {r.resources.map((res, i) => (
                     <Resource key={i} r={res} clash={clashes(res, r.conflicts)} />
                   ))}
                 </div>
               )}
-              <span className="xs faint mono truncate">{r.where}</span>
+              <span className="xs faint mono truncate">
+                <GitBranch size={12} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />
+                {r.where}
+              </span>
             </div>
-            <div className="strip-side">
+            <div className="lane-side">
               {worst ? (
-                <Link to={`/p/${projectId}/conflicts`} className="row" style={{ gap: 6 }} title={worst.message}>
-                  <LevelBadge level={worst.level} />
-                  <span className="xs muted">
-                    với {worst.dev_a === r.dev ? worst.dev_b : worst.dev_a}
+                <Link to={`/p/${projectId}/conflicts`} title={worst.message}>
+                  <StatusDot tone={alert ? "high" : "warning"}>
+                    Đụng {worst.dev_a === r.dev ? worst.dev_b : worst.dev_a}
                     {r.conflicts.length > 1 ? ` +${r.conflicts.length - 1}` : ""}
-                  </span>
+                  </StatusDot>
                 </Link>
               ) : (
-                <span className="xs ok-text">Không đụng ai</span>
+                <StatusDot tone="ok">Ổn</StatusDot>
               )}
-              <span className="xs muted">
-                {r.editing > 0 ? `${r.editing} file đã sửa · ` : ""}
+              <span className="metric" title={r.editing > 0 ? `${r.editing} file đã sửa` : undefined}>
+                {r.editing > 0 && (
+                  <>
+                    <FileCode2 />
+                    {r.editing}
+                    <span aria-hidden="true">·</span>
+                  </>
+                )}
                 {ago(r.since)}
               </span>
             </div>
@@ -159,14 +192,20 @@ function Board({ state, projectId, members }: { state: TeamState; projectId: str
   );
 }
 
-const ATTENTION_ICON: Record<AttentionItem["kind"], string> = {
-  conflict: "Conflict",
-  question: "Câu hỏi",
-  overdue: "Quá hạn",
-  blocked: "Bị chặn",
-  unassigned: "Chưa giao",
-  stale: "Im lặng",
+const ATTENTION: Record<AttentionItem["kind"], { label: string; icon: LucideIcon }> = {
+  conflict: { label: "Conflict", icon: Zap },
+  question: { label: "Câu hỏi", icon: MessageCircleQuestion },
+  overdue: { label: "Quá hạn", icon: CalendarClock },
+  blocked: { label: "Bị chặn", icon: OctagonAlert },
+  unassigned: { label: "Chưa giao", icon: UserX },
+  stale: { label: "Im lặng", icon: Moon },
 };
+const LEVEL_TONE: Record<Level, Tone> = { info: "neutral", warning: "warning", high: "high", critical: "critical" };
+
+function AttentionIcon({ kind }: { kind: AttentionItem["kind"] }) {
+  const I = ATTENTION[kind].icon;
+  return <I />;
+}
 
 function attentionLink(projectId: string, a: AttentionItem): string {
   if (a.kind === "conflict") return `/p/${projectId}/conflicts`;
@@ -180,28 +219,30 @@ function AttentionCard({ projectId }: { projectId: string }) {
   return (
     <Card
       title={
-        <div>
-          <h3>Cần xử lý{data && data.length > 0 ? ` (${data.length})` : ""}</h3>
-          <div className="sub">Việc cần một người quyết định hoặc theo dõi. Bấm để mở chi tiết.</div>
-        </div>
+        <h3>
+          <BellRing />
+          Cần xử lý{data && data.length > 0 ? ` · ${data.length}` : ""}
+        </h3>
       }
       flush
     >
       {!data ? (
         <Loading />
       ) : data.length === 0 ? (
-        <div className="attention-ok">Không có gì cần xử lý. Các agent đang tự phối hợp được.</div>
+        <EmptyState icon={CircleCheck} title="Không có gì cần xử lý" />
       ) : (
         <div className="attention">
           {data.slice(0, 8).map((a) => (
-            <Link key={`${a.kind}:${a.ref}`} to={attentionLink(projectId, a)} className="attention-item">
-              <LevelBadge level={a.level} />
+            <Link key={`${a.kind}:${a.ref}`} to={attentionLink(projectId, a)} className={`attention-item t-${LEVEL_TONE[a.level]}`}>
+              <span className="att-icon" title={`${ATTENTION[a.kind].label} · ${a.level}`}>
+                <AttentionIcon kind={a.kind} />
+              </span>
               <span className="what">
                 <b className="small">{a.title}</b>
                 <span className="xs muted">{a.detail}</span>
               </span>
               <span className="xs faint" style={{ whiteSpace: "nowrap" }}>
-                {ATTENTION_ICON[a.kind]} · {ago(a.at)}
+                {ATTENTION[a.kind].label} · {ago(a.at)}
               </span>
             </Link>
           ))}
@@ -222,29 +263,39 @@ function ProgressCard({ projectId }: { projectId: string }) {
   const { data } = usePoll(() => api.board.list(projectId, "open"), [projectId], 5000);
   const navigate = useNavigate();
   const b = detail.board;
-  const pct = b.total ? Math.round((b.done / b.total) * 100) : 0;
   return (
     <Card
       title={
-        <div>
-          <h3>Tiến độ</h3>
-          <div className="sub">
-            {b.total ? `${b.done}/${b.total} việc xong · ${b.in_progress} đang làm · ${b.overdue} quá hạn · ${b.blocked} bị chặn` : "Chưa có việc trên bảng"}
-          </div>
-        </div>
+        <h3>
+          <ChartNoAxesColumn />
+          Tiến độ
+        </h3>
       }
       actions={
         <Link to={`/p/${projectId}/board`} className="btn sm">
-          Mở bảng việc
+          Bảng việc
         </Link>
       }
     >
       <div className="stack">
-        <div className="progress-line">
-          <span className="progress">
-            <i style={{ width: `${pct}%` }} />
-          </span>
-          <b className="small">{pct}%</b>
+        <div className="row" style={{ gap: 16 }}>
+          <Ring value={b.done} total={b.total} size={64} />
+          <div className="stack tight" style={{ gap: 4 }}>
+            <span className="metric" style={{ color: "var(--fg)" }}>
+              <CircleCheck style={{ color: "var(--ok)" }} />
+              {b.done}/{b.total} xong
+            </span>
+            <span className="metric">
+              <CircleDot style={{ color: "var(--accent)" }} />
+              {b.in_progress} đang làm
+            </span>
+            {(b.overdue > 0 || b.blocked > 0) && (
+              <span className="metric t-high">
+                <OctagonAlert />
+                {b.overdue} quá hạn · {b.blocked} bị chặn
+              </span>
+            )}
+          </div>
         </div>
         {data && data.length > 0 && (
           <div className="stack tight">
@@ -265,14 +316,14 @@ function RecentConversations({ projectId }: { projectId: string }) {
   return (
     <Card
       title={
-        <div>
-          <h3>Trao đổi gần đây</h3>
-          <div className="sub">Agent hỏi nhau, cảnh báo conflict, giao việc.</div>
-        </div>
+        <h3>
+          <MessagesSquare />
+          Trao đổi
+        </h3>
       }
       actions={
         <Link to={`/p/${projectId}/conversations`} className="btn sm">
-          Xem tất cả
+          Tất cả
         </Link>
       }
       flush
@@ -280,7 +331,7 @@ function RecentConversations({ projectId }: { projectId: string }) {
       {!data ? (
         <Loading />
       ) : data.length === 0 ? (
-        <div className="empty">Chưa có trao đổi nào.</div>
+        <EmptyState icon={MessagesSquare} title="Chưa có trao đổi" />
       ) : (
         <div className="stack tight" style={{ padding: 4, gap: 2 }}>
           {data.map((t) => (
@@ -302,35 +353,47 @@ export function ProjectOverview() {
   return (
     <>
       <CharterCard />
-      <div className="summary">
-        <span className="chip">
-          <b>{c.people_active}</b> người đang làm
-        </span>
-        <Link to={`/p/${id}/board`} className={`chip${detail.board.blocked + detail.board.overdue ? " warn" : ""}`}>
-          <b>
-            {detail.board.done}/{detail.board.total}
-          </b>{" "}
-          việc xong
-        </Link>
-        <Link to={`/p/${id}/conflicts`} className={`chip${serious ? " alert" : c.conflicts_open ? " warn" : ""}`}>
-          <b>{c.conflicts_open}</b> conflict đang mở
-        </Link>
-        <Link to={`/p/${id}/conversations`} className={`chip${c.tickets_waiting ? " warn" : ""}`}>
-          <b>{c.tickets_waiting}</b> câu hỏi chờ người
-        </Link>
-        <Link to={`/p/${id}/graph`} className="chip" title={`${detail.graph.files} file, ${detail.graph.refs} tham chiếu`}>
-          <b>{detail.graph.symbols}</b> hàm và class trong code graph
-        </Link>
+      <div className="kpis">
+        <Kpi icon={Users} tone={c.people_active ? "accent" : "neutral"} value={c.people_active} label="Đang làm" />
+        <Kpi
+          icon={Zap}
+          to={`/p/${id}/conflicts`}
+          tone={serious ? "high" : c.conflicts_open ? "warning" : "neutral"}
+          value={c.conflicts_open}
+          label="Conflict"
+        />
+        <Kpi
+          icon={MessageCircleQuestion}
+          to={`/p/${id}/conversations`}
+          tone={c.tickets_waiting ? "warning" : "neutral"}
+          value={c.tickets_waiting}
+          label="Chờ trả lời"
+        />
+        <Kpi
+          icon={SquareKanban}
+          to={`/p/${id}/board`}
+          tone={detail.board.blocked + detail.board.overdue ? "warning" : "neutral"}
+          value={`${detail.board.done}/${detail.board.total}`}
+          label="Việc xong"
+          aside={<Ring value={detail.board.done} total={detail.board.total} size={36} />}
+        />
+        <Kpi
+          icon={Network}
+          to={`/p/${id}/graph`}
+          value={detail.graph.symbols}
+          label="Symbol"
+          title={`${detail.graph.files} file, ${detail.graph.refs} tham chiếu`}
+        />
       </div>
 
       <div className="overview-cols">
         <div className="stack">
           <AttentionCard projectId={id} />
           <section className="stack tight">
-            <div className="row between">
-              <h2>Ai đang làm gì</h2>
-              <span className="xs muted">Mỗi dải là một phiên agent. Ô đỏ là chỗ đang đụng người khác, ô vàng là thay đổi làm hỏng chỗ gọi.</span>
-            </div>
+            <h2 className="section-title" title="Mỗi hàng là một phiên agent. Ô đỏ: đang đụng người khác. Ô vàng: thay đổi làm hỏng chỗ gọi.">
+              <Activity />
+              Ai đang làm gì
+            </h2>
             {state.data ? <Board state={state.data} projectId={id} members={detail.members} /> : <Loading />}
           </section>
         </div>

@@ -31,6 +31,10 @@ export const plural = (n: number, word: string) => `${n} ${word}`;
 
 /** Last path segment of a repo URL or path: "…/realworld/origin.git" → "realworld/origin.git". */
 export function repoName(url: string): string {
-  const parts = url.replace(/\/+$/, "").split(/[/:]/).filter(Boolean);
+  // Local paths on Windows use backslashes ("C:\Users\me\Temp\shop\origin.git").
+  const parts = url
+    .replace(/[/\\]+$/, "")
+    .split(/[/\\:]/)
+    .filter(Boolean);
   return parts.slice(-2).join("/");
 }

@@ -29,14 +29,7 @@ export function ShareLinksCard({ id }: { id: string }) {
   };
 
   return (
-    <Card
-      title={
-        <div>
-          <h3>Link xem chỉ đọc</h3>
-          <div className="sub">Cho người ngoài nhóm xem project này (trình bày, báo cáo): thấy việc, tiến độ, trao đổi, conflict; không sửa được gì.</div>
-        </div>
-      }
-    >
+    <Card title="Link xem chỉ đọc">
       <div className="stack">
         <form className="row" style={{ alignItems: "flex-end" }} onSubmit={(e) => void create(e)}>
           <Field label="Ghi chú">

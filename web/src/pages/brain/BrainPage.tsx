@@ -43,10 +43,7 @@ export function BrainPage() {
 
   return (
     <>
-      <PageHead
-        title="Brain"
-        subtitle="Model AI của Operator. Nó trả lời câu hỏi của agent khi thông tin có sẵn trong code hoặc tài liệu, và xét các việc có nguy cơ đụng nhau."
-      />
+      <PageHead title="Brain" />
 
       <Card
         title={
@@ -78,10 +75,7 @@ export function BrainPage() {
               void reload();
             }}
           >
-            <Field
-              label="Model"
-              hint={data.models.length ? `${data.models.length} model từ các provider đã kết nối` : "Kết nối một provider bên dưới để có danh sách model"}
-            >
+            <Field label="Model" hint={data.models.length ? `${data.models.length} model từ các provider đã kết nối` : "Kết nối provider bên dưới trước"}>
               <select id="brain-model" className="select mono" value={model} onChange={(e) => setModel(e.target.value)}>
                 <option value="">Chưa chọn</option>
                 {model && !data.models.includes(model) && <option value={model}>{model}</option>}
@@ -97,7 +91,7 @@ export function BrainPage() {
               </select>
             </Field>
             {data.thinking !== null && (
-              <Field label="Mức suy nghĩ" hint="Không suy nghĩ là nhanh nhất. Mức cao suy luận kỹ hơn nhưng chậm và tốn hơn.">
+              <Field label="Mức suy nghĩ" hint="Cao hơn: kỹ hơn, chậm hơn.">
                 <Segmented
                   options={[
                     { value: "off", label: "Không" },

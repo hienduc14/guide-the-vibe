@@ -148,14 +148,7 @@ export function MembersTab() {
         </div>
       )}
       {can("manager") && (
-        <Card
-          title={
-            <div>
-              <h3>Thêm thành viên</h3>
-              <div className="sub">Level chỉ dùng để phân xử khi hai việc cùng độ ưu tiên đụng nhau; độ ưu tiên của việc luôn quyết định trước.</div>
-            </div>
-          }
-        >
+        <Card title="Thêm thành viên">
           <form
             className="row"
             style={{ alignItems: "flex-end" }}

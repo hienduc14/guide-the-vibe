@@ -184,7 +184,7 @@ export function SettingsTab() {
         <Card title="Vận hành">
           <div className="stack">
             <div className="row between">
-              <span className="small">Đồng bộ ngay: fetch repo, cập nhật main, code graph và tài liệu.</span>
+              <span className="small">Đồng bộ repo, code graph và tài liệu ngay.</span>
               <button
                 className="btn"
                 type="button"
@@ -201,7 +201,7 @@ export function SettingsTab() {
             </div>
             <hr className="sep admin-only" style={{ margin: 0 }} />
             <div className="row between admin-only">
-              <span className="small">Lưu trữ project: dừng theo dõi repo (dữ liệu vẫn giữ trên server).</span>
+              <span className="small">Lưu trữ: dừng theo dõi repo, giữ dữ liệu.</span>
               <ConfirmButton
                 onConfirm={async () => {
                   const ok = await run(() => api.projects.archive(id), "Đã lưu trữ project");

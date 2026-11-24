@@ -1,0 +1,366 @@
+/*
+ * Theme layer (DESIGN.md). Loaded last: it reshapes the shell and the shared controls without touching
+ * page-specific styles. Remove this import to fall back to the plain components.
+ */
+
+/* ---- type ---- */
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+p {
+  text-wrap: pretty;
+}
+.page-head p {
+  max-width: 64ch;
+}
+
+/* ---- sidebar: one solid navy frame (DESIGN.md), the same in both themes ---- */
+.sidebar {
+  color-scheme: dark; /* native scrollbar and focus colours suit the navy */
+  background: var(--nav-bg);
+  border-right-color: var(--nav-bg);
+  color: var(--nav-fg);
+  padding-block: var(--s4);
+  gap: var(--s5);
+}
+.brand {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  gap: 10px;
+}
+:is(.sidebar, .mobile-bar) .brand {
+  color: var(--nav-fg);
+}
+/* The logo image as drawn: no tile, no padding, never stretched. */
+.gtv-mark {
+  display: block;
+  flex: none;
+  object-fit: contain;
+}
+.sidebar .nav a {
+  color: var(--nav-muted);
+  font-weight: 500;
+  padding-block: 7px;
+}
+.sidebar .nav a:hover {
+  background: var(--nav-hover);
+  color: var(--nav-fg);
+}
+.sidebar .nav a.active {
+  background: var(--nav-active);
+  color: #ffffff;
+  font-weight: 600;
+}
+.sidebar .nav-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 1;
+}
+.sidebar .nav-title {
+  font-size: var(--text-xs);
+  color: var(--nav-faint);
+}
+.sidebar .count {
+  background: var(--nav-line);
+  border-color: transparent;
+  color: var(--nav-fg);
+}
+.sidebar .count.alert {
+  background: var(--high);
+  color: #ffffff;
+}
+.sidebar .dot {
+  background: var(--nav-faint);
+}
+.sidebar .dot.on {
+  background: #4ade80;
+}
+.sidebar .dot.bad {
+  background: #f87171;
+}
+.project-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--nav-line);
+  color: var(--nav-fg);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  flex: none;
+}
+.project-mark .dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--nav-bg);
+}
+.sidebar-foot {
+  border-top-color: var(--nav-line);
+}
+.sidebar .who {
+  background: var(--nav-hover);
+  color: var(--nav-fg);
+}
+.sidebar :is(.muted, .faint, .xs.muted) {
+  color: var(--nav-muted);
+}
+.sidebar .badge {
+  background: var(--nav-line);
+  border-color: transparent;
+  color: var(--nav-fg);
+}
+.sidebar .btn.ghost {
+  color: var(--nav-muted);
+}
+.sidebar .btn.ghost:hover:not(:disabled) {
+  background: var(--nav-hover);
+  color: var(--nav-fg);
+}
+
+/* ---- buttons: square-ish, quiet; one solid logo-blue button per view ---- */
+.btn {
+  height: auto;
+  min-block-size: 32px;
+  padding-inline: var(--s3);
+  border-radius: var(--radius);
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 500;
+}
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--line-strong);
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  filter: none;
+}
+.btn.danger {
+  background: transparent;
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: transparent;
+}
+.btn.sm {
+  min-block-size: 28px;
+  padding-inline: 10px;
+}
+
+/* ---- controls ---- */
+.input,
+.select,
+.textarea {
+  border-color: var(--line-strong);
+  border-radius: var(--radius);
+}
+.seg {
+  border-radius: var(--radius);
+  background: var(--sunken);
+  border-color: transparent;
+}
+
+/* ---- cards: hairline box, no shadow, no explanatory subtitle ---- */
+.card {
+  box-shadow: none;
+  border-color: var(--line);
+  border-radius: var(--radius-lg);
+}
+.card-head {
+  min-height: 0;
+  padding-block: 10px;
+}
+.card-head h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.card-head .sub {
+  color: var(--faint);
+}
+.notice.info {
+  background: var(--sunken);
+  border-color: var(--line);
+}
+
+/* ---- summary: a row of plain numbers, not a row of coloured pills ---- */
+:is(.summary, .grid.stats) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-block: 1px solid var(--line);
+}
+:is(.summary, .grid.stats) > .chip {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: var(--s3) var(--s5) var(--s3) 0;
+  margin-inline-end: var(--s5);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  white-space: normal;
+}
+:is(.summary, .grid.stats) > .chip:not(:last-child) {
+  border-inline-end: 1px solid var(--line);
+}
+:is(.summary, .grid.stats) > .chip b {
+  font-size: var(--text-num);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--fg);
+}
+:is(.summary, .grid.stats) > a.chip:hover {
+  color: var(--fg);
+}
+:is(.summary, .grid.stats) > .chip.warn,
+:is(.summary, .grid.stats) > .chip.alert {
+  background: none;
+  color: var(--muted);
+}
+:is(.summary, .grid.stats) > .chip.warn b {
+  color: var(--warning);
+}
+:is(.summary, .grid.stats) > .chip.alert b {
+  color: var(--high);
+}
+
+/* ---- badges: a dot and a word; only critical is solid ---- */
+.badge {
+  height: auto;
+  min-block-size: 20px;
+  border-radius: 4px;
+}
+.badge.mono {
+  font-size: 0.72rem;
+}
+.badge:is(.info, .warning, .high, .ok, .danger-outline) {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--fg);
+}
+.badge:is(.info, .warning, .high, .ok, .danger-outline)::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+  flex: none;
+}
+.badge.info {
+  --dot: var(--info);
+}
+.badge.warning {
+  --dot: var(--warning);
+}
+.badge:is(.high, .danger-outline) {
+  --dot: var(--high);
+  color: var(--high);
+}
+.badge.ok {
+  --dot: var(--ok);
+}
+.badge:is(.solid, .accent) {
+  background: var(--sunken);
+  color: var(--fg);
+}
+
+/* ---- tabs: ink underline, counts as plain numbers ---- */
+.tabs a.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.tabs .count {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--faint);
+}
+.tabs .count.alert {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--high);
+  color: #fff;
+}
+
+/* ---- colour on a 3px edge only, never a filled panel ---- */
+.charter {
+  border-left: 1px solid var(--line);
+}
+.tcard {
+  box-shadow: none;
+}
+.tcard:hover {
+  box-shadow: none;
+  background: var(--hover);
+}
+.tcard.blocked {
+  background: var(--surface);
+  border-color: color-mix(in oklab, var(--high) 40%, var(--line));
+}
+
+/* ---- mobile top bar ---- */
+@media (max-width: 860px) {
+  .mobile-bar {
+    color-scheme: dark;
+    background: var(--nav-bg);
+    border-bottom-color: var(--nav-bg);
+    color: var(--nav-fg);
+  }
+  .mobile-bar .btn {
+    background: var(--nav-hover);
+    border-color: transparent;
+    color: var(--nav-fg);
+  }
+  :is(.summary, .grid.stats) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  :is(.summary, .grid.stats) > .chip {
+    margin: 0;
+    padding-inline-end: var(--s3);
+  }
+  :is(.summary, .grid.stats) > .chip:not(:last-child) {
+    border-inline-end: 0;
+  }
+}
+
+/* ---- progress follows the action colour; green stays for "done/ok" words ---- */
+.progress i {
+  background: var(--accent);
+}
+.progress {
+  background: var(--sunken);
+}
+a.link,
+.link {
+  color: var(--accent);
+}

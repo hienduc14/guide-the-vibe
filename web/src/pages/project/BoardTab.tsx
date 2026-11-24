@@ -9,9 +9,26 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Field } from "../../components/Field";
 import { Loading } from "../../components/Empty";
-import { LevelBadge } from "../../components/Badge";
-import { Avatar } from "../../components/Member";
-import { DueChip, PRIORITIES, PRIORITY_INFO, PriorityBadge, STATUS_INFO } from "../../components/Task";
+import { DueChip, PRIORITIES, PRIORITY_INFO, STATUS_INFO } from "../../components/Task";
+import { DevAvatar, EmptyState, StatusDot } from "../../components/Visual";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  Bot,
+  Circle,
+  CircleCheck,
+  CircleDot,
+  CircleSlash,
+  Flame,
+  GitPullRequest,
+  MessageSquare,
+  Minus,
+  OctagonAlert,
+  SquareKanban,
+  UserX,
+  type LucideIcon,
+} from "lucide-react";
 import { TaskDialog } from "./TaskDialog";
 
 const COLUMNS: BoardStatus[] = ["todo", "in_progress", "blocked", "review", "done"];
@@ -19,16 +36,36 @@ const COLUMNS: BoardStatus[] = ["todo", "in_progress", "blocked", "review", "don
 /** The column a card shows in: a live high/critical conflict pulls in-progress work into "Bị chặn". */
 export const columnOf = (t: BoardView): BoardStatus => (t.status === "in_progress" && t.blocked ? "blocked" : t.status);
 
+const COLUMN_ICON: Record<BoardStatus, LucideIcon> = {
+  todo: Circle,
+  in_progress: CircleDot,
+  blocked: OctagonAlert,
+  review: GitPullRequest,
+  done: CircleCheck,
+  cancelled: CircleSlash,
+};
+
+function ColumnIcon({ status }: { status: BoardStatus }) {
+  const I = COLUMN_ICON[status];
+  return <I />;
+}
+
+const PRIO_ICON: Record<Priority, LucideIcon> = { urgent: Flame, high: ArrowUp, normal: Minus, low: ArrowDown };
+
 export function TaskCard({ t, onOpen }: { t: BoardView; onOpen: () => void }) {
   const live = t.work.filter((w) => w.session_status === "active");
   const worst = t.conflicts[0];
+  const Prio = PRIO_ICON[t.priority];
   return (
     <button type="button" className={`tcard p-${t.priority}${t.blocked ? " blocked" : ""}`} onClick={onOpen}>
       <span className="tcard-top">
-        <PriorityBadge priority={t.priority} />
+        <span className={`prio p-${t.priority}`} title={`Ưu tiên: ${PRIORITY_INFO[t.priority].label}`}>
+          <Prio size={14} />
+          {PRIORITY_INFO[t.priority].label}
+        </span>
         {t.source === "agent" && (
-          <span className="xs faint" title="Agent tự đăng ký việc này, không có trên bảng trước">
-            agent tự thêm
+          <span className="metric" title="Agent tự đăng ký việc này, không có trên bảng trước">
+            <Bot size={14} />
           </span>
         )}
         <span className="spacer" />
@@ -36,23 +73,34 @@ export function TaskCard({ t, onOpen }: { t: BoardView; onOpen: () => void }) {
       </span>
       <span className="tcard-title">{t.title}</span>
       {worst && (
-        <span className="row" style={{ gap: 6 }} title={worst.message}>
-          <LevelBadge level={worst.level} />
-          <span className="xs muted truncate">đụng {worst.with}</span>
+        <span title={worst.message}>
+          <StatusDot tone={worst.level === "info" ? "neutral" : worst.level}>Đụng {worst.with}</StatusDot>
         </span>
       )}
       <span className="tcard-foot">
         {t.assignee ? (
           <span className="row" style={{ gap: 6 }}>
-            <Avatar name={t.assignee} size={20} />
+            <DevAvatar name={t.assignee} agent={live.find((w) => w.dev === t.assignee)?.agent ?? undefined} size={24} />
             <span className="xs">{t.assignee}</span>
           </span>
         ) : (
-          <span className="xs faint">chưa giao</span>
+          <span className="metric" title="Chưa giao">
+            <UserX size={14} />
+            <span className="xs">chưa giao</span>
+          </span>
         )}
         <span className="spacer" />
-        {live.length > 0 && <span className="dot on" title={`Agent đang chạy: ${live.map((w) => w.dev).join(", ")}`} />}
-        {t.notes_count > 0 && <span className="xs faint">{t.notes_count} ghi chép</span>}
+        {live.length > 0 && (
+          <span className="metric" style={{ color: "var(--ok)" }} title={`Agent đang chạy: ${live.map((w) => w.dev).join(", ")}`}>
+            <Activity size={14} />
+          </span>
+        )}
+        {t.notes_count > 0 && (
+          <span className="metric" title={`${t.notes_count} ghi chép`}>
+            <MessageSquare size={14} />
+            {t.notes_count}
+          </span>
+        )}
       </span>
     </button>
   );
@@ -97,7 +145,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           placeholder="Thêm mã giảm giá vào giỏ hàng"
         />
       </Field>
-      <Field label="Mô tả" hint="Agent đọc mô tả này khi nhận việc: ghi rõ kết quả mong muốn và tiêu chí xong.">
+      <Field label="Mô tả" hint="Kết quả mong muốn và tiêu chí xong.">
         <textarea className="textarea" rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
       </Field>
       <div className="form-grid">
@@ -198,11 +246,9 @@ export function BoardTab() {
 
       {total === 0 && !adding ? (
         <Card>
-          <div className="empty">
-            <b>Bảng việc trống</b>
-            Manager thêm việc ở đây (ưu tiên, hạn, người nhận). Dev gõ <code>/gtv</code> trong Claude Code hoặc Codex để xem và nhận việc. Việc agent tự đăng ký
-            cũng tự hiện ở đây.
-          </div>
+          <EmptyState icon={SquareKanban} title="Bảng việc trống">
+            Thêm việc, hoặc gõ <code>/gtv</code> trong agent.
+          </EmptyState>
         </Card>
       ) : (
         <div className="kanban">
@@ -212,6 +258,7 @@ export function BoardTab() {
             return (
               <section key={col} className={`kcol k-${col}`}>
                 <header title={STATUS_INFO[col].hint}>
+                  <ColumnIcon status={col} />
                   <span>{STATUS_INFO[col].label}</span>
                   <span className="count">{cards.length}</span>
                 </header>
@@ -221,7 +268,7 @@ export function BoardTab() {
                   ))}
                   {cards.length === 0 && (
                     <span className="xs faint" style={{ padding: 8 }}>
-                      —
+                      Chưa có việc
                     </span>
                   )}
                   {col === "done" && cards.length > shown.length && <span className="xs faint">+{cards.length - shown.length} việc cũ hơn</span>}

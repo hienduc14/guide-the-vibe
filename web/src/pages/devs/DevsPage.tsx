@@ -57,15 +57,8 @@ export function DevsPage() {
 
   return (
     <>
-      <PageHead title="Developers" subtitle="Mỗi developer có một token riêng cho daemon trên máy họ. Mời bằng một lệnh, không cần gửi token qua chat." />
-      <Card
-        title={
-          <div>
-            <h3>Mời developer</h3>
-            <div className="sub">Tạo lệnh, gửi cho dev, dev chạy trong thư mục repo của họ. Mở Claude Code hoặc Codex là dùng được.</div>
-          </div>
-        }
-      >
+      <PageHead title="Developers" />
+      <Card title="Mời developer">
         <form className="stack" onSubmit={inviteDev}>
           {firstInOpenMode && (
             <div className="notice error stack tight">
@@ -116,7 +109,7 @@ export function DevsPage() {
           <Table<Dev>
             rows={data}
             rowKey={(d) => d.name}
-            empty="Chưa có developer nào. Tạo lệnh mời ở trên cho người đầu tiên."
+            empty="Chưa có developer nào."
             columns={[
               {
                 key: "n",

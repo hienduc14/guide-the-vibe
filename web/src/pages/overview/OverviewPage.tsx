@@ -3,85 +3,79 @@ import { Link } from "react-router-dom";
 import { useOverview } from "../../hooks/useOverview";
 import { PageHead } from "../../components/Layout";
 import { Card } from "../../components/Card";
-import { AgentBadge, Badge, LevelBadge } from "../../components/Badge";
+import { AvatarStack, EmptyState, Kpi, Ring, StatusDot } from "../../components/Visual";
+import { BrainCircuit, CalendarClock, Flag, FolderGit2, MessageCircleQuestion, SquareKanban, Users, Zap } from "lucide-react";
 import { ErrorNotice, Loading } from "../../components/Empty";
-import { isLoaded, type Level, type ProjectEntry } from "../../api/types";
-import { ago, ms, repoName, shortSha } from "../../lib/format";
+import { isLoaded, type ProjectEntry } from "../../api/types";
+import { ms, repoName, shortSha } from "../../lib/format";
 import { AddProjectForm } from "./AddProjectForm";
 
-const LEVELS: Level[] = ["critical", "high", "warning", "info"];
-
-function ProjectRow({ p }: { p: ProjectEntry }) {
+function ProjectCard({ p }: { p: ProjectEntry }) {
   if (!isLoaded(p)) {
     return (
-      <Link to={`/p/${p.id}`} className="project-row">
-        <div className="stack tight">
-          <h3>{p.name}</h3>
-          <span className="small danger-text">Không mở được project: {p.error}</span>
+      <Link to={`/p/${p.id}`} className="pcard">
+        <div className="pcard-head">
+          <h3 className="truncate">{p.name}</h3>
         </div>
+        <StatusDot tone="high" title={p.error}>
+          Không mở được
+        </StatusDot>
       </Link>
     );
   }
   const active = p.people.filter((x) => x.status === "active");
   const syncFailed = p.last_sync && !p.last_sync.ok;
+  const lv = p.counts.conflicts_by_level;
+  const conflictTone = lv.critical + lv.high > 0 ? "high" : lv.warning > 0 ? "warning" : "neutral";
+  const deadline = p.charter?.deadline;
   return (
-    <Link to={`/p/${p.id}`} className="project-row">
-      <div className="stack tight" style={{ minWidth: 0 }}>
-        <h3 className="truncate">{p.name}</h3>
-        <div className="meta xs muted">
-          <span className="mono truncate" title={p.repo_url}>
+    <Link to={`/p/${p.id}`} className="pcard" title={`${repoName(p.repo_url)} · ${p.main_branch}@${shortSha(p.main_sha)}`}>
+      <div className="pcard-head">
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h3 className="truncate">{p.name}</h3>
+          <span className="xs faint mono truncate" style={{ display: "block" }}>
             {repoName(p.repo_url)}
           </span>
-          <span className="mono">
-            {p.main_branch}@{shortSha(p.main_sha)}
-          </span>
-          {syncFailed ? <span className="danger-text">sync lỗi</span> : p.last_sync && <span>sync {ago(p.last_sync.at)}</span>}
         </div>
-        {p.charter?.goal && <span className="small muted truncate">{p.charter.goal}</span>}
-        {p.board.total > 0 && (
-          <div className="progress-line" title={`${p.board.done}/${p.board.total} việc xong`}>
-            <span className="progress">
-              <i style={{ width: `${Math.round((p.board.done / p.board.total) * 100)}%` }} />
-            </span>
-            <span className="xs muted" style={{ whiteSpace: "nowrap" }}>
-              {p.board.done}/{p.board.total} việc
-              {p.board.overdue > 0 && <span className="danger-text"> · {p.board.overdue} quá hạn</span>}
-              {p.charter?.deadline && <> · hạn {new Date(p.charter.deadline).toLocaleDateString("vi-VN")}</>}
-            </span>
-          </div>
+        <Ring value={p.board.done} total={p.board.total} size={48} />
+      </div>
+      {p.charter?.goal && <p className="pcard-goal">{p.charter.goal}</p>}
+      <div className="pcard-people">
+        {active.length ? (
+          <>
+            <AvatarStack people={active.map((x) => ({ name: x.dev, agent: x.agents[0] }))} />
+            <span>{active.length} đang làm</span>
+          </>
+        ) : (
+          <StatusDot tone="neutral">Không ai đang làm</StatusDot>
         )}
       </div>
-      <div className="people">
-        {active.length === 0 ? (
-          <span className="small muted">Không ai đang làm</span>
-        ) : (
-          active.map((x) => (
-            <span key={x.dev} className="row" style={{ gap: 4 }}>
-              <b className="small">{x.dev}</b>
-              {x.agents.map((a) => (
-                <AgentBadge key={a} agent={a} />
-              ))}
-            </span>
-          ))
-        )}
-      </div>
-      <div className="row" style={{ justifyContent: "flex-end" }}>
-        {p.counts.conflicts_open === 0 ? (
-          <Badge tone="ok">không conflict</Badge>
-        ) : (
-          LEVELS.filter((l) => p.counts.conflicts_by_level[l] > 0).map((l) => (
-            <span key={l} className="row" style={{ gap: 4 }}>
-              <LevelBadge level={l} />
-              <b className="small num">{p.counts.conflicts_by_level[l]}</b>
-            </span>
-          ))
-        )}
-        {p.counts.tickets_waiting > 0 && <Badge tone="warning">{p.counts.tickets_waiting} câu hỏi chờ</Badge>}
-        {p.attention > 0 && (
-          <Badge tone="high" title="Mục cần người xử lý: conflict nghiêm trọng, câu hỏi chờ, việc trễ hoặc bị chặn">
-            {p.attention} cần xử lý
-          </Badge>
-        )}
+      <div className="pcard-foot">
+        <span className="metrics">
+          <span className={`metric t-${conflictTone}`} title="Conflict đang mở">
+            <Zap />
+            {p.counts.conflicts_open}
+          </span>
+          <span className={`metric${p.counts.tickets_waiting ? " t-warning" : ""}`} title="Câu hỏi chờ người">
+            <MessageCircleQuestion />
+            {p.counts.tickets_waiting}
+          </span>
+          <span className={`metric${p.board.overdue ? " t-high" : ""}`} title="Việc quá hạn">
+            <CalendarClock />
+            {p.board.overdue}
+          </span>
+        </span>
+        <span className="spacer" />
+        {syncFailed ? (
+          <StatusDot tone="high" title={p.last_sync?.error}>
+            Sync lỗi
+          </StatusDot>
+        ) : deadline ? (
+          <span className="metric" title="Hạn chót">
+            <Flag />
+            {new Date(deadline).toLocaleDateString("vi-VN")}
+          </span>
+        ) : null}
       </div>
     </Link>
   );
@@ -100,12 +94,13 @@ export function OverviewPage() {
   const serious = sum((p) => p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical);
   const waiting = sum((p) => p.counts.tickets_waiting);
   const bs = data.brain_stats;
+  const done = sum((p) => p.board.done);
+  const total = sum((p) => p.board.total);
 
   return (
     <>
       <PageHead
         title="Tổng quan"
-        subtitle="Ai đang làm ở project nào, chỗ nào đang đụng nhau, và câu hỏi nào đang chờ người trả lời."
         actions={
           <button className="btn primary admin-only" type="button" onClick={() => setAdding((v) => !v)}>
             {adding ? "Đóng" : "Thêm project"}
@@ -122,56 +117,61 @@ export function OverviewPage() {
         />
       )}
 
-      <div className="summary">
-        <span className="chip">
-          <b>{people.size}</b> người đang làm
-        </span>
-        <span className="chip">
-          <b>{sum((p) => p.counts.sessions_active)}</b> phiên agent
-        </span>
-        <span className={`chip${serious ? " alert" : conflicts ? " warn" : ""}`}>
-          <b>{conflicts}</b> conflict đang mở
-        </span>
-        <span className={`chip${waiting ? " warn" : ""}`}>
-          <b>{waiting}</b> câu hỏi chờ người
-        </span>
-        <Link to="/brain" className={`chip${bs.totals.failed ? " alert" : ""}`} title="Số việc Brain đã làm trong 7 ngày">
-          <b>{bs.totals.jobs}</b> việc Brain trong 7 ngày
-          {bs.totals.jobs > 0 && <span className="xs">{bs.totals.failed ? `${bs.totals.failed} lỗi` : `thường mất ${ms(bs.totals.p50_ms)}`}</span>}
-        </Link>
+      <div className="kpis">
+        <Kpi
+          icon={Users}
+          tone={people.size ? "accent" : "neutral"}
+          value={people.size}
+          label="Người đang làm"
+          aside={people.size ? <AvatarStack people={[...people].map((name) => ({ name }))} max={3} size={24} /> : undefined}
+        />
+        <Kpi icon={Zap} tone={serious ? "high" : conflicts ? "warning" : "neutral"} value={conflicts} label="Conflict" />
+        <Kpi icon={MessageCircleQuestion} tone={waiting ? "warning" : "neutral"} value={waiting} label="Chờ trả lời" />
+        <Kpi icon={SquareKanban} value={`${done}/${total}`} label="Việc xong" aside={total ? <Ring value={done} total={total} size={40} /> : undefined} />
+        <Kpi
+          icon={BrainCircuit}
+          to="/brain"
+          tone={bs.totals.failed ? "high" : "neutral"}
+          value={bs.totals.jobs}
+          label="Brain · 7 ngày"
+          title={bs.totals.jobs > 0 ? (bs.totals.failed ? `${bs.totals.failed} lỗi` : `thường mất ${ms(bs.totals.p50_ms)}`) : undefined}
+        />
       </div>
 
       {!data.brain.ok && (
-        <div className={`notice ${data.brain.backend === "null" ? "info" : "error"} row between`}>
+        <div className={`notice ${data.brain.backend === "null" ? "info" : "error"} notice-row`}>
+          <BrainCircuit />
           <span>
             {data.brain.backend === "null"
-              ? "Brain đang tắt: Operator vẫn báo trùng việc, nhưng không tự trả lời câu hỏi."
+              ? "Brain đang tắt: câu hỏi của agent sẽ chờ người trả lời."
               : `Brain chưa chạy được: ${data.brain.detail ?? "chưa kết nối provider hoặc chưa chọn model"}.`}
           </span>
+          <span className="spacer" />
           <Link to="/brain" className="btn sm">
             Mở Brain
           </Link>
         </div>
       )}
 
-      <Card
-        title={
-          <div>
-            <h3>Projects</h3>
-            <div className="sub">Mỗi project là một repo. Dev được nhận vào project theo remote của repo họ clone.</div>
-          </div>
-        }
-        flush
-      >
+      <section className="stack tight">
+        <h2 className="section-title">
+          <FolderGit2 />
+          Projects
+        </h2>
         {data.projects.length === 0 ? (
-          <div className="empty">
-            <b>Chưa có project nào</b>
-            Bấm “Thêm project” và dán URL repo của nhóm (GitHub, GitLab hoặc đường dẫn repo trên server).
-          </div>
+          <Card>
+            <EmptyState icon={FolderGit2} title="Chưa có project">
+              Dán URL repo để bắt đầu.
+            </EmptyState>
+          </Card>
         ) : (
-          data.projects.map((p) => <ProjectRow key={p.id} p={p} />)
+          <div className="project-grid">
+            {data.projects.map((p) => (
+              <ProjectCard key={p.id} p={p} />
+            ))}
+          </div>
         )}
-      </Card>
+      </section>
     </>
   );
 }

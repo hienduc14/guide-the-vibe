@@ -1,3 +1,4 @@
+import { CalendarClock, ChevronDown, Code2, Pencil, Target } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/endpoints";
 import type { Charter } from "../../api/types";
@@ -95,55 +96,70 @@ export function CharterCard() {
   const empty = !Object.keys(c).length;
   const left = c.deadline ? daysUntil(c.deadline) : undefined;
 
-  return (
-    <section className="charter">
-      <div className="row between">
+  const [more, setMore] = useState(false);
+  const hasMore = MORE.some(([k]) => c[k]);
+  const edit = can("manager") && (
+    <button className="btn sm ghost" type="button" onClick={() => setEditing(true)} aria-label="Sửa tiêu chí" title="Sửa tiêu chí">
+      <Pencil size={14} />
+      {empty ? "Đặt tiêu chí" : null}
+    </button>
+  );
+
+  if (editing)
+    return (
+      <section className="charter">
         <span className="label-caps">Tiêu chí project</span>
-        {can("manager") && !editing && (
-          <button className="btn sm ghost" type="button" onClick={() => setEditing(true)}>
-            {empty ? "Đặt tiêu chí" : "Sửa"}
+        <Editor charter={c} onDone={() => setEditing(false)} />
+      </section>
+    );
+  if (empty)
+    return (
+      <section className="charter-strip">
+        <Target className="muted" />
+        <span className="goal muted" title="Mục tiêu, hạn chót và công nghệ giúp agent chọn giải pháp vừa sức.">
+          Chưa có tiêu chí project
+        </span>
+        {edit}
+      </section>
+    );
+  return (
+    <section className="stack tight">
+      <div className="charter-strip">
+        <Target style={{ color: "var(--accent)" }} />
+        <span className="goal" title={c.users ? `Người dùng: ${c.users}` : undefined}>
+          {c.goal ?? "Tiêu chí project"}
+        </span>
+        {c.quality && <Badge tone="accent">{QUALITY[c.quality]}</Badge>}
+        {c.deadline && (
+          <span className={`fact${left !== undefined && left < 0 ? " late" : ""}`} title={`Hạn ${new Date(c.deadline).toLocaleDateString("vi-VN")}`}>
+            <CalendarClock />
+            {left !== undefined && (left >= 0 ? `còn ${left} ngày` : `trễ ${-left} ngày`)}
+          </span>
+        )}
+        {c.stack && c.stack.length > 0 && (
+          <span className="fact" title={c.stack.join(", ")}>
+            <Code2 />
+            {c.stack.slice(0, 3).join(" · ")}
+            {c.stack.length > 3 ? ` +${c.stack.length - 3}` : ""}
+          </span>
+        )}
+        {hasMore && (
+          <button className="btn sm ghost" type="button" onClick={() => setMore((v) => !v)} aria-expanded={more}>
+            Chi tiết
+            <ChevronDown size={14} style={{ transform: more ? "rotate(180deg)" : undefined }} />
           </button>
         )}
+        {edit}
       </div>
-      {editing ? (
-        <Editor charter={c} onDone={() => setEditing(false)} />
-      ) : empty ? (
-        <p className="small muted">
-          Chưa có. Mục tiêu, người dùng, hạn chót và công nghệ giúp agent chọn giải pháp vừa sức (ví dụ MVP 2 tháng thì không dựng microservice).
-        </p>
-      ) : (
-        <>
-          {c.goal && <p className="charter-goal">{c.goal}</p>}
-          <div className="charter-facts">
-            {c.quality && <Badge tone="accent">{QUALITY[c.quality]}</Badge>}
-            {c.deadline && (
-              <span className={left !== undefined && left < 0 ? "danger-text" : ""}>
-                Hạn <b>{new Date(c.deadline).toLocaleDateString("vi-VN")}</b>
-                {left !== undefined && (left >= 0 ? ` · còn ${left} ngày` : ` · trễ ${-left} ngày`)}
-              </span>
-            )}
-            {c.users && <span>{c.users}</span>}
-          </div>
-          {c.stack && c.stack.length > 0 && (
-            <div className="row" style={{ gap: 4 }}>
-              {c.stack.map((s) => (
-                <span key={s} className="res">
-                  {s}
-                </span>
-              ))}
+      {more && (
+        <dl className="charter-more card" style={{ padding: "12px 16px", margin: 0 }}>
+          {MORE.filter(([k]) => c[k]).map(([k, label]) => (
+            <div key={k} style={{ display: "contents" }}>
+              <dt>{label}</dt>
+              <dd>{c[k]}</dd>
             </div>
-          )}
-          {MORE.some(([k]) => c[k]) && (
-            <dl className="charter-more">
-              {MORE.filter(([k]) => c[k]).map(([k, label]) => (
-                <div key={k} style={{ display: "contents" }}>
-                  <dt>{label}</dt>
-                  <dd>{c[k]}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </>
+          ))}
+        </dl>
       )}
     </section>
   );

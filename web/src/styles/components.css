@@ -32,27 +32,6 @@
   color: var(--muted);
   letter-spacing: 0;
 }
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: var(--accent);
-  display: grid;
-  align-content: center;
-  gap: 3px;
-  padding: 0 6px;
-  flex: none;
-}
-/* Three strips: the board, in miniature. */
-.brand-mark i {
-  display: block;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--accent-ink);
-}
-.brand-mark i:nth-child(2) {
-  width: 60%;
-}
 .nav {
   display: flex;
   flex-direction: column;
@@ -139,6 +118,16 @@
 }
 .mobile-bar {
   display: none;
+}
+.menu-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.menu-btn .nav-icon {
+  width: 20px;
+  height: 20px;
 }
 
 @media (max-width: 860px) {
@@ -425,10 +414,14 @@ table.table {
 /* ---- tabs ---- */
 .tabs {
   display: flex;
-  gap: var(--s1);
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  /* The scrollbar is replaced by the edge fades below. */
   scrollbar-width: none;
+  container-type: scroll-state;
+}
+.tabs a + a {
+  margin-inline-start: var(--s1);
 }
 .tabs a {
   display: inline-flex;
@@ -449,6 +442,60 @@ table.table {
   color: var(--accent);
   border-bottom-color: var(--accent);
   font-weight: 600;
+}
+/* Fade the edge that hides more tabs: sticky overlays shown by a scroll-state container query,
+   or by .more-start / .more-end from the IntersectionObserver fallback in Tabs.tsx. */
+.tabs-fade {
+  position: sticky;
+  z-index: 1;
+  flex: none;
+  width: 32px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tabs-fade.start {
+  inset-inline-start: 0;
+  margin-inline-end: -32px;
+  background: linear-gradient(to right, var(--bg), transparent);
+}
+.tabs-fade.end {
+  inset-inline-end: 0;
+  margin-inline-start: -32px;
+  background: linear-gradient(to left, var(--bg), transparent);
+}
+.tabs-sentinel {
+  flex: none;
+  width: 1px;
+  margin-inline: -1px 0;
+  visibility: hidden;
+}
+.tabs.more-start .tabs-fade.start,
+.tabs.more-end .tabs-fade.end {
+  opacity: 1;
+}
+@container scroll-state(scrollable: inline-start) {
+  .tabs-fade.start {
+    opacity: 1;
+  }
+}
+@container scroll-state(scrollable: inline-end) {
+  .tabs-fade.end {
+    opacity: 1;
+  }
+}
+
+/* Sync failure under the project header: one line, raw git output on demand. */
+.sync-error {
+  margin-bottom: var(--s4);
+}
+.sync-error summary {
+  cursor: pointer;
+}
+.sync-error pre {
+  margin: var(--s2) 0 0;
+  white-space: pre-wrap;
+  color: var(--fg);
 }
 
 /* ---- segmented ---- */
@@ -753,69 +800,7 @@ details > summary {
   min-width: 200px;
 }
 
-/* ---- dispatch board: one strip per active task ---- */
-.board {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-}
-.strip {
-  --agent: var(--agent-other);
-  --agent-soft: var(--agent-other-soft);
-  display: grid;
-  grid-template-columns: 148px minmax(0, 1fr) auto;
-  align-items: stretch;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-.strip.claude {
-  --agent: var(--agent-claude);
-  --agent-soft: var(--agent-claude-soft);
-}
-.strip.codex {
-  --agent: var(--agent-codex);
-  --agent-soft: var(--agent-codex-soft);
-}
-.strip-who {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: var(--s3) var(--s4);
-  background: var(--agent-soft);
-  border-left: 5px solid var(--agent);
-}
-.strip-who b {
-  font-size: var(--text-lg);
-  letter-spacing: -0.01em;
-}
-.strip-who span {
-  font-size: var(--text-xs);
-  color: var(--agent);
-  font-weight: 600;
-}
-.strip-what {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--s3) var(--s4);
-  min-width: 0;
-}
-.strip-what h3 {
-  font-size: var(--text-md);
-}
-.strip-what p {
-  font-size: var(--text-sm);
-  color: var(--muted);
-}
-.strip-route {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
+/* ---- resource chips (files, symbols, contracts) ---- */
 .res {
   display: inline-flex;
   align-items: center;
@@ -846,67 +831,12 @@ details > summary {
   background: var(--high-soft);
   color: var(--high);
 }
-.strip-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--s2);
-  padding: var(--s3) var(--s4);
-  border-left: 1px dashed var(--line);
-  min-width: 132px;
-  text-align: right;
-}
-.strip.alert {
-  border-color: color-mix(in srgb, var(--high) 45%, transparent);
-}
-@media (max-width: 760px) {
-  .strip {
-    grid-template-columns: 1fr;
-  }
-  .strip-who {
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: baseline;
-    gap: var(--s2);
-    border-left: 0;
-    border-top: 4px solid var(--agent);
-  }
-  .strip-side {
-    flex-direction: row;
-    align-items: center;
-    border-left: 0;
-    border-top: 1px dashed var(--line);
-    text-align: left;
-    min-width: 0;
-  }
-}
 
 /* ---- project rows on the overview ---- */
-.project-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto;
-  gap: var(--s4);
-  align-items: center;
-  padding: var(--s4);
-  border-bottom: 1px solid var(--line);
-}
-.project-row:last-child {
-  border-bottom: 0;
-}
-.project-row:hover {
-  background: var(--hover);
-}
 .people {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-@media (max-width: 760px) {
-  .project-row {
-    grid-template-columns: 1fr;
-    gap: var(--s2);
-  }
 }
 
 /* ---- provider tiles ---- */

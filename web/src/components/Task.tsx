@@ -1,5 +1,6 @@
 import type { BoardStatus, Priority } from "../api/types";
 import { Badge, type BadgeTone } from "./Badge";
+import { Clock } from "lucide-react";
 
 export const PRIORITIES: Priority[] = ["urgent", "high", "normal", "low"];
 export const PRIORITY_INFO: Record<Priority, { label: string; tone: BadgeTone }> = {
@@ -35,6 +36,7 @@ export function DueChip({ date, done }: { date?: string; done?: boolean }) {
   const d = dueText(date);
   return (
     <span className={`due${!done && d.late ? " late" : !done && d.soon ? " soon" : ""}`} title={`Hạn ${new Date(date).toLocaleDateString("vi-VN")}`}>
+      <Clock size={13} />
       {done ? new Date(date).toLocaleDateString("vi-VN") : d.text}
     </span>
   );

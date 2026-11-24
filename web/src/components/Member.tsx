@@ -29,7 +29,17 @@ export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
     .map((p) => p[0]!.toUpperCase())
     .join("");
   return (
-    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.4, background: `hsl(${h} 45% 88%)`, color: `hsl(${h} 45% 28%)` }}>
+    <span
+      className="avatar"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.4,
+        background: `hsl(${h} 55% 90%)`,
+        color: `hsl(${h} 50% 28%)`,
+      }}
+      title={name}
+    >
       {initials || "?"}
     </span>
   );

@@ -391,7 +391,6 @@ export function ProvidersCard({ model, onChange }: { model: string | null; onCha
     <section className="stack">
       <div className="stack tight">
         <h2>Providers</h2>
-        <p className="small muted">Nơi Brain lấy model. Kết nối một cái là đủ; nối nhiều thì chọn model của provider nào cũng được.</p>
       </div>
 
       {!data.secrets_encrypted && (
@@ -448,7 +447,7 @@ export function ProvidersCard({ model, onChange }: { model: string | null; onCha
       {oauth.length > 0 && (
         <div className="stack tight">
           <h3>Đăng nhập bằng tài khoản</h3>
-          <p className="xs muted">Dùng gói bạn đang trả tiền (Claude Pro/Max, ChatGPT, Copilot…). Không cần API key.</p>
+          <p className="xs muted">Claude Pro/Max, ChatGPT, Copilot… không cần API key.</p>
           <div className="tiles">
             {oauth.map((p) => {
               const f = OAUTH_FEATURED[p.id];
@@ -535,7 +534,7 @@ export function ProvidersCard({ model, onChange }: { model: string | null; onCha
 
       <div className="stack tight">
         <h3>Qua router hoặc endpoint riêng</h3>
-        <p className="xs muted">Router giữ đăng nhập của nhiều tài khoản (Gemini CLI, Antigravity…). gtv gọi nó như một API kiểu OpenAI.</p>
+
         <div className="tiles">
           {routers.map((r) => (
             <Tile key={r.id} id={r.id} name={r.name} color={r.color} blurb={r.blurb}>

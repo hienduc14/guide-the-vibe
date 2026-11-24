@@ -47,9 +47,9 @@ export function LoginPage() {
       <form className="card" onSubmit={(e) => void submit(e)}>
         <div className="card-body stack">
           <div className="brand" style={{ padding: 0 }}>
-            <BrandMark />
+            <BrandMark size={36} />
             <span>
-              gtv
+              Guide the Vibe
               <small>Điều phối agent cho cả nhóm</small>
             </span>
           </div>

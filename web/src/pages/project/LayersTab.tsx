@@ -29,6 +29,26 @@ const METRIC_LABEL: Record<string, string> = {
   tasks: "task",
 };
 
+/** Vietnamese descriptions for the dashboard; the server's English text stays as a fallback for new features. */
+const DESC_VI: Record<string, string> = {
+  registration: "Đăng ký task và báo khi trùng việc người khác",
+  "registration.auto_from_plan": "Tự soạn đăng ký từ kế hoạch của agent",
+  drift_check: "Cảnh báo khi agent sửa ra ngoài phạm vi đã đăng ký",
+  "detect.l0_path": "Trùng đường dẫn hoặc module",
+  "detect.l1_merge": "Thử merge trước các bản đang làm dở (git merge-tree)",
+  "detect.l2_symbol": "Symbol bị đổi trong khi chỗ khác đang dùng (tree-sitter)",
+  "detect.l3_semantic": "LLM đánh giá các đăng ký và bằng chứng",
+  "knowledge.code_graph": "Sơ đồ code bằng tree-sitter (bản gốc + phần đang sửa của từng người)",
+  "knowledge.doc_kb": "Tìm toàn văn trong tài liệu nghiệp vụ, ADR, hỏi đáp",
+  "qa.tier1_answer": "Operator tự trả lời câu hỏi",
+  "qa.tier2_relay": "Chuyển câu hỏi tới agent của dev khác",
+  "qa.tier3_human": "Hỏi người khi các agent không tự quyết được",
+  "policy.ask": "Hỏi lại hoặc chặn khi có conflict high và critical",
+  "coord.priority": "Kèm độ ưu tiên và hạn của mỗi bên, khuyên bên thấp hơn nhường",
+  "notify.desktop": "Thông báo trên máy của dev",
+  brain: "Brain LLM (Pi / null)",
+};
+
 function LayerRow({ l, blockedBy, onSet }: { l: Layer; blockedBy: string[]; onSet: (m: FeatureMode | null) => void }) {
   const metrics = Object.entries(l.metrics);
   const changed = l.override !== null;
@@ -42,7 +62,9 @@ function LayerRow({ l, blockedBy, onSet }: { l: Layer; blockedBy: string[]; onSe
           {blockedBy.length > 0 && <Badge tone="danger-outline">đang tắt do: {blockedBy.join(", ")}</Badge>}
           {l.tripped && <Badge tone="danger">tự ngắt</Badge>}
         </div>
-        <span className="small">{l.description}</span>
+        <span className="small" title={l.description}>
+          {DESC_VI[l.key] ?? l.description}
+        </span>
         <div className="kv">
           {metrics.map(([k, v]) => (
             <span key={k}>
@@ -93,10 +115,9 @@ export function LayersTab() {
   const blockedBy = (l: Layer) => l.blocked_by ?? [];
   return (
     <div className="stack">
-      <div className="notice">
-        Mỗi tính năng có 3 chế độ: <b>off</b> — không chạy; <b>shadow</b> — chạy và ghi log để đánh giá nhưng không báo agent hay người; <b>on</b> — chạy và
-        báo. Tính năng phụ thuộc (cột “cần”) tự tắt khi phụ thuộc bị tắt. Lỗi lặp lại sẽ ngắt tự động.
-      </div>
+      <p className="xs muted">
+        <b>off</b> không chạy · <b>shadow</b> chạy, chỉ ghi log · <b>on</b> chạy và báo
+      </p>
       {GROUPS.map((g) => {
         const rows = data.filter((l) => g.prefix(l.key));
         if (!rows.length) return null;

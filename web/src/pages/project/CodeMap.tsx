@@ -136,14 +136,17 @@ export function CodeMap({ projectId, view }: { projectId: string; view: string }
     <Card
       title={
         <div>
-          <h3>Sơ đồ code</h3>
-          <div className="sub">
-            {mode === "dir"
-              ? "Mỗi chấm là một module (thư mục), to nhỏ theo số hàm/class; mũi tên là import. Vòng xanh: có người đang sửa; vàng: đã đăng ký; đỏ: có conflict."
-              : mode === "file"
-                ? "Mỗi chấm là một file; mũi tên là import."
-                : "Bên trái là nơi gọi hàm, giữa là hàm, bên phải là những gì nó gọi. Nét đứt: chỉ khớp theo tên."}
-          </div>
+          <h3
+            title={
+              mode === "dir"
+                ? "Mỗi chấm là một module, to nhỏ theo số hàm/class; mũi tên là import."
+                : mode === "file"
+                  ? "Mỗi chấm là một file; mũi tên là import."
+                  : "Trái: nơi gọi · giữa: hàm · phải: những gì nó gọi. Nét đứt: chỉ khớp theo tên."
+            }
+          >
+            Sơ đồ code
+          </h3>
         </div>
       }
       actions={
@@ -196,9 +199,7 @@ export function CodeMap({ projectId, view }: { projectId: string; view: string }
                 </button>
               </>
             ) : (
-              structure.data?.truncated && (
-                <span className="xs muted">Repo lớn: hiện các file có nhiều liên kết nhất. Chọn một module ở chế độ Module để xem riêng.</span>
-              )
+              structure.data?.truncated && <span className="xs muted">Chỉ hiện các file nhiều liên kết nhất.</span>
             )}
           </div>
         )}
@@ -219,7 +220,7 @@ export function CodeMap({ projectId, view }: { projectId: string; view: string }
         <div className="codemap">
           <div className="codemap-canvas">
             {mode === "calls" && !symbol ? (
-              <Empty>Nhập tên một hàm để vẽ nơi gọi nó và những gì nó gọi.</Empty>
+              <Empty>Nhập tên hàm.</Empty>
             ) : !drawn ? (
               <Loading />
             ) : drawn.nodes.length === 0 ? (

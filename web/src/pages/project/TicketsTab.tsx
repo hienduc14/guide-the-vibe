@@ -7,7 +7,6 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Badge, StatusBadge } from "../../components/Badge";
 import { Segmented } from "../../components/Segmented";
-import { Table } from "../../components/Table";
 import { Field } from "../../components/Field";
 import { Empty, ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
@@ -116,7 +115,7 @@ export function TicketsTab() {
   return (
     <div className="stack">
       <div className="row between">
-        <p className="small muted">Câu hỏi agent gửi Operator. Bậc 1: Operator tự trả lời · Bậc 2: chuyển agent đồng đội · Bậc 3: hỏi người.</p>
+        <h2 title="Bậc 1: Operator tự trả lời · Bậc 2: chuyển agent đồng đội · Bậc 3: hỏi người">Câu hỏi của agent</h2>
         <Segmented<Filter>
           options={[
             { value: "all", label: "Tất cả" },
@@ -130,39 +129,30 @@ export function TicketsTab() {
         />
       </div>
       <div className="split">
-        <Card flush>
-          <Table<Ticket>
-            rows={rows}
-            rowKey={(t) => t.id}
-            selected={selected}
-            onRowClick={(t) => setSelected(t.id)}
-            empty="Chưa có ticket"
-            columns={[
-              {
-                key: "q",
-                title: "Câu hỏi",
-                render: (t) => <span className="small">{t.question.length > 90 ? t.question.slice(0, 90) + "…" : t.question}</span>,
-              },
-              { key: "from", title: "Từ", render: (t) => t.from_dev },
-              { key: "tier", title: "Bậc", render: (t) => <span className="mono">{t.tier}</span> },
-              { key: "st", title: "Trạng thái", render: (t) => <StatusBadge status={t.status} /> },
-              {
-                key: "at",
-                title: "",
-                render: (t) => (
-                  <span className="xs faint" style={{ whiteSpace: "nowrap" }}>
-                    {ago(t.created_at)}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        </Card>
+        <nav className="pick-list" aria-label="Câu hỏi">
+          {rows.map((t) => (
+            <button key={t.id} type="button" className={`thread-row${t.id === selected ? " active" : ""}`} onClick={() => setSelected(t.id)}>
+              <span className="row" style={{ gap: 6 }}>
+                <StatusBadge status={t.status} />
+                <span className="spacer" />
+                <span className="xs faint">{ago(t.created_at)}</span>
+              </span>
+              <span className="thread-title wrap-anywhere">{t.question}</span>
+              <span className="xs muted">
+                <b>{t.from_dev}</b> · bậc {t.tier} ({TIER[t.tier]})
+              </span>
+            </button>
+          ))}
+          {rows.length === 0 && <Empty>Chưa có câu hỏi nào khớp bộ lọc</Empty>}
+        </nav>
         {current ? (
           <Detail key={current.id} t={current} onReplied={() => void reload()} />
         ) : (
           <Card>
-            <Empty>Chọn một ticket để xem chi tiết</Empty>
+            <Empty>
+              <b>Chưa chọn câu hỏi</b>
+              Chọn một câu hỏi bên trái để xem trả lời, nguồn và trả lời thay agent.
+            </Empty>
           </Card>
         )}
       </div>

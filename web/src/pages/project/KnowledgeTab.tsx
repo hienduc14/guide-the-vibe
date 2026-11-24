@@ -8,7 +8,6 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Badge, StatusBadge } from "../../components/Badge";
 import { Segmented } from "../../components/Segmented";
-import { Table } from "../../components/Table";
 import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { Empty, ErrorNotice, Loading } from "../../components/Empty";
@@ -110,7 +109,7 @@ function DocView({ docId, onChanged, onDeleted }: { docId: string; onChanged: ()
             </select>
           </Field>
           {fromRepo ? (
-            <p className="xs muted">Nội dung lấy từ file trong repo: sửa file và merge vào main để cập nhật.</p>
+            <p className="xs muted">Lấy từ repo: sửa file và merge vào main để cập nhật.</p>
           ) : (
             <Field label="Nội dung (markdown)">
               <textarea className="textarea mono" rows={14} value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} />
@@ -224,16 +223,7 @@ function AddDocs({ onAdded }: { onAdded: (id: string) => void }) {
   };
 
   return (
-    <Card
-      title={
-        <div>
-          <h3>Thêm tài liệu dự án</h3>
-          <div className="sub">
-            Yêu cầu, quy tắc nghiệp vụ, quyết định, quy ước code… Operator dựa vào đây để trả lời agent và quyết định thay vì làm phiền người.
-          </div>
-        </div>
-      }
-    >
+    <Card title="Thêm tài liệu">
       <div className="stack">
         <div
           className={`dropzone${over ? " over" : ""}`}
@@ -469,28 +459,22 @@ export function KnowledgeTab() {
           {!list.data ? (
             <Loading />
           ) : (
-            <Table<KbListItem>
-              rows={rows}
-              rowKey={(d) => d.id}
-              selected={selected}
-              onRowClick={(d) => setSelected(d.id)}
-              empty={filter === "core" ? "Chưa có tài liệu cốt lõi. Mở một tài liệu và bấm “Đánh dấu cốt lõi”." : "Chưa có tài liệu"}
-              columns={[
-                {
-                  key: "t",
-                  title: "Tiêu đề",
-                  render: (d) => (
-                    <span className="small">
-                      {d.pinned ? <b title="Tài liệu cốt lõi">★ </b> : null}
-                      {d.title}
-                    </span>
-                  ),
-                },
-                { key: "type", title: "Loại", render: (d) => <Badge>{TYPE_LABEL[d.type] ?? d.type}</Badge> },
-                { key: "st", title: "Trạng thái", render: (d) => <StatusBadge doc status={d.status} /> },
-                { key: "src", title: "Nguồn", render: (d) => <span className="xs muted">{SOURCE_LABEL[d.source] ?? d.source}</span> },
-              ]}
-            />
+            <nav className="pick-list flat" aria-label="Tài liệu">
+              {rows.map((d: KbListItem) => (
+                <button key={d.id} type="button" className={`thread-row${d.id === selected ? " active" : ""}`} onClick={() => setSelected(d.id)}>
+                  <span className="thread-title wrap-anywhere">
+                    {d.pinned ? <span title="Tài liệu cốt lõi">★ </span> : null}
+                    {d.title}
+                  </span>
+                  <span className="row" style={{ gap: 6 }}>
+                    <Badge>{TYPE_LABEL[d.type] ?? d.type}</Badge>
+                    <StatusBadge doc status={d.status} />
+                    <span className="xs muted">· {SOURCE_LABEL[d.source] ?? d.source}</span>
+                  </span>
+                </button>
+              ))}
+              {rows.length === 0 && <Empty>{filter === "core" ? "Chưa có tài liệu cốt lõi." : "Chưa có tài liệu"}</Empty>}
+            </nav>
           )}
         </Card>
         {selected ? (
@@ -506,8 +490,9 @@ export function KnowledgeTab() {
         ) : (
           <Card>
             <Empty>
-              Chọn một tài liệu. Đánh dấu <b>cốt lõi</b> cho yêu cầu, quy tắc và quyết định mà Operator phải dựa vào. Câu trả lời của Operator vào đây ở trạng
-              thái “chưa xác nhận” và chỉ thành tri thức chính thức khi có người xác nhận.
+              <b>Chưa chọn tài liệu</b>
+              Chọn một tài liệu bên trái để đọc. Tài liệu cốt lõi (★) là thứ Operator luôn dựa vào; câu trả lời của Operator vào đây ở trạng thái “chưa xác
+              nhận” cho tới khi có người xác nhận.
             </Empty>
           </Card>
         )}

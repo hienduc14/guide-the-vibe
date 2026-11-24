@@ -99,6 +99,7 @@ export class TicketService {
           context: t.context,
           teammates: this.devs().filter((d) => d !== session.dev),
           charter: charterText(this.store.charter),
+          coreDocs: this.engine.kb.coreText(),
         }),
         schema: ANSWER_SCHEMA,
       }),

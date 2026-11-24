@@ -565,3 +565,28 @@ body[data-role="viewer"] .manage-only {
     max-height: 260px;
   }
 }
+
+/* ---- documents ----------------------------------------------------------------------------- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--s5) var(--s4);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--sunken);
+  text-align: center;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.dropzone:hover,
+.dropzone.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+button.chip {
+  font: inherit;
+  cursor: pointer;
+}

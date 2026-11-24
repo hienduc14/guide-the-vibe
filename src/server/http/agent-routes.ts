@@ -234,23 +234,48 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const { kb } = c.get("rt").engine;
     const q = c.req.query("q");
     if (q) return c.json(kb.search(q, { limit: Number(c.req.query("limit") ?? 8) }));
+    if (c.req.query("core")) return c.json(kb.core().map(({ body, ...d }) => ({ ...d, size: body.length })));
     return c.json(kb.list({ type: c.req.query("type"), status: c.req.query("status") as never }));
   });
 
   app.post("/kb", async (c) => {
-    const body = (await c.req.json()) as { title: string; body: string; type?: string; supersedes?: string };
+    const body = (await c.req.json()) as { title: string; body: string; type?: string; supersedes?: string; pinned?: boolean; path?: string };
     if (!body.title?.trim() || !body.body?.trim()) throw new Error("title and body are required");
-    return c.json(
-      c.get("rt").engine.kb.upsert({
-        id: newId("manual"),
-        type: body.type ?? "doc",
-        title: body.title,
-        body: body.body,
-        status: "active",
-        source: "manual",
-        supersedes: body.supersedes,
-      }),
-    );
+    if (body.body.length > 400_000) throw new Error("document too large (max 400 000 characters): split it");
+    const { engine } = c.get("rt");
+    const doc = engine.kb.upsert({
+      id: newId("manual"),
+      type: body.type ?? "doc",
+      title: body.title.trim(),
+      body: body.body,
+      status: "active",
+      source: "manual",
+      path: body.path, // the uploaded file's name, for reference
+      supersedes: body.supersedes,
+      pinned: body.pinned ? 1 : 0,
+    });
+    engine.store.logEvent("kb_add", c.get("dev"), { id: doc.id, title: doc.title, type: doc.type, pinned: !!doc.pinned });
+    engine.store.changed();
+    return c.json(doc);
+  });
+
+  app.patch("/kb/:id", async (c) => {
+    const { engine } = c.get("rt");
+    const doc = engine.kb.edit(c.req.param("id"), await c.req.json());
+    if (!doc) throw new Error("unknown document");
+    engine.store.logEvent("kb_edit", c.get("dev"), { id: doc.id, pinned: !!doc.pinned });
+    engine.store.changed();
+    return c.json(doc);
+  });
+
+  app.delete("/kb/:id", (c) => {
+    const { engine } = c.get("rt");
+    const doc = engine.kb.get(c.req.param("id"));
+    if (!doc) throw new Error("unknown document");
+    if (doc.source === "repo") throw new Error("this document comes from the repository: delete or change the file in git");
+    engine.kb.remove(doc.id);
+    engine.store.logEvent("kb_delete", c.get("dev"), { id: doc.id, title: doc.title });
+    return c.json({ ok: true });
   });
 
   app.get("/kb/:id", (c) => c.json(c.get("rt").engine.kb.get(c.req.param("id")) ?? { error: "not found" }));

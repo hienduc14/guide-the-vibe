@@ -139,6 +139,15 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     (args) => call("pick_task", args),
   );
   server.registerTool(
+    "gtv_docs",
+    {
+      description:
+        "Read the team's project documents (requirements, business rules, decisions, guides). No arguments: list the core documents the team expects you to follow. query: search all documents. id: read one in full.",
+      inputSchema: { query: z.string().optional(), id: z.string().optional() },
+    },
+    (args) => call("docs", args),
+  );
+  server.registerTool(
     "gtv_log_work",
     {
       description: "Add a short note to your board task's work log: progress, a decision, a blocker. Managers read it on the dashboard.",

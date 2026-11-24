@@ -126,7 +126,10 @@ export const api = {
     list: (id: string) => get<KbListItem[]>(`${p(id)}/kb`),
     search: (id: string, q: string) => get<KbHit[]>(`${p(id)}/kb?q=${encodeURIComponent(q)}&limit=20`),
     get: (id: string, docId: string) => get<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}`),
-    add: (id: string, doc: { title: string; body: string; type: string }) => post<KbDoc>(`${p(id)}/kb`, doc),
+    add: (id: string, doc: { title: string; body: string; type: string; pinned?: boolean; path?: string }) => post<KbDoc>(`${p(id)}/kb`, doc),
+    edit: (id: string, docId: string, changes: { title?: string; body?: string; type?: string; pinned?: boolean }) =>
+      patch<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}`, changes),
+    remove: (id: string, docId: string) => del<{ ok: boolean }>(`${p(id)}/kb/${encodeURIComponent(docId)}`),
     review: (id: string, docId: string, action: "confirm" | "reject") => post<KbDoc>(`${p(id)}/kb/${encodeURIComponent(docId)}/${action}`),
   },
 

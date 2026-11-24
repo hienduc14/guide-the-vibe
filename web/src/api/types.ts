@@ -226,6 +226,8 @@ export interface KbListItem {
   path?: string | null;
   ticket_id?: string | null;
   supersedes?: string | null;
+  pinned?: number;
+  size?: number;
   created_at: string;
   updated_at: string;
 }

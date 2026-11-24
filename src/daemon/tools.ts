@@ -107,6 +107,25 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       );
       return lines.join("\n");
     }
+    case "docs": {
+      if (args.id) {
+        const d = await client.call<any>("GET", `${p}/kb/${encodeURIComponent(args.id)}`);
+        if (d.error) return `No document ${args.id}.`;
+        const body = d.body.length > 30_000 ? `${d.body.slice(0, 30_000)}\n… (truncated)` : d.body;
+        return `# ${d.title} [${d.type}${d.pinned ? ", core" : ""}, ${d.id}]\n\n${body}`;
+      }
+      if (args.query) {
+        const hits = await client.call<any[]>("GET", `${p}/kb?q=${encodeURIComponent(args.query)}&limit=8`);
+        if (!hits.length) return "No team document matches. Ask the Operator with gtv_ask, or your user.";
+        return [
+          "Matching team documents (read one in full with gtv_docs id):",
+          ...hits.map((h) => `- ${h.id} [${h.type}${h.status === "unverified" ? ", unverified" : ""}] ${h.section}: ${h.snippet}`),
+        ].join("\n");
+      }
+      const core = await client.call<any[]>("GET", `${p}/kb?core=1`);
+      if (!core.length) return "The team has not marked core documents. Search with gtv_docs query, or ask with gtv_ask.";
+      return ["Core project documents (follow them; read one with gtv_docs id):", ...core.map((d) => `- ${d.id} [${d.type}] ${d.title}`)].join("\n");
+    }
     case "log_work": {
       const t = myTask();
       const boardId = args.task_id ?? t?.board_id;

@@ -25,6 +25,10 @@ blockers with `gtv_log_work`.
 
 ## While coding — ask instead of guessing
 
+The team keeps requirements, business rules and decisions in gtv. The briefing lists the **core documents**;
+read the ones that touch your task with `gtv_docs` (`id`), or search with `gtv_docs` (`query`) before choosing
+an approach. Follow them; if your task needs to go against one, tell your user.
+
 Call `gtv_ask` when:
 
 - you are about to change code another developer is working on or depends on;

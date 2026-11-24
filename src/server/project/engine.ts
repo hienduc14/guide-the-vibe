@@ -186,6 +186,11 @@ export class Engine {
     const lines = ["gtv Project Operator is active for this repo."];
     const charter = charterText(this.store.charter);
     if (charter) lines.push("Project charter — choose technology and solutions that fit it:", charter);
+    const core = this.kb.core();
+    if (core.length)
+      lines.push(
+        `Core project documents (requirements and decisions the team expects you to follow; read them with gtv_docs): ${core.map((d) => `"${d.title}" (${d.id})`).join(", ")}`,
+      );
     const members = this.store.members();
     if (members.length > 1 || (members.length === 1 && members[0].dev !== session.dev))
       lines.push(`Team: ${members.map((m) => `${m.dev}${m.dev === session.dev ? " (you)" : ""} — ${m.role}, ${m.level}`).join("; ")}`);
@@ -344,6 +349,7 @@ export class Engine {
         kind: "judge_registration",
         prompt: registrationPrompt({
           charter: charterText(this.store.charter),
+          coreDocs: this.kb.coreText(),
           task: brief(task),
           others: others.map(brief),
           evidence: evidence.map((c) => ({ layer: c.layer, level: c.level, subject: c.subject, message: c.message })),

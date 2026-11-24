@@ -58,7 +58,7 @@ export function ProjectLayout() {
           { to: `/p/${id}/conflicts`, label: "Conflicts", count: c.conflicts_open, alert: c.conflicts_by_level.high + c.conflicts_by_level.critical > 0 },
           { to: `/p/${id}/layers`, label: "Layers" },
           { to: `/p/${id}/qa`, label: "Q&A", count: c.tickets_waiting, alert: c.tickets_waiting > 0 },
-          { to: `/p/${id}/knowledge`, label: "Knowledge", count: c.kb_unverified },
+          { to: `/p/${id}/knowledge`, label: "Tài liệu", count: c.kb_unverified },
           { to: `/p/${id}/graph`, label: "Code graph" },
           { to: `/p/${id}/stats`, label: "Thống kê" },
           { to: `/p/${id}/settings`, label: "Cài đặt", className: "manage-only" },

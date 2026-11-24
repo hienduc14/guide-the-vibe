@@ -98,6 +98,7 @@ export interface ProjectRecord {
   aliases: string[];
   policy: Policy;
   description?: string;
+  charter: Charter;
   archived: boolean;
   created_at: string;
   updated_at: string;
@@ -384,4 +385,18 @@ export interface Member {
   note?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ---- project charter --------------------------------------------------------------------
+
+export interface Charter {
+  goal?: string;
+  users?: string;
+  deadline?: string;
+  milestones?: string;
+  stack?: string[];
+  constraints?: string;
+  non_goals?: string;
+  quality?: "prototype" | "mvp" | "production";
+  notes?: string;
 }

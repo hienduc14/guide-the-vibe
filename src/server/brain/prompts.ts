@@ -64,9 +64,10 @@ export function answerPrompt(input: {
   question: string;
   context?: string;
   teammates: string[];
+  charter?: string;
 }): string {
   return `A developer's coding agent asks you a question mid-task.
-
+${input.charter ? `\nProject charter (goals and limits the team agreed on; prefer answers that fit it):\n${input.charter}\n` : ""}
 Asker: ${input.asker} (workspace ${input.askerWorkspace})${input.askerTask ? `\nAsker's registered task: ${input.askerTask}` : ""}
 Teammates you can forward to: ${input.teammates.join(", ") || "(none)"}
 
@@ -110,7 +111,7 @@ export interface RegistrationOutput {
   sources: { type: string; ref: string; note?: string }[];
 }
 
-export function registrationPrompt(input: { task: unknown; others: unknown[]; evidence: unknown[] }): string {
+export function registrationPrompt(input: { task: unknown; others: unknown[]; evidence: unknown[]; charter?: string }): string {
   return `A developer's agent just registered a task before starting to code. Judge whether it semantically conflicts with the other active tasks:
 the same feature done twice, incompatible assumptions, one task changing a contract (API, data shape, behaviour) the other relies on.
 Only report real risks; unrelated tasks must not be listed. Deterministic detectors already found the evidence listed below.
@@ -124,7 +125,11 @@ ${JSON.stringify(input.others, null, 2)}
 Deterministic evidence (path/symbol overlaps, merge conflicts):
 ${JSON.stringify(input.evidence, null, 2)}
 
-Use the gtv tools (code graph, WIP diffs, knowledge base) when the overlap is unclear. Also give short advice: relevant ADRs/docs, which teammate to talk to.`;
+Use the gtv tools (code graph, WIP diffs, knowledge base) when the overlap is unclear. Also give short advice: relevant ADRs/docs, which teammate to talk to.${
+    input.charter
+      ? `\n\nProject charter (goals and limits the team agreed on). If the task's plan clearly goes against it (a new framework outside the stack, work listed as out of scope, effort that does not fit the deadline), say so in the advice:\n${input.charter}`
+      : ""
+  }`;
 }
 
 export const INTENT_SCHEMA = {

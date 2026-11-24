@@ -10,7 +10,7 @@ import { ProjectRuntime, type ProjectRecord } from "../project/runtime.ts";
 import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
 import { PiBrain } from "../brain/pi.ts";
 import type { ServerConfig } from "../config.ts";
-import type { Policy } from "../../shared/types.ts";
+import type { Charter, Policy } from "../../shared/types.ts";
 import { log, nowIso } from "../../shared/util.ts";
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
@@ -37,6 +37,7 @@ export interface ProjectInput {
   aliases?: string[];
   policy?: Partial<Policy>;
   description?: string;
+  charter?: Charter;
 }
 
 export class Hub {
@@ -51,6 +52,7 @@ export class Hub {
     this.cfg = cfg;
     this.brain = brain;
     this.db = new Db(cfg.dataDir === ":memory:" ? ":memory:" : join(cfg.dataDir, "hub.db"), HUB_SCHEMA);
+    this.db.ensureColumn("projects", "charter", "TEXT NOT NULL DEFAULT '{}'");
     this.accounts = new Accounts(this.db);
   }
 
@@ -97,11 +99,12 @@ export class Hub {
         modules: input.policy?.modules ?? prev?.policy.modules ?? {},
       },
       description: input.description ?? prev?.description,
+      charter: input.charter ? cleanCharter(input.charter) : (prev?.charter ?? {}),
       archived: prev?.archived ?? false,
       created_at: prev?.created_at ?? now,
       updated_at: now,
     };
-    this.db.upsert("projects", { ...rec, aliases: rec.aliases, policy: rec.policy, archived: rec.archived });
+    this.db.upsert("projects", { ...rec, aliases: rec.aliases, policy: rec.policy, charter: rec.charter, archived: rec.archived });
     return rec;
   }
 
@@ -267,8 +270,25 @@ function rowToRecord(r: Record<string, unknown>): ProjectRecord {
     ...(r as unknown as ProjectRecord),
     aliases: parseJson(r.aliases, []),
     policy: { critical_paths: [], modules: {}, ...parseJson<Partial<Policy>>(r.policy, {}) },
+    charter: parseJson<Charter>(r.charter, {}),
     archived: !!r.archived,
   };
+}
+
+/** Keep only known charter fields, trimmed; empty strings drop out. */
+function cleanCharter(c: Charter): Charter {
+  const out: Charter = {};
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 2000) : undefined);
+  for (const k of ["goal", "users", "milestones", "constraints", "non_goals", "notes"] as const) {
+    const v = text(c[k]);
+    if (v) out[k] = v;
+  }
+  const d = text(c.deadline);
+  if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) out.deadline = d;
+  if (c.quality && ["prototype", "mvp", "production"].includes(c.quality)) out.quality = c.quality;
+  const stack = (c.stack ?? []).map((s) => String(s).trim()).filter(Boolean);
+  if (stack.length) out.stack = stack.slice(0, 30);
+  return out;
 }
 
 function checkDevName(name: string): void {

@@ -8,6 +8,7 @@ import { LevelBadge, agentName, agentTone } from "../../components/Badge";
 import { Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { ActivityFeed } from "./ActivityFeed";
+import { CharterCard } from "./CharterCard";
 import { LEVEL_LABEL } from "../../components/Member";
 import type { Member } from "../../api/types";
 
@@ -164,6 +165,7 @@ export function ProjectOverview() {
 
   return (
     <>
+      <CharterCard />
       <div className="summary">
         <span className="chip">
           <b>{c.people_active}</b> người đang làm

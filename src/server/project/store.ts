@@ -5,6 +5,7 @@ import { EventEmitter } from "node:events";
 import { Db, parseJson } from "../../shared/db.ts";
 import type {
   AgentCapabilities,
+  Charter,
   Conflict,
   FeatureMode,
   Footprint,
@@ -30,6 +31,7 @@ export class Store extends EventEmitter {
   readonly db: Db;
   private version = 0;
   policy: Policy = { critical_paths: [], modules: {} };
+  charter: Charter = {};
   features: () => Record<string, FeatureMode> = () => ({});
 
   constructor(db: Db) {
@@ -390,6 +392,7 @@ export class Store extends EventEmitter {
       conflicts: this.conflicts("open"),
       features: this.features(),
       policy: this.policy,
+      charter: this.charter,
     };
   }
 }

@@ -3,7 +3,7 @@
 import type { ServerClient } from "./client.ts";
 import type { LocalSession } from "./decide.ts";
 import type { WorkspaceInfo } from "./workspace.ts";
-import type { TeamState, Ticket } from "../shared/types.ts";
+import { charterText, type TeamState, type Ticket } from "../shared/types.ts";
 
 export interface ToolContext {
   client: ServerClient;
@@ -91,7 +91,10 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
 
 export function describeStatus(st: TeamState | undefined, server: string, dev: string, ws?: WorkspaceInfo): string {
   if (!st) return "gtv: not connected to the Operator server for this project.";
-  const lines: string[] = [`Connected to ${server} as ${dev}${ws ? ` — project ${ws.project}, workspace ${ws.id} (${ws.label})` : ""}.`, "Active tasks:"];
+  const lines: string[] = [`Connected to ${server} as ${dev}${ws ? ` — project ${ws.project}, workspace ${ws.id} (${ws.label})` : ""}.`];
+  const charter = charterText(st.charter);
+  if (charter) lines.push("Project charter:", charter);
+  lines.push("Active tasks:");
   for (const t of st.tasks) {
     const scope = t.resources.map((r) => `${r.kind}:${r.value}${r.op ? `(${r.op})` : ""}`).join(", ");
     lines.push(`- ${t.id} ${t.dev}${t.workspace_id === ws?.id ? " (you)" : ""} "${t.title}"${scope ? ` — ${scope}` : ""}`);

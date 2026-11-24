@@ -172,6 +172,7 @@ export interface TeamState {
   conflicts: Conflict[];
   features: Record<string, FeatureMode>;
   policy: Policy;
+  charter?: Charter;
 }
 
 export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";
@@ -186,6 +187,44 @@ export interface Member {
   note?: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * What the project is for and within which limits: agents read it (briefing, gtv_status, the Operator's prompts)
+ * to pick technology and solutions that fit, e.g. "MVP in 2 months for 100 users" rules out a microservice mesh.
+ */
+export interface Charter {
+  goal?: string;
+  users?: string; // who uses it and how many
+  deadline?: string; // YYYY-MM-DD
+  milestones?: string;
+  stack?: string[];
+  constraints?: string;
+  non_goals?: string;
+  quality?: "prototype" | "mvp" | "production";
+  notes?: string;
+}
+
+const QUALITY_TEXT: Record<NonNullable<Charter["quality"]>, string> = {
+  prototype: "prototype — speed over polish, throwaway code is fine",
+  mvp: "MVP — working and simple; avoid over-engineering, but no known bugs in the main flows",
+  production: "production — tests, error handling, security and maintainability matter",
+};
+
+/** The charter as a few lines for agents and the brain; empty when nothing is set. */
+export function charterText(c: Charter | undefined): string {
+  if (!c) return "";
+  const lines: string[] = [];
+  if (c.goal) lines.push(`Goal: ${c.goal}`);
+  if (c.users) lines.push(`Users: ${c.users}`);
+  if (c.deadline) lines.push(`Deadline: ${c.deadline}`);
+  if (c.milestones) lines.push(`Milestones: ${c.milestones}`);
+  if (c.quality) lines.push(`Quality bar: ${QUALITY_TEXT[c.quality]}`);
+  if (c.stack?.length) lines.push(`Stack (use these; ask before adding new frameworks or services): ${c.stack.join(", ")}`);
+  if (c.constraints) lines.push(`Constraints: ${c.constraints}`);
+  if (c.non_goals) lines.push(`Out of scope: ${c.non_goals}`);
+  if (c.notes) lines.push(`Notes: ${c.notes}`);
+  return lines.join("\n");
 }
 
 export type FeatureMode = "off" | "shadow" | "on";

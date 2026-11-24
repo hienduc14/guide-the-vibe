@@ -13,7 +13,7 @@ import { type Brain, BrainUnavailable, Semaphore } from "../brain/types.ts";
 import { REGISTRATION_SCHEMA, registrationPrompt, type RegistrationOutput, INTENT_SCHEMA, intentPrompt } from "../brain/prompts.ts";
 import { CircuitBreaker, resolveFeatures, isActive, type FeatureKey, FEATURE_KEYS } from "../../shared/features.ts";
 import type { Conflict, FeatureMode, GtvEvent, Session, Task, TaskRegistration, Workspace, Level } from "../../shared/types.ts";
-import { LEVEL_RANK } from "../../shared/types.ts";
+import { LEVEL_RANK, charterText } from "../../shared/types.ts";
 import { log, nowIso, truncate } from "../../shared/util.ts";
 
 export interface EngineConfig {
@@ -168,6 +168,8 @@ export class Engine {
     const mine = state.conflicts.filter((c) => c.workspace_a === session.workspace_id || c.workspace_b === session.workspace_id);
     const waiting = this.store.tickets({ status: ["forwarded", "waiting_human"], to_dev: session.dev });
     const lines = ["gtv Project Operator is active for this repo."];
+    const charter = charterText(this.store.charter);
+    if (charter) lines.push("Project charter — choose technology and solutions that fit it:", charter);
     const members = this.store.members();
     if (members.length > 1 || (members.length === 1 && members[0].dev !== session.dev))
       lines.push(`Team: ${members.map((m) => `${m.dev}${m.dev === session.dev ? " (you)" : ""} — ${m.role}, ${m.level}`).join("; ")}`);
@@ -319,6 +321,7 @@ export class Engine {
       const res = await this.brain.run<RegistrationOutput>({
         kind: "judge_registration",
         prompt: registrationPrompt({
+          charter: charterText(this.store.charter),
           task: brief(task),
           others: others.map(brief),
           evidence: evidence.map((c) => ({ layer: c.layer, level: c.level, subject: c.subject, message: c.message })),

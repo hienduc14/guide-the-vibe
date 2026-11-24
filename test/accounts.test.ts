@@ -130,3 +130,30 @@ test("members: everyone who works is a member; managers set role and level; agen
   assert.equal(o.json.people.find((p: any) => p.dev === "alice").level, "lead");
   assert.equal((await call("/api/projects/shop/members/bob", { method: "DELETE", token: lead.token })).status, 200);
 });
+
+test("charter: managers set it, agents get it in the briefing and in gtv_status state", async () => {
+  await call("/api/users/pm", { method: "PUT", token: ADMIN, body: { role: "manager", password: "pm-pass-123" } });
+  const pm = await login("pm", "pm-pass-123");
+  const res = await call<any>("/api/projects/shop", {
+    method: "PATCH",
+    token: pm.token,
+    body: {
+      charter: { goal: "Shop MVP", users: "100 beta users", deadline: "2027-01-31", quality: "mvp", stack: ["Node", " Postgres ", ""], deadline_bad: 1 },
+    },
+  });
+  assert.deepEqual(res.json.charter.stack, ["Node", "Postgres"]);
+  assert.equal(res.json.charter.quality, "mvp");
+  assert.equal(
+    (await call("/api/projects/shop", { method: "PATCH", token: pm.token, body: { charter: { deadline: "soon" } } })).json.charter.deadline,
+    undefined,
+  );
+  await call("/api/projects/shop", {
+    method: "PATCH",
+    token: pm.token,
+    body: { charter: { goal: "Shop MVP", deadline: "2027-01-31", stack: ["Node", "Postgres"] } },
+  });
+  const s = await startSession("shop", "carol");
+  assert.match(s.json.results[0].briefing, /Project charter[\s\S]*Goal: Shop MVP[\s\S]*Deadline: 2027-01-31[\s\S]*Stack .*Node, Postgres/);
+  const st = await call<any>("/v1/p/shop/state", { token: ADMIN });
+  assert.equal(st.json.charter.goal, "Shop MVP");
+});

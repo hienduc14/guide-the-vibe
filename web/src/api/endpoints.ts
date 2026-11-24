@@ -23,6 +23,7 @@ import type {
   TeamState,
   Ticket,
   OAuthSession,
+  Charter,
   Me,
   Member,
   MemberLevel,
@@ -42,6 +43,7 @@ export interface ProjectInput {
   aliases?: string[];
   description?: string;
   policy?: Partial<Policy>;
+  charter?: Charter;
 }
 
 export const api = {

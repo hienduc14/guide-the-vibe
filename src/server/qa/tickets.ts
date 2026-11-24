@@ -5,7 +5,7 @@
 // gtv_ask never blocks for long: it returns an answer or a ticket id; late answers are pushed to the asker.
 
 import type { Engine } from "../project/engine.ts";
-import type { Session, Ticket } from "../../shared/types.ts";
+import { charterText, type Session, type Ticket } from "../../shared/types.ts";
 import { ANSWER_SCHEMA, answerPrompt, type AnswerOutput } from "../brain/prompts.ts";
 import { isActive } from "../../shared/features.ts";
 import { newId, nowIso, truncate } from "../../shared/util.ts";
@@ -97,6 +97,7 @@ export class TicketService {
           question: t.question,
           context: t.context,
           teammates: this.devs().filter((d) => d !== session.dev),
+          charter: charterText(this.store.charter),
         }),
         schema: ANSWER_SCHEMA,
       }),

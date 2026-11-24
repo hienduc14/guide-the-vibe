@@ -8,7 +8,16 @@ import { clock, parseJson } from "../../lib/format";
 /** Routine events: hidden under "Quan trọng" so conflicts and questions are not buried. */
 const ROUTINE = new Set(["snapshot", "session_start", "prompt", "conflict_ack"]);
 const PAGE = 15;
-const ACTIONS: Record<string, string> = { ack: "đã xử lý", dismiss: "bỏ qua", reopen: "mở lại", confirm: "xác nhận", reject: "loại" };
+const ACTIONS: Record<string, string> = {
+  ack: "đánh dấu đã biết",
+  dismiss: "bỏ qua",
+  reopen: "mở lại",
+  confirm: "xác nhận",
+  reject: "loại",
+  edit: "sửa",
+  pin: "ghim",
+  unpin: "bỏ ghim",
+};
 
 /** One-line human summary of an event_log row, plus its severity when it has one. */
 export function describe(e: ActivityEvent): { text: string; level?: Level } {
@@ -49,7 +58,25 @@ export function describe(e: ActivityEvent): { text: string; level?: Level } {
     case "manual_message":
       return { text: `ghi chú gửi ${p.to_dev}: ${p.body}` };
     case "work_merged":
-      return { text: "work đã merge vào main" };
+      return { text: "work đã merge vào nhánh chính" };
+    case "board_create":
+      return { text: `tạo việc “${p.title ?? p.board_id}”${p.assignee ? `, giao ${p.assignee}` : ""}` };
+    case "board_update":
+      return { text: `cập nhật việc ${p.board_id ?? ""}${Array.isArray(p.changes) && p.changes.length ? `: ${p.changes.join(", ")}` : ""}` };
+    case "board_note":
+      return { text: `ghi chú vào việc ${p.board_id ?? ""}: ${p.body ?? ""}` };
+    case "board_pick":
+      return { text: `nhận việc ${p.board_id ?? ""}` };
+    case "board_delete":
+      return { text: `xoá việc ${p.board_id ?? ""}` };
+    case "member_set":
+      return { text: `cập nhật thành viên ${p.dev ?? ""}${p.role ? ` (${p.role})` : ""}` };
+    case "member_removed":
+      return { text: `bỏ thành viên ${p.dev ?? ""}` };
+    case "kb_add":
+      return { text: `thêm tài liệu “${p.title ?? p.id}”` };
+    case "kb_delete":
+      return { text: `xoá tài liệu “${p.title ?? p.id}”` };
     default:
       if (e.type.startsWith("conflict_")) return { text: `${verb("conflict_")} conflict ${p.id ?? ""}` };
       if (e.type.startsWith("kb_")) return { text: `${verb("kb_")} tài liệu ${p.id ?? ""}` };

@@ -89,7 +89,7 @@ export function SettingsTab() {
             <Field label="Nhánh chính">
               <input className="input mono" value={f.main_branch} onChange={(e) => setF({ ...f, main_branch: e.target.value })} />
             </Field>
-            <Field label="Aliases" hint="remote khác trỏ về repo này (dấu phẩy)">
+            <Field label="Remote khác" hint="URL khác cũng trỏ về repo này, cách nhau bằng dấu phẩy">
               <input className="input mono" value={f.aliases} onChange={(e) => setF({ ...f, aliases: e.target.value })} />
             </Field>
             <Field label="Mô tả">
@@ -116,22 +116,22 @@ export function SettingsTab() {
             />
           </Field>
           <div className="form-grid">
-            <Field label="Critical paths" hint="mỗi dòng một glob — hai người cùng chạm → conflict CRITICAL">
+            <Field label="Đường dẫn quan trọng" hint="mỗi dòng một glob — hai người cùng chạm → conflict CRITICAL">
               <textarea
                 className="textarea"
                 rows={5}
                 value={f.critical}
                 onChange={(e) => setF({ ...f, critical: e.target.value })}
-                placeholder={"**/migrations/**\npackage-lock.json"}
+                placeholder={"Ví dụ:\n**/migrations/**\npackage-lock.json"}
               />
             </Field>
-            <Field label="Modules" hint="mỗi dòng “tên: glob, glob” — dùng cho L0 cùng module">
+            <Field label="Module" hint="mỗi dòng “tên: glob, glob” — dùng cho L0 cùng module">
               <textarea
                 className="textarea"
                 rows={5}
                 value={f.modules}
                 onChange={(e) => setF({ ...f, modules: e.target.value })}
-                placeholder={"auth: src/app/routes/auth/**\narticles: src/app/routes/article/**"}
+                placeholder={"Ví dụ:\nauth: src/app/routes/auth/**\narticles: src/app/routes/article/**"}
               />
             </Field>
           </div>
@@ -196,7 +196,7 @@ export function SettingsTab() {
                   void reload();
                 }}
               >
-                {syncing ? "Đang sync…" : "Sync now"}
+                {syncing ? "Đang đồng bộ…" : "Đồng bộ ngay"}
               </button>
             </div>
             <hr className="sep admin-only" style={{ margin: 0 }} />

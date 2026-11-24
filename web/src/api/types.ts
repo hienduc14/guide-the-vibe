@@ -29,6 +29,8 @@ export interface Person {
   role: string | null;
   level: MemberLevel | null;
   status: SessionStatus;
+  /** Has work in progress and an agent session that has not ended: the dashboard's one meaning of "đang làm". */
+  working?: boolean;
   agents: string[];
   workspaces: string[];
   last_seen: string;

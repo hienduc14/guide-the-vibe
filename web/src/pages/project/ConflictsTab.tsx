@@ -29,6 +29,11 @@ const KIND_VI: Record<string, string> = {
   same_symbol_declared: "Cùng khai báo một symbol",
   breaking_change_used: "Đổi symbol mà bên kia đang dùng",
   semantic: "Brain thấy hai việc xung khắc",
+  edit_in_scope: "Sửa file trong phạm vi người khác đã đăng ký",
+  planned_breaking_change: "Định đổi symbol mà bên kia đang dùng",
+  critical_path: "Cùng chạm đường dẫn quan trọng",
+  main: "Không merge sạch được vào nhánh chính",
+  text: "Thử merge thì đụng nhau ở cùng dòng code",
 };
 
 function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" | "reopen") => void }) {

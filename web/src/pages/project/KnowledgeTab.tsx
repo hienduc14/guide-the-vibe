@@ -12,6 +12,9 @@ import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { Empty, ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
+import { EmptyState } from "../../components/Visual";
+import { Markdown } from "../../components/Markdown";
+import { BookOpen } from "lucide-react";
 
 export const DOC_TYPES: { value: string; label: string }[] = [
   { value: "req", label: "Yêu cầu" },
@@ -141,7 +144,7 @@ function DocView({ docId, onChanged, onDeleted }: { docId: string; onChanged: ()
               Tài liệu cốt lõi: Operator đọc nó mỗi khi trả lời agent hoặc đánh giá việc đăng ký, agent thấy tên nó khi mở phiên.
             </div>
           )}
-          <div className="doc-body">{data.body}</div>
+          <div className="doc-body">{data.type === "qa" ? data.body : <Markdown text={data.body} />}</div>
           {can("manager") && data.source !== "ticket" && (
             <div className="row">
               <button className="btn sm" type="button" onClick={() => setEdit({ title: data.title, body: data.body, type: data.type })}>
@@ -469,7 +472,7 @@ export function KnowledgeTab() {
                   <span className="row" style={{ gap: 6 }}>
                     <Badge>{TYPE_LABEL[d.type] ?? d.type}</Badge>
                     <StatusBadge doc status={d.status} />
-                    <span className="xs muted">· {SOURCE_LABEL[d.source] ?? d.source}</span>
+                    {d.source !== "ticket" && <span className="xs muted">· {SOURCE_LABEL[d.source] ?? d.source}</span>}
                   </span>
                 </button>
               ))}
@@ -489,11 +492,10 @@ export function KnowledgeTab() {
           />
         ) : (
           <Card>
-            <Empty>
-              <b>Chưa chọn tài liệu</b>
+            <EmptyState icon={BookOpen} title="Chưa chọn tài liệu">
               Chọn một tài liệu bên trái để đọc. Tài liệu cốt lõi (★) là thứ Operator luôn dựa vào; câu trả lời của Operator vào đây ở trạng thái “chưa xác
               nhận” cho tới khi có người xác nhận.
-            </Empty>
+            </EmptyState>
           </Card>
         )}
       </div>

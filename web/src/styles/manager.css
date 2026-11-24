@@ -317,13 +317,17 @@ body[data-role="viewer"] .manage-only {
   display: grid;
   grid-template-columns: minmax(240px, 320px) 1fr;
   gap: var(--s3);
-  min-height: 520px;
+  /* Fill the window below the project header and filters, so only the list and the chat scroll. */
+  height: max(480px, calc(100dvh - 250px));
+}
+.convo > .chat {
+  max-height: none;
 }
 .convo-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 70vh;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--s1);
   border: 1px solid var(--line);
@@ -556,8 +560,14 @@ body[data-role="viewer"] .manage-only {
   .overview-cols {
     grid-template-columns: 1fr;
   }
+  .convo {
+    height: auto;
+  }
   .convo-list {
     max-height: 260px;
+  }
+  .convo > .chat {
+    max-height: 70vh;
   }
 }
 

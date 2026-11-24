@@ -55,7 +55,7 @@ export function ProjectLayout() {
             </span>
             {data.last_sync && (
               <span className={data.last_sync.ok ? "" : "danger-text"}>
-                {data.last_sync.ok ? "sync" : "sync lỗi"} {ago(data.last_sync.at)}
+                {data.last_sync.ok ? "đồng bộ" : "đồng bộ lỗi"} {ago(data.last_sync.at)}
               </span>
             )}
           </span>

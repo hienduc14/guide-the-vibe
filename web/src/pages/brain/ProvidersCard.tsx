@@ -32,10 +32,10 @@ const BRAND: Record<string, { color: string; mark?: string; blurb?: string }> = 
 /** Account logins worth a tile; the rest go in a picker. Blurbs differ from the API-key ones on purpose. */
 const OAUTH_FEATURED: Record<string, { name: string; blurb: string }> = {
   anthropic: { name: "Claude Pro/Max", blurb: "Dùng gói Claude bạn đang trả tiền." },
-  "openai-codex": { name: "ChatGPT Plus/Pro", blurb: "Model GPT qua gói ChatGPT, như Codex CLI." },
+  "openai-codex": { name: "ChatGPT Plus/Pro (Codex)", blurb: "Dùng gói ChatGPT đang trả tiền, qua cùng cổng với Codex CLI." },
   "github-copilot": { name: "GitHub Copilot", blurb: "Claude, GPT và Gemini trong gói Copilot." },
   antigravity: { name: "Antigravity", blurb: "Gemini và Claude bằng tài khoản Google. Google có thể khoá tài khoản dùng cách này." },
-  openai: { name: "ChatGPT", blurb: "Đăng nhập ChatGPT bằng trình duyệt." },
+  openai: { name: "ChatGPT (trình duyệt)", blurb: "Đăng nhập tài khoản ChatGPT trên web, không cần gói Codex." },
   xai: { name: "Grok", blurb: "Gói Grok trên X." },
 };
 
@@ -444,119 +444,134 @@ export function ProvidersCard({ model, onChange }: { model: string | null; onCha
         </div>
       )}
 
-      {oauth.length > 0 && (
-        <div className="stack tight">
-          <h3>Đăng nhập bằng tài khoản</h3>
-          <p className="xs muted">Claude Pro/Max, ChatGPT, Copilot… không cần API key.</p>
-          <div className="tiles">
-            {oauth.map((p) => {
-              const f = OAUTH_FEATURED[p.id];
-              return (
-                <Tile key={p.id} id={p.id} name={f.name} blurb={f.blurb}>
-                  <span className="xs faint">{p.oauth === "device" ? "Nhập mã" : "Dán lại URL"}</span>
-                  <button className="btn sm primary" type="button" onClick={() => setOpen({ kind: "oauth", id: p.id, name: f.name })}>
-                    Đăng nhập
-                  </button>
-                </Tile>
-              );
-            })}
-            {oauthRest.length > 0 && (
-              <div className="tile">
-                <div className="tile-head">
-                  <Logo id="other" name="+" color="#8794a2" />
-                  <h3>Tài khoản khác</h3>
-                </div>
-                <select id="other-oauth" className="select" value={otherOauth} onChange={(e) => setOtherOauth(e.target.value)} aria-label="Tài khoản khác">
-                  <option value="">Chọn trong {oauthRest.length} dịch vụ…</option>
-                  {oauthRest.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="tile-foot">
-                  <span />
-                  <button
-                    className="btn sm primary"
-                    type="button"
-                    disabled={!otherOauth}
-                    onClick={() => setOpen({ kind: "oauth", id: otherOauth, name: byId.get(otherOauth)?.name ?? otherOauth })}
-                  >
-                    Đăng nhập
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="stack tight">
-        <h3>Dùng API key</h3>
-        <div className="tiles">
-          {popular.map((p) => (
-            <Tile key={p.id} id={p.id} name={p.name} blurb={BRAND[p.id]?.blurb ?? (p.models ? `${p.models} model` : undefined)}>
-              <span />
-              <button className="btn sm" type="button" onClick={() => setOpen({ kind: "key", id: p.id, name: p.name })}>
-                Nhập key
-              </button>
-            </Tile>
-          ))}
-          {rest.length > 0 && (
-            <div className="tile">
-              <div className="tile-head">
-                <Logo id="other" name="+" color="#8794a2" />
-                <h3>Provider khác</h3>
-              </div>
-              <select id="other-provider" className="select" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Provider khác">
-                <option value="">Chọn trong {rest.length} provider…</option>
-                {rest.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <div className="tile-foot">
-                <span />
-                <button
-                  className="btn sm"
-                  type="button"
-                  disabled={!other}
-                  onClick={() => setOpen({ kind: "key", id: other, name: byId.get(other)?.name ?? other })}
-                >
-                  Nhập key
-                </button>
+      <details className="add-providers" open={connected.length === 0}>
+        <summary>
+          <b>{connected.length ? "Kết nối thêm provider" : "Kết nối một provider"}</b>
+          <span className="xs muted">Đăng nhập tài khoản, nhập API key, hoặc trỏ tới router/endpoint riêng</span>
+        </summary>
+        <div className="stack">
+          {oauth.length > 0 && (
+            <div className="stack tight">
+              <h3>Đăng nhập bằng tài khoản</h3>
+              <p className="xs muted">Claude Pro/Max, ChatGPT, Copilot… không cần API key.</p>
+              <div className="tiles">
+                {oauth.map((p) => {
+                  const f = OAUTH_FEATURED[p.id];
+                  return (
+                    <Tile key={p.id} id={p.id} name={f.name} blurb={f.blurb}>
+                      <span />
+                      <button
+                        className="btn sm primary"
+                        type="button"
+                        title={p.oauth === "device" ? "Mở trang đăng nhập rồi nhập mã gtv đưa" : "Đăng nhập trên trình duyệt rồi dán URL trả về"}
+                        onClick={() => setOpen({ kind: "oauth", id: p.id, name: f.name })}
+                      >
+                        Đăng nhập
+                      </button>
+                    </Tile>
+                  );
+                })}
+                {oauthRest.length > 0 && (
+                  <div className="tile">
+                    <div className="tile-head">
+                      <Logo id="other" name="+" color="#8794a2" />
+                      <h3>Tài khoản khác</h3>
+                    </div>
+                    <select id="other-oauth" className="select" value={otherOauth} onChange={(e) => setOtherOauth(e.target.value)} aria-label="Tài khoản khác">
+                      <option value="">Chọn trong {oauthRest.length} dịch vụ…</option>
+                      {oauthRest.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="tile-foot">
+                      <span />
+                      <button
+                        className="btn sm primary"
+                        type="button"
+                        disabled={!otherOauth}
+                        onClick={() => setOpen({ kind: "oauth", id: otherOauth, name: byId.get(otherOauth)?.name ?? otherOauth })}
+                      >
+                        Đăng nhập
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="stack tight">
-        <h3>Qua router hoặc endpoint riêng</h3>
+          <div className="stack tight">
+            <h3>Dùng API key</h3>
+            <div className="tiles">
+              {popular.map((p) => (
+                <Tile key={p.id} id={p.id} name={p.name} blurb={BRAND[p.id]?.blurb ?? (p.models ? `${p.models} model` : undefined)}>
+                  <span />
+                  <button className="btn sm" type="button" onClick={() => setOpen({ kind: "key", id: p.id, name: p.name })}>
+                    Nhập key
+                  </button>
+                </Tile>
+              ))}
+              {rest.length > 0 && (
+                <div className="tile">
+                  <div className="tile-head">
+                    <Logo id="other" name="+" color="#8794a2" />
+                    <h3>Provider khác</h3>
+                  </div>
+                  <select id="other-provider" className="select" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Provider khác">
+                    <option value="">Chọn trong {rest.length} provider…</option>
+                    {rest.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="tile-foot">
+                    <span />
+                    <button
+                      className="btn sm"
+                      type="button"
+                      disabled={!other}
+                      onClick={() => setOpen({ kind: "key", id: other, name: byId.get(other)?.name ?? other })}
+                    >
+                      Nhập key
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-        <div className="tiles">
-          {routers.map((r) => (
-            <Tile key={r.id} id={r.id} name={r.name} color={r.color} blurb={r.blurb}>
-              <span className="xs faint mono truncate">{r.base_url.replace(/^https?:\/\//, "")}</span>
-              <button className="btn sm" type="button" onClick={() => setOpen({ kind: "endpoint", preset: r })}>
-                Kết nối
-              </button>
-            </Tile>
-          ))}
-          <Tile
-            id="custom"
-            name="Endpoint khác"
-            color="#8794a2"
-            blurb="Bất kỳ API nào tương thích OpenAI hoặc Anthropic: vLLM, LM Studio, gateway của công ty…"
-          >
-            <span />
-            <button className="btn sm" type="button" onClick={() => setOpen({ kind: "endpoint" })}>
-              Thêm
-            </button>
-          </Tile>
+          <div className="stack tight">
+            <h3>Qua router hoặc endpoint riêng</h3>
+
+            <div className="tiles">
+              {routers.map((r) => (
+                <Tile key={r.id} id={r.id} name={r.name} color={r.color} blurb={r.blurb}>
+                  <span className="xs faint mono truncate" title="Địa chỉ mặc định, tính từ máy chạy server gtv; đổi được khi kết nối">
+                    {r.base_url.replace(/^https?:\/\//, "")}
+                  </span>
+                  <button className="btn sm" type="button" onClick={() => setOpen({ kind: "endpoint", preset: r })}>
+                    Kết nối
+                  </button>
+                </Tile>
+              ))}
+              <Tile
+                id="custom"
+                name="Endpoint khác"
+                color="#8794a2"
+                blurb="Bất kỳ API nào tương thích OpenAI hoặc Anthropic: vLLM, LM Studio, gateway của công ty…"
+              >
+                <span />
+                <button className="btn sm" type="button" onClick={() => setOpen({ kind: "endpoint" })}>
+                  Thêm
+                </button>
+              </Tile>
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
 
       {open?.kind === "oauth" && <OAuthDialog id={open.id} name={open.name} onClose={() => setOpen(undefined)} onDone={() => changed(open.id)} />}
       {open?.kind === "key" && <KeyDialog id={open.id} name={open.name} onClose={() => setOpen(undefined)} onDone={changed} />}

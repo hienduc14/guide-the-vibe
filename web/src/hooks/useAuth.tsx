@@ -20,6 +20,24 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const ROLE_KEY = "gtv.lastRole";
+function readRole(): Role | null {
+  try {
+    const r = localStorage.getItem(ROLE_KEY);
+    return r && r in RANK ? (r as Role) : null;
+  } catch {
+    return null;
+  }
+}
+function writeRole(role: Role | null) {
+  try {
+    if (role) localStorage.setItem(ROLE_KEY, role);
+    else localStorage.removeItem(ROLE_KEY);
+  } catch {
+    /* storage blocked: the role then loads with /me as before */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTok] = useState<string | null>(getShareToken() ?? getToken());
   const [needsLogin, setNeedsLogin] = useState(false);
@@ -40,9 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, needsLogin]);
 
   // Role-dependent CSS: .manage-only and .admin-only controls disappear for lower roles.
+  // Until /me answers, keep the role from the last visit so the sidebar does not flash
+  // admin items away and back on every reload; the server still refuses what a role may not do.
   useEffect(() => {
-    const role = me?.role ?? "viewer";
-    document.body.dataset.role = role;
+    if (!me) {
+      if (!document.body.dataset.role) document.body.dataset.role = readRole() ?? "viewer";
+      return;
+    }
+    document.body.dataset.role = me.role;
+    writeRole(me.role);
   }, [me]);
 
   const login = useCallback((t: string) => {
@@ -58,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setTok(null);
     setMe(undefined);
+    writeRole(null);
+    document.body.dataset.role = "viewer";
     setNeedsLogin(true);
   }, []);
 

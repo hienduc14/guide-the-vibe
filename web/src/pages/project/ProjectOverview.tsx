@@ -59,7 +59,7 @@ const clashes = (r: TaskResource, conflicts: Conflict[]) =>
 function Resource({ r, clash }: { r: TaskResource; clash: boolean }) {
   return (
     <span className={`res${clash ? " clash" : BREAKING.has(r.op ?? "") ? " breaking" : ""}`} title={`${r.kind}: ${r.value}${r.op ? ` (${r.op})` : ""}`}>
-      {r.value}
+      <span className="res-v">{r.value}</span>
       {r.op && <em>{OP_LABEL[r.op] ?? r.op}</em>}
     </span>
   );
@@ -214,7 +214,7 @@ function attentionLink(projectId: string, a: AttentionItem): string {
 }
 
 /** What a lead should look at now: serious conflicts, questions waiting for a person, late or blocked work. */
-function AttentionCard({ projectId }: { projectId: string }) {
+function AttentionCard({ projectId, openConflicts }: { projectId: string; openConflicts: number }) {
   const { data } = usePoll(() => api.projects.attention(projectId), [projectId], 5000);
   return (
     <Card
@@ -229,7 +229,13 @@ function AttentionCard({ projectId }: { projectId: string }) {
       {!data ? (
         <Loading />
       ) : data.length === 0 ? (
-        <EmptyState icon={CircleCheck} title="Không có gì cần xử lý" />
+        <EmptyState icon={CircleCheck} title="Không có gì cần xử lý">
+          {openConflicts > 0 && (
+            <>
+              {openConflicts} conflict còn mở nhưng đã được các bên ghi nhận. <Link to={`/p/${projectId}/conflicts`}>Xem conflict</Link>
+            </>
+          )}
+        </EmptyState>
       ) : (
         <div className="attention">
           {data.slice(0, 8).map((a) => (
@@ -388,7 +394,7 @@ export function ProjectOverview() {
 
       <div className="overview-cols">
         <div className="stack">
-          <AttentionCard projectId={id} />
+          <AttentionCard projectId={id} openConflicts={c.conflicts_open} />
           <section className="stack tight">
             <h2 className="section-title" title="Mỗi hàng là một phiên agent. Ô đỏ: đang đụng người khác. Ô vàng: thay đổi làm hỏng chỗ gọi.">
               <Activity />

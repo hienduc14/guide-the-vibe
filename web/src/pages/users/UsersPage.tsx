@@ -53,7 +53,7 @@ export function UsersPage() {
       <div className="grid">
         {(["admin", "manager", "viewer"] as Role[]).map((r) => (
           <div key={r} className="card">
-            <div className="card-body stack tight">
+            <div className="card-body stack tight" style={{ alignItems: "flex-start" }}>
               <RoleBadge role={r} />
               <span className="small muted">{ROLE_INFO[r].what}</span>
             </div>
@@ -96,7 +96,7 @@ export function UsersPage() {
           <Table<User>
             rows={data}
             rowKey={(u) => u.name}
-            empty="Chưa có tài khoản nào."
+            empty="Chưa có tài khoản nào. Admin token không phải tài khoản nên không nằm trong danh sách này."
             columns={[
               { key: "n", title: "Tên", render: (u) => <b>{u.name}</b> },
               {

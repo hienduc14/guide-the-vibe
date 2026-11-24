@@ -10,6 +10,8 @@ import { Segmented } from "../../components/Segmented";
 import { Field } from "../../components/Field";
 import { Empty, ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
+import { EmptyState } from "../../components/Visual";
+import { MessageCircleQuestion } from "lucide-react";
 
 type Filter = "waiting" | "all" | "1" | "2" | "3";
 const WAITING = new Set(["answering", "forwarded", "waiting_human"]);
@@ -149,10 +151,9 @@ export function TicketsTab() {
           <Detail key={current.id} t={current} onReplied={() => void reload()} />
         ) : (
           <Card>
-            <Empty>
-              <b>Chưa chọn câu hỏi</b>
+            <EmptyState icon={MessageCircleQuestion} title="Chưa chọn câu hỏi">
               Chọn một câu hỏi bên trái để xem trả lời, nguồn và trả lời thay agent.
-            </Empty>
+            </EmptyState>
           </Card>
         )}
       </div>

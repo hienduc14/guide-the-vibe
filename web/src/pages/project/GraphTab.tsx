@@ -13,7 +13,7 @@ import { CodeMap } from "./CodeMap";
 const CONF_TONE = { local: "solid", import: "strong", name: "default" } as const;
 
 export function GraphTab() {
-  const { id } = useProject();
+  const { id, detail } = useProject();
   const stats = usePoll(() => api.graph.stats(id), [id], 15_000);
   const state = usePoll(() => api.projects.state(id), [id], 15_000);
   const [view, setView] = useState("base");
@@ -33,7 +33,7 @@ export function GraphTab() {
         <Stat label="Symbol" value={stats.data?.base.symbols ?? "—"} />
         <Stat label="Tham chiếu" value={stats.data?.base.refs ?? "—"} />
         <Stat
-          label="main"
+          label={`Commit ${detail.main_branch}`}
           value={
             <span className="mono" style={{ fontSize: "var(--text-lg)" }}>
               {shortSha(stats.data?.main)}

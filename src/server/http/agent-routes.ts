@@ -16,6 +16,8 @@ type Ctx = Context<ProjectEnv>;
 const sessionOf = (c: Ctx, id: string | undefined): Session => {
   const s = id ? c.get("rt").engine.store.session(id) : undefined;
   if (!s || (s.dev !== c.get("dev") && !c.get("admin"))) throw new Error(`unknown session ${id}`);
+  // Any call from an agent shows its developer is at work, not only prompts and edits (gtv_ask, gtv_pick_task…).
+  if (s.dev === c.get("dev")) c.get("rt").engine.store.touchSession(s.id);
   return s;
 };
 

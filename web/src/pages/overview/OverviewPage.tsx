@@ -23,7 +23,7 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
       </Link>
     );
   }
-  const active = p.people.filter((x) => x.status === "active");
+  const active = p.people.filter((x) => x.working ?? x.status === "active");
   const syncFailed = p.last_sync && !p.last_sync.ok;
   const lv = p.counts.conflicts_by_level;
   const conflictTone = lv.critical + lv.high > 0 ? "high" : lv.warning > 0 ? "warning" : "neutral";
@@ -54,21 +54,21 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
         <span className="metrics">
           <span className={`metric t-${conflictTone}`} title="Conflict đang mở">
             <Zap />
-            {p.counts.conflicts_open}
+            {p.counts.conflicts_open} conflict
           </span>
           <span className={`metric${p.counts.tickets_waiting ? " t-warning" : ""}`} title="Câu hỏi chờ người">
             <MessageCircleQuestion />
-            {p.counts.tickets_waiting}
+            {p.counts.tickets_waiting} chờ trả lời
           </span>
           <span className={`metric${p.board.overdue ? " t-high" : ""}`} title="Việc quá hạn">
             <CalendarClock />
-            {p.board.overdue}
+            {p.board.overdue} quá hạn
           </span>
         </span>
         <span className="spacer" />
         {syncFailed ? (
           <StatusDot tone="high" title={p.last_sync?.error}>
-            Sync lỗi
+            Đồng bộ lỗi
           </StatusDot>
         ) : deadline ? (
           <span className="metric" title="Hạn chót">
@@ -89,7 +89,7 @@ export function OverviewPage() {
 
   const loaded = data.projects.filter(isLoaded);
   const sum = (f: (p: (typeof loaded)[number]) => number) => loaded.reduce((n, p) => n + f(p), 0);
-  const people = new Set(loaded.flatMap((p) => p.people.filter((x) => x.status === "active").map((x) => x.dev)));
+  const people = new Set(loaded.flatMap((p) => p.people.filter((x) => x.working ?? x.status === "active").map((x) => x.dev)));
   const conflicts = sum((p) => p.counts.conflicts_open);
   const serious = sum((p) => p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical);
   const waiting = sum((p) => p.counts.tickets_waiting);

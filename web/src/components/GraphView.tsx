@@ -29,6 +29,13 @@ interface Pos {
   vy: number;
 }
 
+/** Paths keep their last two parts ("src/app/routes/article" → "routes/article"); the full id stays in the hover title. */
+function shortLabel(label: string): string {
+  const parts = label.split("/").filter(Boolean);
+  const short = parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : label;
+  return short.length > 28 ? `${short.slice(0, 27)}…` : short;
+}
+
 const W = 1000;
 const H = 640;
 
@@ -224,6 +231,15 @@ export function GraphView({
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const maxW = Math.max(1, ...edges.map((e) => e.weight ?? 1));
+  // Graph units per screen pixel: text is sized in screen pixels so labels stay 11px whatever the zoom or box size.
+  const unit = vb.w / Math.max(1, size.w) / view.k;
+  // With many nodes, only the biggest and the flagged ones keep a permanent label; the rest show on hover.
+  const labelled = useMemo(() => {
+    if (nodes.length <= 14) return undefined;
+    const keep = new Set(nodes.filter((n) => n.ring || n.note).map((n) => n.id));
+    for (const n of [...nodes].sort((a, b) => b.r - a.r).slice(0, 10)) keep.add(n.id);
+    return keep;
+  }, [nodes]);
 
   return (
     <div className="graphview" style={{ height }} ref={box}>
@@ -292,11 +308,13 @@ export function GraphView({
                 <title>{n.title ?? n.label}</title>
                 {n.ring && <circle r={n.r + 5} fill="none" stroke={n.ring} strokeWidth={3} />}
                 <circle r={n.r} fill={n.color} className="gv-dot" />
-                <text y={n.r + 13} textAnchor="middle" className="gv-label">
-                  {n.label.length > 28 ? `${n.label.slice(0, 27)}…` : n.label}
-                </text>
+                {(!labelled || labelled.has(n.id) || neighbours?.has(n.id)) && (
+                  <text y={n.r + 14 * unit} textAnchor="middle" className="gv-label" style={{ fontSize: 11 * unit, strokeWidth: 3 * unit }}>
+                    {shortLabel(n.label)}
+                  </text>
+                )}
                 {n.note && (
-                  <text y={n.r + 26} textAnchor="middle" className="gv-note" fill={n.ring}>
+                  <text y={n.r + 27 * unit} textAnchor="middle" className="gv-note" fill={n.ring} style={{ fontSize: 10.5 * unit, strokeWidth: 3 * unit }}>
                     {n.note}
                   </text>
                 )}

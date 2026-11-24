@@ -327,6 +327,29 @@ export class Store extends EventEmitter {
     return m;
   }
 
+  /**
+   * Everyone who works on the project is a member: called when a dev opens a session, registers, picks or is
+   * given a task. Adds a default row once; a manager sets role and level on the dashboard.
+   */
+  ensureMember(dev: string | undefined): void {
+    if (!dev || this.member(dev) || !/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) return;
+    this.saveMember(dev, {});
+  }
+
+  /** One-off repair for projects created before members were added automatically everywhere. */
+  backfillMembers(): number {
+    const devs = this.db.all<{ dev: string }>(
+      `SELECT dev FROM sessions UNION SELECT dev FROM tasks UNION SELECT assignee AS dev FROM board_tasks WHERE assignee IS NOT NULL`,
+    );
+    let added = 0;
+    for (const { dev } of devs) {
+      if (this.member(dev)) continue;
+      this.ensureMember(dev);
+      if (this.member(dev)) added++;
+    }
+    return added;
+  }
+
   removeMember(dev: string): void {
     this.db.run(`DELETE FROM members WHERE dev = ?`, dev);
     this.changed();

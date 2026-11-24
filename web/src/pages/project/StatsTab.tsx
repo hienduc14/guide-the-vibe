@@ -19,7 +19,7 @@ import { ms } from "../../lib/format";
 const toBars = (rows: KN[], label: (k: string) => string = (k) => k) => rows.map((r) => ({ label: label(r.k), value: r.n }));
 const TIER: Record<string, string> = { "1": "Bậc 1 · Operator", "2": "Bậc 2 · agent đồng đội", "3": "Bậc 3 · người" };
 
-function TechStats({ days }: { days: "7" | "30" }) {
+function TechStats({ days }: { days: string }) {
   const { id } = useProject();
   const { data, error } = usePoll(() => api.projects.stats(id, Number(days)), [id, days], 10_000);
   if (error && !data) return <ErrorNotice error={error} />;
@@ -223,7 +223,7 @@ export function StatsTab() {
           title={`Kỳ trước: ${p.donePrev}`}
           aside={
             <span className={`delta${delta > 0 ? " up" : delta < 0 ? " down" : ""}`}>
-              {delta > 0 ? "▲" : delta < 0 ? "▼" : "="} {Math.abs(delta)}
+              {delta === 0 ? "như kỳ trước" : `${delta > 0 ? "▲" : "▼"} ${Math.abs(delta)} so với kỳ trước`}
             </span>
           }
         />
@@ -314,9 +314,9 @@ export function StatsTab() {
       <details className="tech-stats" open={tech} onToggle={(e) => setTech((e.target as HTMLDetailsElement).open)}>
         <summary>
           <Wrench />
-          Số liệu kỹ thuật (Brain, conflict, hỏi đáp, sự kiện)
+          Số liệu kỹ thuật (Brain, conflict, hỏi đáp, sự kiện) · {range} ngày
         </summary>
-        {tech && <TechStats days={n >= 30 ? "30" : "7"} />}
+        {tech && <TechStats days={range} />}
       </details>
     </div>
   );

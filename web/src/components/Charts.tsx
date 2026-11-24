@@ -7,8 +7,24 @@ export interface BarDatum {
   alt?: number;
 }
 
-export function BarChart({ data, height = 120, altLabel = "lỗi" }: { data: BarDatum[]; height?: number; altLabel?: string }) {
-  if (!data.length) return <div className="empty">Chưa có dữ liệu</div>;
+export function BarChart({
+  data,
+  height = 120,
+  altLabel = "lỗi",
+  empty = "Chưa có gì trong khoảng thời gian này",
+}: {
+  data: BarDatum[];
+  height?: number;
+  altLabel?: string;
+  empty?: string;
+}) {
+  // All-zero days draw an empty grid that reads like a broken chart; say so in words instead.
+  if (!data.some((d) => d.value > 0))
+    return (
+      <div className="empty" style={{ minHeight: height, display: "grid", placeItems: "center" }}>
+        {empty}
+      </div>
+    );
   const max = Math.max(1, ...data.map((d) => d.value));
   const chartH = height - 20;
   return (

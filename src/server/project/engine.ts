@@ -62,6 +62,10 @@ export class Engine {
     this.brain = opts.brain;
     this.cfg = opts.cfg;
     this.store.features = () => this.features();
+    // One-off repairs for data written before the board and automatic members existed; no-ops afterwards.
+    const adopted = this.board.adoptOrphans();
+    const members = this.store.backfillMembers();
+    if (adopted || members) log("engine", `repaired: ${adopted} board item(s) for old registrations, ${members} member(s) added`);
   }
 
   // ---- feature flags --------------------------------------------------------
@@ -158,7 +162,7 @@ export class Engine {
         const session = this.store.upsertSession({ ...ev.session, dev });
         this.store.logEvent("session_start", dev, ev.session);
         // Everyone who works on the project is a member; a manager sets their role and level on the dashboard.
-        if (!this.store.member(dev)) this.store.saveMember(dev, {});
+        this.store.ensureMember(dev);
         return { session, briefing: this.briefing(session) };
       }
       case "session_end":
@@ -205,7 +209,18 @@ export class Engine {
         lines.push(`- ${t.dev}: "${t.title}"${paths ? ` (${paths})` : ""}`);
       }
     } else lines.push("No teammate has an active task right now.");
-    if (mine.length) lines.push(`Open conflicts involving you: ${mine.map((c) => `${c.id} ${c.level} ${c.subject}`).join("; ")}`);
+    // Work the developer already owns, so a new session carries it on instead of registering it again.
+    const own = this.board
+      .list({ open: true, assignee: session.dev })
+      .filter((t) => t.status === "in_progress" || t.status === "blocked" || t.status === "todo")
+      .slice(0, 5);
+    if (own.length)
+      lines.push(
+        `Your unfinished board tasks (to carry one on, call gtv_pick_task with its id before gtv_register_task): ${own
+          .map((t) => `${t.id} "${t.title}" (${t.status.replace("_", " ")})`)
+          .join("; ")}`,
+      );
+    if (mine.length) lines.push(`Open conflicts involving you:${mine.map((c) => `${c.id} ${c.level} ${c.subject}`).join("; ")}`);
     if (waiting.length)
       lines.push(`Questions waiting for your answer: ${waiting.map((t) => `${t.id}: ${truncate(t.forwarded_question ?? t.question, 120)}`).join(" | ")}`);
     lines.push(
@@ -278,6 +293,16 @@ export class Engine {
     const board_id = this.board.resolveFor(session, reg);
     const previous = this.store.sessionTask(session.id);
     const task = this.store.registerTask(session, { ...reg, board_id });
+    // Carried over from an earlier session in this checkout: that session's registration is replaced by this one.
+    this.store.db.run(
+      `UPDATE tasks SET status = 'abandoned', updated_at = ? WHERE dev = ? AND workspace_id = ? AND board_id = ? AND id != ? AND status IN ('registered','active')`,
+      task.created_at,
+      session.dev,
+      session.workspace_id,
+      board_id,
+      task.id,
+    );
+    this.store.ensureMember(session.dev);
     // The session moved on to other work: its previous item goes back to To do (unless another agent is on it).
     if (previous?.board_id && previous.board_id !== board_id) this.board.onRegistrationClosed(previous, "abandoned");
     this.board.onRegistered(task, session);

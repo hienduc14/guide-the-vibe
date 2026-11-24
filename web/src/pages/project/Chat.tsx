@@ -41,12 +41,22 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
   const end = useRef<HTMLDivElement>(null);
   const { can } = useAuth();
   const run = useAction();
-  const [to, setTo] = useState(thread.participants.find((p) => p !== "operator") ?? "");
+  // Messages go to developers' agents: thread participants who are members or were sent something.
+  const recipients = thread.participants.filter((p) => !isSystem(p) && (members.some((m) => m.dev === p) || thread.entries.some((e) => e.to === p)));
+  const [to, setTo] = useState(recipients[0] ?? "");
   const [text, setText] = useState("");
   const first = thread.participants.find((p) => !isSystem(p));
   const role = new Map(members.map((m) => [m.dev, m.role]));
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [thread.id, thread.entries.length]);
-  useEffect(() => setTo(thread.participants.find((p) => p !== "operator") ?? ""), [thread.id]);
+  // Scroll the chat itself (not the page) to the newest message. scrollIntoView would move the page, and
+  // returns a promise in recent Chrome, which React would take for a cleanup function.
+  useEffect(() => {
+    const body = end.current?.parentElement;
+    if (body) body.scrollTop = body.scrollHeight;
+  }, [thread.id, thread.entries.length]);
+  useEffect(() => {
+    setTo(recipients[0] ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread.id]);
 
   return (
     <div className="chat">
@@ -114,7 +124,7 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
           }}
         >
           <select className="input sm" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Gửi tới">
-            {[...new Set([...thread.participants.filter((p) => !isSystem(p)), ...members.map((m) => m.dev)])].map((p) => (
+            {[...new Set([...recipients, ...members.map((m) => m.dev)])].map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>

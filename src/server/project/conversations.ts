@@ -47,14 +47,13 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
     const kind = m.kind === "ticket_question" ? "forward" : m.kind === "human_request" ? "human" : m.kind === "ticket_answer" ? "answer" : "note";
     // The asker's own "forwarded to X" notice adds nothing to the thread.
     if (kind === "answer" && /^Question \S+ (was forwarded|is waiting)/.test(m.body)) continue;
-    entries.push({
-      id: m.id,
-      from: m.from_dev ?? "gtv",
-      to: m.to_dev,
-      at: m.created_at,
-      kind,
-      body: strip(m.body).replace(/\nAnswer with the gtv_reply tool[\s\S]*$/, ""),
-    });
+    const body = strip(m.body)
+      .replace(/\nAnswer with the gtv_reply tool[\s\S]*$/, "")
+      .replace(/\nReply in a terminal:[\s\S]*$/, "")
+      .replace(/^Q: [\s\S]*?\nA: /, ""); // answers repeat the question: the thread already shows it
+    // A question asked straight to a teammate is delivered word for word: the asker's bubble already says it.
+    if (kind === "forward" && body.trim() === t.question.trim()) continue;
+    entries.push({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind, body });
   }
   // A synchronous answer (gtv_ask returned it directly) has no message: take it from the ticket.
   if (t.answer && (t.status === "answered" || t.status === "closed" || t.status === "expired") && !entries.some((e) => e.kind === "answer"))
@@ -209,8 +208,10 @@ export function attention(engine: Engine): AttentionItem[] {
         ref: t.id,
         at: t.updated_at,
       });
+  const listed = new Set(out.filter((a) => a.kind === "conflict").map((a) => a.ref));
   for (const b of engine.board.list({ open: true })) {
-    if (b.blocked)
+    // Work blocked only by a conflict already listed above would repeat it: list the task when nothing else does.
+    if (b.blocked && (b.status === "blocked" || !b.conflicts.some((c) => listed.has(c.id))))
       out.push({
         kind: "blocked",
         level: "high",

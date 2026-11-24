@@ -194,11 +194,11 @@ test("conversations: question, forward and answer read as one thread; leads see 
     q.entries.map((e: any) => [e.kind, e.from, e.to]),
     [
       ["question", "alice", "bob"],
-      ["forward", "alice", "bob"],
       ["answer", "bob", "alice"],
     ],
+    "a question asked straight to bob is not repeated as a forward",
   );
-  assert.match(q.entries[1].body, /^Can I change total\(\) to take a Cart\?$/);
+  assert.equal(q.entries[1].body, "Yes, after Friday", "the answer without the repeated question");
   assert.ok(threads.some((x) => x.kind === "conflict" && x.participants.includes("alice") && x.participants.includes("bob")));
   assert.ok(threads.some((x) => x.kind === "task" && x.title === "Hotfix totals"));
   const note = threads.find((x) => x.id === "note:bob");

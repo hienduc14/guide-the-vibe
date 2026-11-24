@@ -8,6 +8,8 @@ import type {
   Conflict,
   FeatureMode,
   Footprint,
+  Member,
+  MemberLevel,
   Message,
   Policy,
   Session,
@@ -18,7 +20,7 @@ import type {
   Ticket,
   Workspace,
 } from "../../shared/types.ts";
-import { AGENT_CAPABILITIES, LEVEL_RANK } from "../../shared/types.ts";
+import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_LEVELS } from "../../shared/types.ts";
 import { newId, nowIso, normPath } from "../../shared/util.ts";
 
 const SESSION_IDLE_MS = 5 * 60_000;
@@ -292,6 +294,39 @@ export class Store extends EventEmitter {
     this.db.run(`UPDATE conflicts SET status = ?, updated_at = ? WHERE id = ?`, status, nowIso(), c.id);
     this.changed();
     return { ...c, status };
+  }
+
+  // ---- members -------------------------------------------------------------------
+
+  members(): Member[] {
+    return this.db.all<Member>(`SELECT * FROM members ORDER BY dev`);
+  }
+
+  member(dev: string): Member | undefined {
+    return this.db.get<Member>(`SELECT * FROM members WHERE dev = ?`, dev);
+  }
+
+  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string }): Member {
+    if (!/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) throw new Error("dev name: letters, digits, . _ -");
+    if (input.level && !MEMBER_LEVELS.includes(input.level)) throw new Error(`level must be one of ${MEMBER_LEVELS.join(", ")}`);
+    const prev = this.member(dev);
+    const now = nowIso();
+    const m: Member = {
+      dev,
+      role: (input.role ?? prev?.role ?? "developer").trim() || "developer",
+      level: input.level ?? prev?.level ?? "mid",
+      note: input.note ?? prev?.note,
+      created_at: prev?.created_at ?? now,
+      updated_at: now,
+    };
+    this.db.upsert("members", m as unknown as Record<string, unknown>);
+    this.changed();
+    return m;
+  }
+
+  removeMember(dev: string): void {
+    this.db.run(`DELETE FROM members WHERE dev = ?`, dev);
+    this.changed();
   }
 
   // ---- messages -----------------------------------------------------------------

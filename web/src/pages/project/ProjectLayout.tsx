@@ -52,6 +52,7 @@ export function ProjectLayout() {
       <Tabs
         items={[
           { to: `/p/${id}`, label: "Tổng quan", end: true },
+          { to: `/p/${id}/members`, label: "Thành viên", count: data.members.length },
           { to: `/p/${id}/conflicts`, label: "Conflicts", count: c.conflicts_open, alert: c.conflicts_by_level.high + c.conflicts_by_level.critical > 0 },
           { to: `/p/${id}/layers`, label: "Layers" },
           { to: `/p/${id}/qa`, label: "Q&A", count: c.tickets_waiting, alert: c.tickets_waiting > 0 },

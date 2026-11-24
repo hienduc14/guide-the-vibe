@@ -27,11 +27,24 @@ export function summarize(rt: ProjectRuntime) {
   for (const c of state.conflicts) byLevel[c.level]++;
   const people = new Map<
     string,
-    { dev: string; status: string; agents: Set<string>; workspaces: Set<string>; last_seen: string; tasks: string[]; editing: number; conflicts: number }
+    {
+      dev: string;
+      role: string | null;
+      level: string | null;
+      status: string;
+      agents: Set<string>;
+      workspaces: Set<string>;
+      last_seen: string;
+      tasks: string[];
+      editing: number;
+      conflicts: number;
+    }
   >();
   for (const s of sessions) {
     const p = people.get(s.dev) ?? {
       dev: s.dev,
+      role: store.member(s.dev)?.role ?? null,
+      level: store.member(s.dev)?.level ?? null,
       status: "ended",
       agents: new Set(),
       workspaces: new Set(),
@@ -67,6 +80,7 @@ export function summarize(rt: ProjectRuntime) {
       tickets_waiting: store.tickets({ status: ["answering", "forwarded", "waiting_human"] }).length,
       kb_unverified: rt.engine.kb.list({ status: "unverified" }).length,
     },
+    members: store.members(),
     people: [...people.values()]
       .map((p) => ({ ...p, agents: [...p.agents], workspaces: [...p.workspaces] }))
       .sort((a, b) => (a.status === b.status ? a.dev.localeCompare(b.dev) : a.status === "active" ? -1 : 1)),
@@ -253,6 +267,21 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     const p = await rt(c.req.param("id"));
     await p.sync();
     return c.json({ last_sync: p.lastSync, main: p.engine.mainSha });
+  });
+
+  // Team members: role and level per developer in this project.
+  app.get("/projects/:id/members", async (c) => c.json((await rt(c.req.param("id"))).engine.store.members()));
+  app.put("/projects/:id/members/:dev", async (c) => {
+    const p = await rt(c.req.param("id"));
+    const m = p.engine.store.saveMember(c.req.param("dev"), await c.req.json());
+    p.engine.store.logEvent("member_set", c.get("dev"), m);
+    return c.json(m);
+  });
+  app.delete("/projects/:id/members/:dev", async (c) => {
+    const p = await rt(c.req.param("id"));
+    p.engine.store.removeMember(c.req.param("dev"));
+    p.engine.store.logEvent("member_removed", c.get("dev"), { dev: c.req.param("dev") });
+    return c.json({ ok: true });
   });
 
   // Read-only links for showing a project to people outside the team.

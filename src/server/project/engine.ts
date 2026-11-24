@@ -141,6 +141,8 @@ export class Engine {
       case "session_start": {
         const session = this.store.upsertSession({ ...ev.session, dev });
         this.store.logEvent("session_start", dev, ev.session);
+        // Everyone who works on the project is a member; a manager sets their role and level on the dashboard.
+        if (!this.store.member(dev)) this.store.saveMember(dev, {});
         return { session, briefing: this.briefing(session) };
       }
       case "session_end":
@@ -166,6 +168,9 @@ export class Engine {
     const mine = state.conflicts.filter((c) => c.workspace_a === session.workspace_id || c.workspace_b === session.workspace_id);
     const waiting = this.store.tickets({ status: ["forwarded", "waiting_human"], to_dev: session.dev });
     const lines = ["gtv Project Operator is active for this repo."];
+    const members = this.store.members();
+    if (members.length > 1 || (members.length === 1 && members[0].dev !== session.dev))
+      lines.push(`Team: ${members.map((m) => `${m.dev}${m.dev === session.dev ? " (you)" : ""} — ${m.role}, ${m.level}`).join("; ")}`);
     if (others.length) {
       lines.push("Teammates' active tasks:");
       for (const t of others) {

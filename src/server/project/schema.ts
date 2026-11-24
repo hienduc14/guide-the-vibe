@@ -49,6 +49,11 @@ CREATE TABLE IF NOT EXISTS kb_docs (
   source TEXT NOT NULL, path TEXT, ticket_id TEXT, supersedes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS kb_fts USING fts5(doc_id UNINDEXED, title, body, tokenize = 'unicode61 remove_diacritics 2');
+-- Team members of this project: what they do (role) and how senior they are (level). Level breaks ties
+-- between equally urgent tasks; it never overrides task priority.
+CREATE TABLE IF NOT EXISTS members (
+  dev TEXT PRIMARY KEY, role TEXT NOT NULL, level TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS feature_overrides (feature TEXT PRIMARY KEY, mode TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS event_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, type TEXT NOT NULL, actor TEXT, payload TEXT NOT NULL

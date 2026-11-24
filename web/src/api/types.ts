@@ -26,6 +26,8 @@ export interface BrainStats {
 
 export interface Person {
   dev: string;
+  role: string | null;
+  level: MemberLevel | null;
   status: SessionStatus;
   agents: string[];
   workspaces: string[];
@@ -52,6 +54,7 @@ export interface ProjectSummary {
     tickets_waiting: number;
     kb_unverified: number;
   };
+  members: Member[];
   people: Person[];
   error?: undefined;
 }
@@ -368,4 +371,17 @@ export interface ShareLink {
   expires_at: string | null;
   last_used: string | null;
   code?: string;
+}
+
+// ---- project members --------------------------------------------------------------------
+
+export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";
+
+export interface Member {
+  dev: string;
+  role: string;
+  level: MemberLevel;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -174,6 +174,20 @@ export interface TeamState {
   policy: Policy;
 }
 
+export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";
+export const MEMBER_LEVELS: MemberLevel[] = ["intern", "junior", "mid", "senior", "lead"];
+export const LEVEL_ORDER: Record<MemberLevel, number> = { intern: 0, junior: 1, mid: 2, senior: 3, lead: 4 };
+
+/** A developer's place in one project. */
+export interface Member {
+  dev: string;
+  role: string; // free text: "backend", "frontend", "tech lead", "qa", …
+  level: MemberLevel;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type FeatureMode = "off" | "shadow" | "on";
 
 export interface Policy {

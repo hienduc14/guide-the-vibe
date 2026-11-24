@@ -24,6 +24,8 @@ import type {
   Ticket,
   OAuthSession,
   Me,
+  Member,
+  MemberLevel,
   Role,
   ShareLink,
   User,
@@ -55,6 +57,13 @@ export const api = {
     list: () => get<User[]>("/api/users"),
     save: (name: string, input: { role?: Role; password?: string }) => put<User>(`/api/users/${encodeURIComponent(name)}`, input),
     remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
+  },
+
+  members: {
+    list: (id: string) => get<Member[]>(`${a(id)}/members`),
+    save: (id: string, dev: string, input: { role?: string; level?: MemberLevel; note?: string }) =>
+      put<Member>(`${a(id)}/members/${encodeURIComponent(dev)}`, input),
+    remove: (id: string, dev: string) => del<{ ok: boolean }>(`${a(id)}/members/${encodeURIComponent(dev)}`),
   },
 
   shareLinks: {

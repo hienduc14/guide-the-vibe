@@ -11,6 +11,8 @@ import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
+import { isLoaded } from "../../api/types";
+import { LevelLadder } from "../../components/Member";
 import { InviteLink, IssuedToken, forgetIssued, lastIssued, rememberIssued } from "./IssuedToken";
 
 /** The daemon talks to the server constantly; seen in the last 5 minutes = connected. */
@@ -25,6 +27,9 @@ export function DevsPage() {
   const [ack, setAck] = useState(false);
   const [invite, setInvite] = useState<{ name: string; code: string }>();
   // Issuing the first developer ends open dev mode; without an admin token the dashboard then locks.
+  // Where each developer works and as what (from each project's members).
+  const roles = (dev: string) =>
+    (overview?.projects ?? []).filter(isLoaded).flatMap((p) => p.members.filter((m) => m.dev === dev).map((m) => ({ project: p.name, m })));
   const firstInOpenMode = !!overview?.open_mode && (data?.length ?? 0) === 0;
 
   const inviteDev = async (e: FormEvent) => {
@@ -124,6 +129,23 @@ export function DevsPage() {
                     />
                     <b>{d.name}</b>
                   </span>
+                ),
+              },
+              {
+                key: "p",
+                title: "Project · vai trò",
+                render: (d) => (
+                  <div className="stack tight" style={{ gap: 4 }}>
+                    {roles(d.name).map(({ project, m }) => (
+                      <span key={project} className="row" style={{ gap: 8 }}>
+                        <span className="small">
+                          <b>{project}</b> · {m.role}
+                        </span>
+                        <LevelLadder level={m.level} />
+                      </span>
+                    ))}
+                    {roles(d.name).length === 0 && <span className="xs faint">chưa thuộc project nào</span>}
+                  </div>
                 ),
               },
               { key: "s", title: "Kết nối lần cuối", render: (d) => <span className="xs muted">{d.last_seen ? ago(d.last_seen) : "chưa bao giờ"}</span> },

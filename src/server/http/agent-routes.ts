@@ -103,6 +103,8 @@ export function agentRoutes(): Hono<ProjectEnv> {
     return c.json(next);
   });
 
+  app.get("/members", (c) => c.json(c.get("rt").engine.store.members()));
+
   app.get("/tasks", (c) => c.json(c.get("rt").engine.store.activeTasks()));
 
   /** "Would touching these paths/symbols collide with someone?" (gtv_check) */

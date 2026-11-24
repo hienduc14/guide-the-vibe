@@ -41,3 +41,75 @@ body[data-role="viewer"] .manage-only {
 .who b {
   font-size: var(--text-sm);
 }
+
+/* ---- members ---------------------------------------------------------------------------- */
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.members {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.member {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.member-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+}
+.member-role {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.member-now {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--line);
+}
+
+.ladder {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.ladder i {
+  width: 14px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.ladder i.on {
+  background: var(--accent);
+}
+.ladder span {
+  margin-left: 6px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.strip-who .who-role {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}

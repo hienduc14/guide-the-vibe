@@ -14,9 +14,10 @@ let a: Origin;
 let b: Origin;
 const ADMIN = "admin-secret";
 
-async function call<T = any>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<{ status: number; json: T }> {
+async function call<T = any>(path: string, init: { method?: string; body?: unknown; token?: string; dev?: string } = {}): Promise<{ status: number; json: T }> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (init.token) headers.authorization = `Bearer ${init.token}`;
+  if (init.dev) headers["x-gtv-dev"] = init.dev;
   const res = await srv.app.request(path, { method: init.method ?? "GET", headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
   return { status: res.status, json: (await res.json()) as T };
 }
@@ -96,4 +97,36 @@ test("share links read one project and nothing else", async () => {
 
   await call(`/api/projects/shop/share-links/${link.json.id}`, { method: "DELETE", token: ADMIN });
   assert.equal((await call("/api/me", { token: code })).status, 401, "revoked");
+});
+
+const startSession = (project: string, dev: string, token = ADMIN) =>
+  call<any>(`/v1/p/${project}/events`, {
+    method: "POST",
+    token,
+    dev,
+    body: { type: "session_start", session: { dev, agent: "claude", workspace_id: `ws_${dev}`, workspace_label: dev, agent_session_id: `s-${dev}` } },
+  });
+
+test("members: everyone who works is a member; managers set role and level; agents see the team", async () => {
+  await startSession("shop", "alice");
+  const m = await call<any[]>("/api/projects/shop/members", { token: ADMIN });
+  assert.deepEqual(
+    m.json.map((x) => [x.dev, x.role, x.level]),
+    [["alice", "developer", "mid"]],
+  );
+  await call("/api/users/lead", { method: "PUT", token: ADMIN, body: { role: "manager", password: "lead-pass-1" } });
+  await call("/api/users/watch", { method: "PUT", token: ADMIN, body: { role: "viewer", password: "watch-pass-1" } });
+  const lead = await login("lead", "lead-pass-1");
+  const watch = await login("watch", "watch-pass-1");
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "PUT", token: watch.token, body: { role: "frontend", level: "junior" } })).status, 403);
+  const bob = await call<any>("/api/projects/shop/members/bob", { method: "PUT", token: lead.token, body: { role: "frontend", level: "junior" } });
+  assert.equal(bob.json.level, "junior");
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "PUT", token: lead.token, body: { level: "guru" } })).status, 400);
+  await call("/api/projects/shop/members/alice", { method: "PUT", token: lead.token, body: { role: "tech lead", level: "lead" } });
+
+  const s = await startSession("shop", "bob");
+  assert.match(s.json.results[0].briefing, /Team: alice — tech lead, lead; bob \(you\) — frontend, junior/);
+  const o = await call<any>("/api/projects/shop", { token: watch.token });
+  assert.equal(o.json.people.find((p: any) => p.dev === "alice").level, "lead");
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "DELETE", token: lead.token })).status, 200);
 });

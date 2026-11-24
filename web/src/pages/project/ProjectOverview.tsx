@@ -8,6 +8,8 @@ import { LevelBadge, agentName, agentTone } from "../../components/Badge";
 import { Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { ActivityFeed } from "./ActivityFeed";
+import { LEVEL_LABEL } from "../../components/Member";
+import type { Member } from "../../api/types";
 
 const RANK: Record<Level, number> = { info: 0, warning: 1, high: 2, critical: 3 };
 const BREAKING = new Set(["sig_change", "rename", "delete"]);
@@ -89,7 +91,8 @@ function strips(s: TeamState): Strip[] {
   return out;
 }
 
-function Board({ state, projectId }: { state: TeamState; projectId: string }) {
+function Board({ state, projectId, members }: { state: TeamState; projectId: string; members: Member[] }) {
+  const member = new Map(members.map((m) => [m.dev, m]));
   const rows = strips(state);
   if (!rows.length)
     return (
@@ -109,6 +112,11 @@ function Board({ state, projectId }: { state: TeamState; projectId: string }) {
           <article key={r.key} className={`strip ${agentTone(r.agent)}${alert ? " alert" : ""}`}>
             <div className="strip-who">
               <b>{r.dev}</b>
+              {member.get(r.dev) && (
+                <span className="who-role">
+                  {member.get(r.dev)!.role} · {LEVEL_LABEL[member.get(r.dev)!.level]}
+                </span>
+              )}
               <span>{agentName(r.agent)}</span>
             </div>
             <div className="strip-what">
@@ -179,7 +187,7 @@ export function ProjectOverview() {
           <h2>Bảng điều phối</h2>
           <span className="xs muted">Mỗi dải là một phiên agent. Ô đỏ là chỗ đang đụng người khác, ô vàng là thay đổi làm hỏng chỗ gọi.</span>
         </div>
-        {state.data ? <Board state={state.data} projectId={id} /> : <Loading />}
+        {state.data ? <Board state={state.data} projectId={id} members={detail.members} /> : <Loading />}
       </section>
 
       <ActivityFeed events={activity.data ?? []} />

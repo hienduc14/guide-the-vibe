@@ -143,3 +143,38 @@ test("managers edit items from the dashboard and every change is logged", async 
   assert.equal((await call(`/v1/p/shop/board/${t.id}`, { method: "DELETE", dev: "lead" })).status, 200);
   assert.equal(board().get(t.id), undefined);
 });
+
+test("conflict notices carry both tasks' priority and tell the lower-priority side to give way", async () => {
+  const hot = await call<any>("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Hotfix totals", priority: "urgent", assignee: "alice" } });
+  const nice = await call<any>("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Refactor cart", priority: "low", assignee: "bob" } });
+  for (const [dev, item] of [
+    ["alice", hot.json.id],
+    ["bob", nice.json.id],
+  ]) {
+    await call(`/v1/p/shop/board/${item}/pick`, { method: "POST", dev, body: { session_id: sessions[dev] } });
+    await call("/v1/p/shop/tasks", {
+      method: "POST",
+      dev,
+      body: { session_id: sessions[dev], title: `${dev} cart work`, resources: [{ kind: "path", value: "src/cart.ts" }] },
+    });
+  }
+  const store = srv.hub.live("shop")!.engine.store;
+  store.markDelivered([...pending("alice"), ...pending("bob")].map((m) => m.id));
+  for (const dev of ["alice", "bob"])
+    await call("/v1/p/shop/events", { method: "POST", dev, body: { type: "edit", session_id: sessions[dev], paths: ["src/cart.ts"], phase: "post" } });
+
+  const toBob = pending("bob").find((m) => m.kind === "conflict")!;
+  const toAlice = pending("alice").find((m) => m.kind === "conflict")!;
+  assert.match(toBob.body, /Your task: "Refactor cart" \(low\)\. alice \(developer, mid\)'s task: "Hotfix totals" \(urgent\)/);
+  assert.match(toBob.body, /alice's work goes first \(higher priority\)\. Pause your changes/);
+  assert.match(toAlice.body, /Your work goes first \(higher priority\); bob was asked to give way/);
+
+  // Off: plain notices, as before.
+  srv.hub.live("shop")!.engine.setFeature("coord.priority", "off");
+  store.markDelivered([...pending("alice"), ...pending("bob")].map((m) => m.id));
+  store.syncConflicts("L0", [], () => true);
+  await call("/v1/p/shop/events", { method: "POST", dev: "bob", body: { type: "edit", session_id: sessions.bob, paths: ["src/user.ts"], phase: "post" } });
+  srv.hub.live("shop")!.engine.runL0();
+  const plain = pending("bob").find((m) => m.kind === "conflict");
+  assert.ok(plain && !/goes first/.test(plain.body));
+});

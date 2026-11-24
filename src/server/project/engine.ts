@@ -3,6 +3,7 @@
 import type { Db } from "../../shared/db.ts";
 import { Store } from "./store.ts";
 import { Board, type BoardView } from "./board.ts";
+import { conflictAdvice, standingOf } from "./coord.ts";
 import type { Repo } from "./repo.ts";
 import { KnowledgeBase, type KbHit } from "../knowledge/kb.ts";
 import { CodeGraph, BASE } from "../../codeintel/graph.ts";
@@ -120,20 +121,29 @@ export class Engine {
   }
 
   notifyConflicts(conflicts: Conflict[]): void {
+    const coord = this.mode("coord.priority");
     for (const c of conflicts) {
       this.store.logEvent("conflict", undefined, c);
       if (c.level === "info") continue; // visible in status, not pushed into agents
-      for (const [ws, dev] of [
-        [c.workspace_a, c.dev_a],
-        [c.workspace_b, c.dev_b],
-      ] as const) {
+      const sides = [
+        [c.workspace_a, c.dev_a, c.workspace_b, c.dev_b],
+        [c.workspace_b, c.dev_b, c.workspace_a, c.dev_a],
+      ] as const;
+      for (const [ws, dev, otherWs, otherDev] of sides) {
         if (ws === "main") continue;
+        // Each side hears what the other is doing, how urgent both are, and who should give way (SPEC D40).
+        let extra = "";
+        if (coord !== "off" && otherWs !== "main") {
+          const a = conflictAdvice(standingOf(this, ws, dev), standingOf(this, otherWs, otherDev), c.subject);
+          if (coord === "on") extra = `\n${a.header}\n→ ${a.advice}`;
+          else this.store.logEvent("priority_advice", dev, { conflict: c.id, ...a });
+        }
         this.store.addMessage({
           to_dev: dev,
           to_workspace: ws,
           kind: "conflict",
           ref_id: c.id,
-          body: `[gtv ${c.level.toUpperCase()} · ${c.layer}] ${c.message}\n(conflict ${c.id} — after coordinating, acknowledge it with the gtv_ack tool)`,
+          body: `[gtv ${c.level.toUpperCase()} · ${c.layer}] ${c.message}${extra}\n(conflict ${c.id} — after coordinating, acknowledge it with the gtv_ack tool)`,
         });
       }
     }

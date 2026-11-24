@@ -8,6 +8,7 @@ import type { Engine } from "../project/engine.ts";
 import { charterText, type Session, type Ticket } from "../../shared/types.ts";
 import { ANSWER_SCHEMA, answerPrompt, type AnswerOutput } from "../brain/prompts.ts";
 import { isActive } from "../../shared/features.ts";
+import { describeWork, standingOf } from "../project/coord.ts";
 import { newId, nowIso, truncate } from "../../shared/util.ts";
 
 export interface TicketConfig {
@@ -139,11 +140,15 @@ export class TicketService {
     t.forwarded_question = question;
     t.answer = note;
     this.save(t);
+    // Who asks and for what work, so the teammate can weigh the question against their own task (SPEC D40).
+    const asker = this.store.session(t.from_session);
+    const work =
+      this.engine.mode("coord.priority") === "on" && asker ? ` · working on ${describeWork(standingOf(this.engine, asker.workspace_id, t.from_dev))}` : "";
     this.store.addMessage({
       to_dev: toDev,
       kind: "ticket_question",
       ref_id: t.id,
-      body: `[gtv question ${t.id} from ${t.from_dev}] ${question}\nAnswer with the gtv_reply tool (ticket_id "${t.id}") if you can decide from your task and code; if your user must decide, call gtv_reply with escalate=true and ask them.`,
+      body: `[gtv question ${t.id} from ${t.from_dev}${work}] ${question}\nAnswer with the gtv_reply tool (ticket_id "${t.id}") if you can decide from your task and code; if your user must decide, call gtv_reply with escalate=true and ask them.`,
     });
     this.notifyAsker(t, `Question ${t.id} was forwarded to ${toDev}. Continue with other work; the answer will be delivered to you.`);
     return t;

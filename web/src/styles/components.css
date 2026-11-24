@@ -882,6 +882,14 @@ details > summary {
   color: #fff;
   background: var(--logo, var(--muted));
 }
+/* A real logo sits on a white chip with a hairline, in both themes, so dark marks stay visible. */
+.logo.real {
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.logo.real img {
+  display: block;
+}
 .tile-head h3 {
   font-size: var(--text-md);
 }

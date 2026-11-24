@@ -61,8 +61,36 @@ const ROUTERS = [
   { id: "ollama", name: "Ollama", base_url: "http://localhost:11434/v1", color: "#3a3f45", blurb: "Model chạy trên máy của bạn." },
 ];
 
+/** Real logos (public/providers, see SOURCE.txt there); providers without one keep the coloured monogram. */
+const LOGO: Record<string, string> = {
+  anthropic: "claude-color",
+  "openai-codex": "codex-color",
+  "openai-chatgpt": "openai",
+  openai: "openai",
+  "github-copilot": "githubcopilot",
+  antigravity: "antigravity-color",
+  "google-antigravity": "antigravity-color",
+  google: "gemini-color",
+  openrouter: "openrouter",
+  xai: "xai",
+  "kimi-coding": "kimi-color",
+  meta: "meta-color",
+  groq: "groq",
+  deepseek: "deepseek-color",
+  mistral: "mistral-color",
+  cerebras: "cerebras-color",
+  ollama: "ollama",
+};
+
 function Logo({ id, name, color }: { id: string; name: string; color?: string }) {
   const b = BRAND[id];
+  const file = LOGO[id];
+  if (file)
+    return (
+      <span className="logo real" aria-hidden="true">
+        <img src={`/providers/${file}.svg`} alt="" width={22} height={22} />
+      </span>
+    );
   const mark = b?.mark ?? name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2);
   return (
     <span className="logo" style={{ ["--logo" as string]: color ?? b?.color ?? "#5b6875" }} aria-hidden="true">

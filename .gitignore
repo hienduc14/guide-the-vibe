@@ -6,3 +6,6 @@ node_modules/
 dist/
 sandbox/
 docker/.env
+
+# local screenshots and generated images
+output/

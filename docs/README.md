@@ -13,4 +13,4 @@
 | [testing.md](testing.md)                     | Bộ test, cách chạy, self-test RealWorld, đọc báo cáo                                                                             |
 | [reports/](reports/)                         | Báo cáo kiểm thử sinh tự động (đừng sửa tay)                                                                                     |
 
-Đặc tả gốc và lý do thiết kế: [../SPEC.md](../SPEC.md). Dashboard: [../web/README.md](../web/README.md).
+Đặc tả gốc và lý do thiết kế: [../SPEC.md](../SPEC.md). Dashboard: [../web/README.md](../web/README.md). Hệ thiết kế giao diện: [../DESIGN.md](../DESIGN.md).

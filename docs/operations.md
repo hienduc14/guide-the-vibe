@@ -103,7 +103,7 @@ Mọi xác thực LLM đi qua Pi: key nhập trên dashboard nằm trong `Creden
 
 Cách gtv gọi Pi (`src/server/brain/pi.ts`): Pi không ép schema JSON nên schema nằm trong prompt và gtv tự kiểm JSON (sai thì nhắc lại một lần, giữ nguyên lịch sử). Chỉ lượt kết thúc bằng `stop` + JSON hợp lệ mới tính là thành công. Lỗi tạm thời (429/5xx, mất kết nối, quá giờ) thành `BrainUnavailable`: tính năng bỏ qua (fail-open) mà không làm nhảy cầu dao. Lỗi khác (key sai, model sai) là lỗi thật và hiện trên dashboard.
 
-Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashboard **Brain** và tab **Thống kê** của project.
+Thống kê job (số lượt, p50/p95, lỗi theo loại/ngày/project): dashboard **Brain** và mục _Số liệu kỹ thuật_ cuối tab **Thống kê** của project.
 
 ## Backup và nâng cấp
 

@@ -53,7 +53,7 @@ Phát hành: tăng `version` trong `package.json`, rồi `npm run build:npm && n
 
 1. Thêm key vào `FEATURES` trong `src/shared/features.ts` (`default`, `requires?`, `description`).
 2. Kiểm tra mode trong code: `engine.mode("key")` / `isActive(...)`; bọc phần có thể lỗi bằng `engine.guarded("key", fn)` để có cầu dao.
-3. (Tùy) metric trong `layers()` của `src/server/http/admin-routes.ts` và nhãn trong `web/src/pages/project/LayersTab.tsx`.
+3. (Tùy) metric trong `layers()` của `src/server/http/admin-routes.ts` và nhãn trong `web/src/pages/project/LayersTab.tsx` (**Khác › Lớp phát hiện**).
 
 ### Thêm một lớp phát hiện
 

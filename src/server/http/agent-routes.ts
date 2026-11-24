@@ -80,7 +80,9 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const body = (await c.req.json()) as { session_id: string } & TaskRegistration;
     const session = sessionOf(c, body.session_id);
     if (!body.title) throw new Error("title is required");
-    return c.json(await engine.register(session, { title: body.title, goal: body.goal, base_sha: body.base_sha, resources: body.resources ?? [] }));
+    return c.json(
+      await engine.register(session, { title: body.title, goal: body.goal, base_sha: body.base_sha, resources: body.resources ?? [], board_id: body.board_id }),
+    );
   });
 
   app.patch("/tasks/:id", async (c) => {
@@ -100,7 +102,42 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const next = engine.store.updateTask(t.id, { title: body.title, goal: body.goal, resources, status: body.status } as never);
     if (body.status === "done" || body.status === "abandoned") engine.tasksClosed([t.id]);
     else engine.runL0();
+    if (body.status && body.status !== t.status) engine.board.onRegistrationClosed(t, body.status);
     return c.json(next);
+  });
+
+  // ---- task board ------------------------------------------------------------------------
+
+  app.get("/board", (c) => {
+    const { board } = c.get("rt").engine;
+    const scope = c.req.query("scope"); // open (default) | all | mine
+    if (scope === "mine") return c.json(board.list({ open: true, assignee: c.get("dev") }));
+    return c.json(board.list({ open: scope !== "all" }));
+  });
+  app.post("/board", async (c) => c.json(c.get("rt").engine.board.create(await c.req.json(), c.get("dev"))));
+  app.get("/board/:id", (c) => {
+    const { board } = c.get("rt").engine;
+    const t = board.get(c.req.param("id"));
+    if (!t) return c.json({ error: "not found" }, 404);
+    return c.json({ ...board.view(t), notes: board.notes(t.id), registrations: board.registrations(t.id) });
+  });
+  app.patch("/board/:id", async (c) => c.json(c.get("rt").engine.board.update(c.req.param("id"), await c.req.json(), c.get("dev"))));
+  app.delete("/board/:id", (c) => {
+    c.get("rt").engine.board.remove(c.req.param("id"), c.get("dev"));
+    return c.json({ ok: true });
+  });
+  app.post("/board/:id/notes", async (c) => {
+    const { board } = c.get("rt").engine;
+    const { body } = (await c.req.json()) as { body?: string };
+    if (!board.get(c.req.param("id"))) throw new Error("unknown board task");
+    return c.json(board.note(c.req.param("id"), c.get("dev"), "note", String(body ?? "")));
+  });
+  /** An agent takes an item (gtv_pick_task). */
+  app.post("/board/:id/pick", async (c) => {
+    const { engine } = c.get("rt");
+    const { session_id } = (await c.req.json()) as { session_id: string };
+    const t = engine.board.pick(c.req.param("id"), sessionOf(c, session_id));
+    return c.json({ ...engine.board.view(t), notes: engine.board.notes(t.id) });
   });
 
   app.get("/members", (c) => c.json(c.get("rt").engine.store.members()));

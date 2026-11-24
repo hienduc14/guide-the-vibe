@@ -92,7 +92,10 @@ export function devAuth(hub: Hub) {
 export function v1Auth(hub: Hub) {
   return async (c: Context<{ Variables: AuthVars }>, next: Next) => {
     const token = bearer(c);
-    const p = token && (token === hub.cfg.adminToken || /^gtv[sl]_/.test(token)) ? dashboardPrincipal(hub, c) : undefined;
+    const dashboardToken = !!token && (token === hub.cfg.adminToken || /^gtv[sl]_/.test(token));
+    // No token and no X-Gtv-Dev: the dashboard in open mode (daemons always name their developer).
+    const openDashboard = !token && !c.req.header("x-gtv-dev");
+    const p = dashboardToken || openDashboard ? dashboardPrincipal(hub, c) : undefined;
     if (!p) return devAuth(hub)(c, next);
     const method = c.req.method;
     const write = method !== "GET" && method !== "HEAD";

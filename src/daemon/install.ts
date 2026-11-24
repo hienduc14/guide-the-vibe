@@ -8,12 +8,15 @@ import { CONFIG_DIR, daemonUrl, loadDaemonConfig, tokenFingerprint } from "./con
 
 // Set by scripts/build-npm.mjs: the npm package is one bundled file with the skill inlined.
 declare const __GTV_SKILL__: string | undefined;
+declare const __GTV_TASKS_SKILL__: string | undefined;
 const BUNDLED = typeof __GTV_SKILL__ === "string";
 
 export const GTV_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 /** What hooks and MCP run. The npm build copies itself to ~/.gtv/bin, so npx's cache can be cleared. */
 export const GTV_BIN = (BUNDLED ? join(CONFIG_DIR, "bin", "gtv.mjs") : join(GTV_ROOT, "bin", "gtv.mjs")).replace(/\\/g, "/");
 const skillText = () => (BUNDLED ? __GTV_SKILL__! : readFileSync(join(GTV_ROOT, "src", "adapters", "skill", "SKILL.md"), "utf8"));
+/** The /gtv skill: pick work from the task board. */
+const tasksSkillText = () => (BUNDLED ? __GTV_TASKS_SKILL__! : readFileSync(join(GTV_ROOT, "src", "adapters", "skill", "gtv", "SKILL.md"), "utf8"));
 
 function ensureBin(): void {
   if (!BUNDLED) return;
@@ -97,9 +100,9 @@ function mergeHooks(existing: Record<string, any[]> | undefined, add: Record<str
   return out;
 }
 
-function installSkill(dir: string): string {
+function installSkill(dir: string, text = skillText()): string {
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "SKILL.md"), skillText());
+  writeFileSync(join(dir, "SKILL.md"), text);
   return join(dir, "SKILL.md");
 }
 
@@ -126,7 +129,8 @@ export function installClaude(project: string, daemon = daemonUrl()): string[] {
   mcp.mcpServers = { ...(mcp.mcpServers ?? {}), gtv: { command: "node", args: [GTV_BIN, "mcp", "--agent", "auto", "--daemon", daemon] } };
   writeJson(mcpPath, mcp);
   const skill = installSkill(join(project, ".claude", "skills", "gtv-collaboration"));
-  return [settingsPath, mcpPath, skill];
+  const tasks = installSkill(join(project, ".claude", "skills", "gtv"), tasksSkillText()); // /gtv
+  return [settingsPath, mcpPath, skill, tasks];
 }
 
 export function installCodex(project: string, daemon = daemonUrl()): string[] {
@@ -150,5 +154,6 @@ export function installCodex(project: string, daemon = daemonUrl()): string[] {
   toml += `${toml && !toml.endsWith("\n") ? "\n" : ""}\n[mcp_servers.gtv]\ncommand = "node"\nargs = ["${GTV_BIN}", "mcp", "--agent", "codex", "--daemon", "${daemon}"]\ntool_timeout_sec = 150\n# gtv tools only talk to the Operator (never touch code); without this Codex asks for every call, and fails them under approval_policy = "never"\ndefault_tools_approval_mode = "approve"\n`;
   writeFileSync(tomlPath, toml);
   const skill = installSkill(join(project, ".codex", "skills", "gtv-collaboration"));
-  return [hooksPath, tomlPath, skill];
+  const tasks = installSkill(join(project, ".codex", "skills", "gtv"), tasksSkillText()); // $gtv
+  return [hooksPath, tomlPath, skill, tasks];
 }

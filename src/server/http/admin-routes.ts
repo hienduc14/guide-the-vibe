@@ -25,6 +25,7 @@ export function summarize(rt: ProjectRuntime) {
   const sessions = store.sessions(true);
   const byLevel: Record<Level, number> = { info: 0, warning: 0, high: 0, critical: 0 };
   for (const c of state.conflicts) byLevel[c.level]++;
+  const items = rt.engine.board.list().filter((t) => t.status !== "cancelled");
   const people = new Map<
     string,
     {
@@ -79,6 +80,14 @@ export function summarize(rt: ProjectRuntime) {
       conflicts_by_level: byLevel,
       tickets_waiting: store.tickets({ status: ["answering", "forwarded", "waiting_human"] }).length,
       kb_unverified: rt.engine.kb.list({ status: "unverified" }).length,
+    },
+    board: {
+      total: items.length,
+      done: items.filter((t) => t.status === "done").length,
+      open: items.filter((t) => t.status !== "done").length,
+      in_progress: items.filter((t) => t.status === "in_progress").length,
+      overdue: items.filter((t) => t.overdue).length,
+      blocked: items.filter((t) => t.blocked).length,
     },
     members: store.members(),
     people: [...people.values()]

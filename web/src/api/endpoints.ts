@@ -23,6 +23,11 @@ import type {
   TeamState,
   Ticket,
   OAuthSession,
+  BoardDetail,
+  BoardInput,
+  BoardNote,
+  BoardTask,
+  BoardView,
   Charter,
   Me,
   Member,
@@ -59,6 +64,15 @@ export const api = {
     list: () => get<User[]>("/api/users"),
     save: (name: string, input: { role?: Role; password?: string }) => put<User>(`/api/users/${encodeURIComponent(name)}`, input),
     remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
+  },
+
+  board: {
+    list: (id: string, scope: "open" | "all" = "all") => get<BoardView[]>(`${p(id)}/board?scope=${scope}`),
+    get: (id: string, taskId: string) => get<BoardDetail>(`${p(id)}/board/${encodeURIComponent(taskId)}`),
+    create: (id: string, input: BoardInput) => post<BoardTask>(`${p(id)}/board`, input),
+    update: (id: string, taskId: string, input: BoardInput) => patch<BoardTask>(`${p(id)}/board/${encodeURIComponent(taskId)}`, input),
+    remove: (id: string, taskId: string) => del<{ ok: boolean }>(`${p(id)}/board/${encodeURIComponent(taskId)}`),
+    note: (id: string, taskId: string, body: string) => post<BoardNote>(`${p(id)}/board/${encodeURIComponent(taskId)}/notes`, { body }),
   },
 
   members: {

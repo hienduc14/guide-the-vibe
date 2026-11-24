@@ -156,6 +156,7 @@ export class Store extends EventEmitter {
       goal: reg.goal,
       base_sha: reg.base_sha,
       resources: (reg.resources ?? []).map((r) => ({ ...r, value: r.kind === "path" ? normPath(r.value) : r.value, source: r.source ?? "declared" })),
+      board_id: reg.board_id,
       status: "active",
       created_at: now,
       updated_at: now,

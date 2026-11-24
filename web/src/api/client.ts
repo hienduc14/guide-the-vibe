@@ -56,12 +56,13 @@ let memoryToken: string | null = getToken();
 export const UNAUTHORIZED_EVENT = "gtv:unauthorized";
 
 export interface RequestOptions {
-  /** Acting developer for project calls (X-Gtv-Dev). Defaults to "admin". */
+  /** Acting developer for project calls (X-Gtv-Dev). Defaults to the logged-in user. */
   as?: string;
 }
 
 export async function request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { "x-gtv-dev": opts.as || "admin" };
+  const headers: Record<string, string> = {};
+  if (opts.as) headers["x-gtv-dev"] = opts.as;
   if (body !== undefined) headers["content-type"] = "application/json";
   const token = shareToken ?? memoryToken ?? getToken();
   if (token) headers.authorization = `Bearer ${token}`;

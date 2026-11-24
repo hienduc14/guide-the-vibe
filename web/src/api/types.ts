@@ -54,6 +54,7 @@ export interface ProjectSummary {
     tickets_waiting: number;
     kb_unverified: number;
   };
+  board: { total: number; done: number; open: number; in_progress: number; overdue: number; blocked: number };
   members: Member[];
   people: Person[];
   error?: undefined;
@@ -399,4 +400,60 @@ export interface Charter {
   non_goals?: string;
   quality?: "prototype" | "mvp" | "production";
   notes?: string;
+}
+
+// ---- task board -----------------------------------------------------------------------------
+
+export type Priority = "urgent" | "high" | "normal" | "low";
+export type BoardStatus = "todo" | "in_progress" | "blocked" | "review" | "done" | "cancelled";
+
+export interface BoardTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: Priority;
+  due_date?: string;
+  estimate_h?: number;
+  assignee?: string;
+  status: BoardStatus;
+  source: "board" | "agent";
+  created_by: string;
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  done_at?: string;
+}
+
+export interface BoardView extends BoardTask {
+  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null }[];
+  conflicts: { id: string; level: Level; status: string; with: string; message: string }[];
+  blocked: boolean;
+  overdue: boolean;
+  notes_count: number;
+}
+
+export interface BoardNote {
+  id: string;
+  board_id: string;
+  author: string;
+  kind: "note" | "system";
+  body: string;
+  created_at: string;
+}
+
+export interface BoardDetail extends BoardView {
+  notes: BoardNote[];
+  registrations: Task[];
+}
+
+export interface BoardInput {
+  title?: string;
+  description?: string;
+  priority?: Priority;
+  due_date?: string | null;
+  estimate_h?: number | null;
+  assignee?: string | null;
+  status?: BoardStatus;
+  labels?: string[];
 }

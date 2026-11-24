@@ -2,6 +2,7 @@
 
 import type { Db } from "../../shared/db.ts";
 import { Store } from "./store.ts";
+import { Board, type BoardView } from "./board.ts";
 import type { Repo } from "./repo.ts";
 import { KnowledgeBase, type KbHit } from "../knowledge/kb.ts";
 import { CodeGraph, BASE } from "../../codeintel/graph.ts";
@@ -29,6 +30,7 @@ export interface RegistrationFeedback {
   knowledge: KbHit[];
   advice?: string;
   l3: "done" | "pending" | "off" | "shadow" | "unavailable";
+  board?: BoardView;
 }
 
 export class Engine {
@@ -36,6 +38,7 @@ export class Engine {
   readonly db: Db;
   readonly graph: CodeGraph;
   readonly kb: KnowledgeBase;
+  readonly board: Board;
   readonly repo?: Repo;
   readonly brain: Brain;
   readonly breaker = new CircuitBreaker();
@@ -48,7 +51,9 @@ export class Engine {
 
   constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig }) {
     this.db = opts.db;
+    opts.db.ensureColumn("tasks", "board_id", "TEXT");
     this.store = new Store(opts.db);
+    this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);
     this.kb = new KnowledgeBase(opts.db);
     this.repo = opts.repo;
@@ -254,7 +259,12 @@ export class Engine {
   // ---- registration ------------------------------------------------------------
 
   async register(session: Session, reg: TaskRegistration): Promise<RegistrationFeedback> {
-    const task = this.store.registerTask(session, reg);
+    const board_id = this.board.resolveFor(session, reg);
+    const previous = this.store.sessionTask(session.id);
+    const task = this.store.registerTask(session, { ...reg, board_id });
+    // The session moved on to other work: its previous item goes back to To do (unless another agent is on it).
+    if (previous?.board_id && previous.board_id !== board_id) this.board.onRegistrationClosed(previous, "abandoned");
+    this.board.onRegistered(task, session);
     this.store.logEvent("register", session.dev, task);
     this.runL0();
 
@@ -303,7 +313,8 @@ export class Engine {
     }
     const worst = overlaps.reduce((m, o) => Math.max(m, LEVEL_RANK[o.level]), -1);
     const status = worst >= LEVEL_RANK.high ? "needs_coordination" : worst >= LEVEL_RANK.warning ? "adjust_suggested" : "ok";
-    return { task, status, overlaps, knowledge, advice, l3 };
+    const item = this.board.get(board_id);
+    return { task, status, overlaps, knowledge, advice, l3, board: item ? this.board.view(item) : undefined };
   }
 
   private l3Budget(): boolean {
@@ -481,6 +492,7 @@ export class Engine {
     const leftover = this.store.footprints().some((f) => f.workspace_id === ws.id);
     if (!leftover) return; // nothing edited here: a clean checkout of a newer main is a pull, not a merge
     for (const t of tasks) this.store.updateTask(t.id, { status: "done" });
+    this.board.onMerged(tasks, parent);
     this.tasksClosed(tasks.map((t) => t.id));
     this.store.clearFootprints(ws.id);
     this.graph.clearLayer(ws.id);

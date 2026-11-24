@@ -15,6 +15,7 @@ import { GraphTab } from "./pages/project/GraphTab";
 import { StatsTab } from "./pages/project/StatsTab";
 import { SettingsTab } from "./pages/project/SettingsTab";
 import { MembersTab } from "./pages/project/MembersTab";
+import { BoardTab } from "./pages/project/BoardTab";
 import { BrainPage } from "./pages/brain/BrainPage";
 import { DevsPage } from "./pages/devs/DevsPage";
 import { UsersPage } from "./pages/users/UsersPage";
@@ -30,6 +31,7 @@ function Gate() {
           <Route index element={<OverviewPage />} />
           <Route path="p/:id" element={<ProjectLayout />}>
             <Route index element={<ProjectOverview />} />
+            <Route path="board" element={<BoardTab />} />
             <Route path="members" element={<MembersTab />} />
             <Route path="conflicts" element={<ConflictsTab />} />
             <Route path="layers" element={<LayersTab />} />

@@ -23,6 +23,8 @@ export interface TaskRegistration {
   goal?: string;
   base_sha?: string;
   resources: TaskResource[];
+  /** The board item this work is for (gtv_pick_task links it automatically). */
+  board_id?: string;
 }
 
 export type TaskStatus = "registered" | "active" | "pr_open" | "done" | "abandoned";
@@ -173,6 +175,42 @@ export interface TeamState {
   features: Record<string, FeatureMode>;
   policy: Policy;
   charter?: Charter;
+}
+
+export type Priority = "urgent" | "high" | "normal" | "low";
+export const PRIORITIES: Priority[] = ["urgent", "high", "normal", "low"];
+export const PRIORITY_RANK: Record<Priority, number> = { low: 0, normal: 1, high: 2, urgent: 3 };
+
+export type BoardStatus = "todo" | "in_progress" | "blocked" | "review" | "done" | "cancelled";
+export const BOARD_STATUSES: BoardStatus[] = ["todo", "in_progress", "blocked", "review", "done", "cancelled"];
+
+/** An item on the project's task board. */
+export interface BoardTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: Priority;
+  due_date?: string; // YYYY-MM-DD
+  estimate_h?: number;
+  assignee?: string;
+  status: BoardStatus;
+  source: "board" | "agent"; // created on the board, or from an agent's registration
+  created_by: string;
+  picked_session?: string;
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  done_at?: string;
+}
+
+export interface BoardNote {
+  id: string;
+  board_id: string;
+  author: string;
+  kind: "note" | "system";
+  body: string;
+  created_at: string;
 }
 
 export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";

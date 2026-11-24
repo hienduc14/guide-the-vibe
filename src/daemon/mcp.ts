@@ -64,6 +64,10 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
         title: z.string(),
         goal: z.string().optional(),
         resources: z.array(RESOURCE).describe("Files/globs, modules, symbols and contracts you expect to touch"),
+        board_task_id: z
+          .string()
+          .optional()
+          .describe("The task-board item this work is for (not needed after gtv_pick_task; without one, gtv adds your work to the board)"),
       },
     },
     (args) => call("register_task", args),
@@ -116,6 +120,32 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     (args) => call("check", args),
   );
   server.registerTool("gtv_inbox", { description: "Read pending gtv messages and questions waiting for you." }, () => call("inbox", {}));
+  server.registerTool(
+    "gtv_tasks",
+    {
+      description:
+        "List the project's task board: open tasks with priority, due date and assignee, most urgent first. Use it when the user asks what to work on, or runs /gtv.",
+      inputSchema: { mine: z.boolean().optional().describe("Only tasks assigned to you") },
+    },
+    (args) => call("tasks", args),
+  );
+  server.registerTool(
+    "gtv_pick_task",
+    {
+      description:
+        "Take a task from the board (after the user agreed): it is assigned to you and goes in progress. Returns its description and notes. Then plan and call gtv_register_task.",
+      inputSchema: { task_id: z.string() },
+    },
+    (args) => call("pick_task", args),
+  );
+  server.registerTool(
+    "gtv_log_work",
+    {
+      description: "Add a short note to your board task's work log: progress, a decision, a blocker. Managers read it on the dashboard.",
+      inputSchema: { note: z.string(), task_id: z.string().optional().describe("Defaults to the board task of your registered work") },
+    },
+    (args) => call("log_work", args),
+  );
   server.registerTool(
     "gtv_ack",
     { description: "Acknowledge a conflict after you coordinated with the teammate.", inputSchema: { conflict_id: z.string() } },

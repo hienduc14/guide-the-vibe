@@ -6,6 +6,7 @@ import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
 import type { FeatureMode, GtvEvent, Message, Session, TaskRegistration, TaskResource } from "../../shared/types.ts";
 import { BASE } from "../../codeintel/graph.ts";
+import { callMap, structureMap } from "../../codeintel/map.ts";
 import { FEATURES } from "../../shared/features.ts";
 import { globMatch, newId, normPath } from "../../shared/util.ts";
 
@@ -309,6 +310,39 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const view = c.req.query("view") ?? BASE;
     return c.json(graph.findSymbols(c.req.query("q") ?? "", view, 3).map((t) => ({ symbol: t.id, callers: graph.whoCalls(t, view) })));
   });
+  /**
+   * The code map: modules or files with their imports, and who is working where right now (files being
+   * edited, registered scopes, open conflicts) so the map doubles as a picture of the team's work.
+   */
+  app.get("/graph/map", (c) => {
+    const { engine } = c.get("rt");
+    const level = c.req.query("level") === "file" ? "file" : "dir";
+    const map = structureMap(engine.graph, c.req.query("view") ?? BASE, {
+      level,
+      depth: Number(c.req.query("depth") ?? 0) || undefined,
+      focus: c.req.query("focus") || undefined,
+    });
+    const state = engine.store.teamState();
+    const inNode = (path: string, node: string) =>
+      level === "file" ? path === node : node === "(root)" ? !path.includes("/") : path === node || path.startsWith(`${node}/`);
+    const nodes = map.nodes.map((n) => {
+      const editing = [...new Set(state.footprints.filter((f) => inNode(f.path, n.id)).map((f) => f.dev))];
+      const scoped = [
+        ...new Set(
+          state.tasks
+            .filter((t) =>
+              t.resources.some((r) => r.kind === "path" && (level === "file" ? globMatch(r.value, n.id) : inNode(r.value.replace(/\/?\*.*$/, ""), n.id))),
+            )
+            .map((t) => t.dev),
+        ),
+      ];
+      const conflicts = state.conflicts.filter((x) => inNode(x.subject, n.id)).map((x) => x.level);
+      return { ...n, editing, scoped, conflicts };
+    });
+    return c.json({ ...map, nodes });
+  });
+  app.get("/graph/calls", (c) => c.json(callMap(c.get("rt").engine.graph, c.req.query("q") ?? "", c.req.query("view") ?? BASE)));
+
   app.get("/graph/stats", (c) => {
     const { engine } = c.get("rt");
     return c.json({ base: engine.graph.stats(BASE), main: engine.mainSha });

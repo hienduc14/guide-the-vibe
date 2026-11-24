@@ -493,3 +493,41 @@ export interface AttentionItem {
   ref: string;
   at: string;
 }
+
+// ---- code map -------------------------------------------------------------------------------
+
+export interface MapNode {
+  id: string;
+  label: string;
+  kind: "dir" | "file";
+  files: number;
+  symbols: number;
+  lang?: string;
+  editing: string[];
+  scoped: string[];
+  conflicts: Level[];
+}
+
+export interface StructureMap {
+  level: "dir" | "file";
+  depth: number;
+  truncated: boolean;
+  nodes: MapNode[];
+  edges: { source: string; target: string; weight: number }[];
+}
+
+export interface CallNode {
+  id: string;
+  label: string;
+  kind: string;
+  path: string;
+  line: number;
+  role: "center" | "caller" | "callee";
+  sig?: string;
+}
+
+export interface CallMap {
+  center?: CallNode;
+  nodes: CallNode[];
+  edges: { source: string; target: string; confidence: "local" | "import" | "name" }[];
+}

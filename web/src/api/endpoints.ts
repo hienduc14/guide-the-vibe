@@ -3,6 +3,8 @@
 import { del, get, patch, post, put } from "./client";
 import type {
   ActivityEvent,
+  CallMap,
+  StructureMap,
   AttentionItem,
   Thread,
   BrainInfo,
@@ -135,6 +137,9 @@ export const api = {
 
   graph: {
     stats: (id: string) => get<{ base: { files: number; symbols: number; refs: number }; main: string | null }>(`${p(id)}/graph/stats`),
+    map: (id: string, view: string, level: "dir" | "file", focus?: string) =>
+      get<StructureMap>(`${p(id)}/graph/map?view=${encodeURIComponent(view)}&level=${level}${focus ? `&focus=${encodeURIComponent(focus)}` : ""}`),
+    calls: (id: string, q: string, view: string) => get<CallMap>(`${p(id)}/graph/calls?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
     symbols: (id: string, q: string, view: string) => get<SymbolRow[]>(`${p(id)}/graph/symbols?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
     callers: (id: string, q: string, view: string) =>
       get<{ symbol: string; callers: CallerHit[] }[]>(`${p(id)}/graph/callers?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),

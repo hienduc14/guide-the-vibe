@@ -65,6 +65,10 @@ export function summarize(rt: ProjectRuntime) {
   for (const t of state.tasks) people.get(t.dev)?.tasks.push(t.title);
   for (const f of state.footprints) if (people.has(f.dev)) people.get(f.dev)!.editing++;
   for (const c of state.conflicts) for (const d of [c.dev_a, c.dev_b]) if (people.has(d)) people.get(d)!.conflicts++;
+  // "Đang làm": has work in progress (a registration or a board item) and an agent session that has not ended
+  // (seen in the last 2 hours). Every count of people at work on the dashboard uses this one rule.
+  const working = (p: { dev: string; status: string; tasks: string[] }) =>
+    p.status !== "ended" && (p.tasks.length > 0 || items.some((t) => t.status === "in_progress" && t.assignee === p.dev));
   return {
     id: rt.record.id,
     name: rt.record.name,
@@ -74,7 +78,9 @@ export function summarize(rt: ProjectRuntime) {
     main_sha: rt.engine.mainSha ?? null,
     last_sync: rt.lastSync ?? null,
     counts: {
-      people_active: [...people.values()].filter((p) => p.status === "active").length,
+      // "Đang làm": has work in progress (a board item or a registration) and an agent session that has not ended
+      // (seen in the last 2 hours). Every place on the dashboard counts people this one way.
+      people_active: [...people.values()].filter(working).length,
       sessions_active: state.sessions.filter((s) => s.status === "active").length,
       tasks_active: state.tasks.length,
       conflicts_open: state.conflicts.length,
@@ -94,7 +100,7 @@ export function summarize(rt: ProjectRuntime) {
     attention: attention(rt.engine).length,
     members: store.members(),
     people: [...people.values()]
-      .map((p) => ({ ...p, agents: [...p.agents], workspaces: [...p.workspaces] }))
+      .map((p) => ({ ...p, working: working(p), agents: [...p.agents], workspaces: [...p.workspaces] }))
       .sort((a, b) => (a.status === b.status ? a.dev.localeCompare(b.dev) : a.status === "active" ? -1 : 1)),
   };
 }

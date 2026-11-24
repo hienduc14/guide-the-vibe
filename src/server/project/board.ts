@@ -135,6 +135,7 @@ export class Board {
       started_at: input.status === "in_progress" ? now : undefined,
     };
     this.save(t);
+    this.store.ensureMember(t.assignee);
     this.note(t.id, by, "system", source === "agent" ? `${by}'s agent started this work without a board item; gtv added it.` : `${by} created the task.`);
     if (t.assignee && t.assignee !== by) this.tellAssignee(t, by);
     this.store.logEvent("board_create", by, { board_id: t.id, title: t.title, priority: t.priority, assignee: t.assignee });
@@ -171,6 +172,7 @@ export class Board {
       changes.push(`moved it to ${next.status}`);
     }
     this.save(next);
+    this.store.ensureMember(next.assignee);
     if (changes.length) this.note(id, by, "system", `${by} ${changes.join(", ")}.`);
     if (next.assignee && next.assignee !== prev.assignee && next.assignee !== by) this.tellAssignee(next, by);
     if (changes.length) this.store.logEvent("board_update", by, { board_id: id, changes });
@@ -207,6 +209,7 @@ export class Board {
     const next: BoardTask = { ...t, assignee: session.dev, picked_session: session.id, updated_at: nowIso() };
     if (t.status === "todo") this.setStatus(next, "in_progress");
     this.save(next);
+    this.store.ensureMember(session.dev);
     this.note(id, session.dev, "system", `${session.dev}'s agent (${session.agent}) picked the task.`);
     this.store.logEvent("board_pick", session.dev, { board_id: id, session: session.id });
     this.store.changed();
@@ -228,7 +231,77 @@ export class Board {
       session.id,
     );
     if (picked) return picked.id;
+    // A new agent session in the same checkout carries on the dev's unfinished work, as long as the session
+    // that registered it is no longer active: same item, no duplicate on the board.
+    const carried = this.db.get<{ id: string }>(
+      `SELECT b.id FROM tasks t JOIN board_tasks b ON b.id = t.board_id LEFT JOIN sessions s ON s.id = t.session_id
+       WHERE t.dev = ? AND t.workspace_id = ? AND t.session_id != ? AND t.status IN ('registered','active')
+         AND b.status IN ('todo','in_progress','blocked') AND (s.id IS NULL OR s.status != 'active')
+       ORDER BY t.updated_at DESC LIMIT 1`,
+      session.dev,
+      session.workspace_id,
+      session.id,
+    );
+    if (carried) return carried.id;
     return this.create({ title: reg.title, description: reg.goal, assignee: session.dev, status: "in_progress" }, session.dev, "agent").id;
+  }
+
+  /**
+   * One-off repair: registrations made before the board existed (board_id NULL) get an item of their own, so
+   * the board, "who is working" and the member list count the same work. Registrations of one dev in one
+   * workspace with the same title share an item. Returns how many items were created.
+   */
+  adoptOrphans(): number {
+    const rows = this.db.all<{
+      id: string;
+      dev: string;
+      workspace_id: string;
+      title: string;
+      goal: string | null;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>(`SELECT id, dev, workspace_id, title, goal, status, created_at, updated_at FROM tasks WHERE board_id IS NULL ORDER BY created_at`);
+    const groups = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const key = `${r.dev}\u0000${r.workspace_id}\u0000${r.title.trim().toLowerCase()}`;
+      groups.set(key, [...(groups.get(key) ?? []), r]);
+    }
+    const RANK: Record<string, number> = { registered: 4, active: 4, pr_open: 3, done: 2, abandoned: 1 };
+    const STATUS: Record<string, BoardStatus> = { registered: "in_progress", active: "in_progress", pr_open: "review", done: "done", abandoned: "cancelled" };
+    for (const group of groups.values()) {
+      const first = group[0]!;
+      const last = group[group.length - 1]!;
+      const best = group.reduce((a, b) => ((RANK[b.status] ?? 0) >= (RANK[a.status] ?? 0) ? b : a));
+      const status = STATUS[best.status] ?? "todo";
+      const t: BoardTask = {
+        id: newId("bt"),
+        title: first.title.trim().slice(0, 200),
+        description: last.goal?.trim() || undefined,
+        priority: "normal",
+        assignee: first.dev,
+        status,
+        source: "agent",
+        created_by: first.dev,
+        labels: [],
+        created_at: first.created_at,
+        updated_at: last.updated_at,
+        started_at: first.created_at,
+        done_at: status === "done" ? last.updated_at : undefined,
+      };
+      this.save(t);
+      this.db.run(`UPDATE tasks SET board_id = ? WHERE id IN (${group.map(() => "?").join(",")})`, t.id, ...group.map((r) => r.id));
+      this.db.upsert("board_notes", {
+        id: newId("bn"),
+        board_id: t.id,
+        author: "gtv",
+        kind: "system",
+        body: `Added from ${first.dev}'s earlier registration (made before the task board existed).`,
+        created_at: first.created_at,
+      });
+    }
+    if (groups.size) this.store.changed();
+    return groups.size;
   }
 
   /** A registration now works on this item. */

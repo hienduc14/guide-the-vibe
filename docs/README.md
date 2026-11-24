@@ -11,6 +11,7 @@
 | [operations.md](operations.md)               | Docker compose, biến môi trường, project/token, đăng nhập ChatGPT cho Brain, chọn model, backup, SSH + deploy server nhóm, sự cố |
 | [development.md](development.md)             | Thiết lập dev (Node 24 type stripping), quy ước, hướng dẫn thêm flag/layer/job/tool/adapter/trang                                |
 | [testing.md](testing.md)                     | Bộ test, cách chạy, self-test RealWorld, đọc báo cáo                                                                             |
+| [backlog.md](backlog.md)                     | Việc để sau: ý đã bàn nhưng chưa làm, kèm lý do và chỗ trong code                                                                |
 | [reports/](reports/)                         | Báo cáo kiểm thử sinh tự động (đừng sửa tay)                                                                                     |
 
 Đặc tả gốc và lý do thiết kế: [../SPEC.md](../SPEC.md). Dashboard: [../web/README.md](../web/README.md). Hệ thiết kế giao diện: [../DESIGN.md](../DESIGN.md).

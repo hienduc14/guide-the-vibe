@@ -147,8 +147,8 @@ export class Board {
       updated_at: now,
       started_at: input.status === "in_progress" ? now : undefined,
     };
+    if (source === "board") this.checkAssignee(t.assignee);
     this.save(t);
-    this.store.ensureMember(t.assignee);
     this.note(t.id, by, "system", source === "agent" ? `${by}'s agent started this work without a board item; gtv added it.` : `${by} created the task.`);
     if (t.assignee && t.assignee !== by) this.tellAssignee(t, by);
     this.store.logEvent("board_create", by, { board_id: t.id, title: t.title, priority: t.priority, assignee: t.assignee });
@@ -184,13 +184,18 @@ export class Board {
       this.setStatus(next, checkStatus(patch.status));
       changes.push(`moved it to ${next.status}`);
     }
+    if (next.assignee !== prev.assignee) this.checkAssignee(next.assignee);
     this.save(next);
-    this.store.ensureMember(next.assignee);
     if (changes.length) this.note(id, by, "system", `${by} ${changes.join(", ")}.`);
     if (next.assignee && next.assignee !== prev.assignee && next.assignee !== by) this.tellAssignee(next, by);
     if (changes.length) this.store.logEvent("board_update", by, { board_id: id, changes });
     this.store.changed();
     return next;
+  }
+
+  /** Work goes to members only: nobody joins a project by being given a task. */
+  private checkAssignee(dev: string | undefined): void {
+    if (dev && !this.store.member(dev)) throw new Error(`${dev} is not a member of this project`);
   }
 
   remove(id: string, by: string): void {
@@ -232,7 +237,6 @@ export class Board {
     const next: BoardTask = { ...t, assignee: session.dev, picked_session: session.id, updated_at: nowIso() };
     if (t.status === "todo") this.setStatus(next, "in_progress");
     this.save(next);
-    this.store.ensureMember(session.dev);
     this.note(id, session.dev, "system", `${session.dev}'s agent (${session.agent}) picked the task.`);
     this.store.logEvent("board_pick", session.dev, { board_id: id, session: session.id });
     this.store.changed();

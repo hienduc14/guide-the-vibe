@@ -237,10 +237,15 @@ export const MEMBER_LEVELS: MemberLevel[] = ["intern", "junior", "mid", "senior"
 export const LEVEL_ORDER: Record<MemberLevel, number> = { intern: 0, junior: 1, mid: 2, senior: 3, lead: 4 };
 
 /** A developer's place in one project. */
+/** What a member may do in the project: manage it, work on it (their agents connect), or only look. */
+export type MemberAccess = "manager" | "developer" | "viewer";
+export const MEMBER_ACCESS: MemberAccess[] = ["manager", "developer", "viewer"];
+
 export interface Member {
   dev: string;
   role: string; // free text: "backend", "frontend", "tech lead", "qa", …
   level: MemberLevel;
+  access: MemberAccess;
   note?: string;
   created_at: string;
   updated_at: string;

@@ -1,5 +1,5 @@
 // One place for work: every registration lives on a board item, a new session carries on the dev's unfinished
-// item instead of adding a duplicate, members appear wherever someone works, and old data is repaired at start.
+// item instead of adding a duplicate, tasks go to members only, and old data is repaired at start.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -81,13 +81,16 @@ test("another checkout (branch) of the same dev starts its own item", async () =
   assert.notEqual(a.json.task.board_id, b.json.task.board_id);
 });
 
-test("members appear wherever someone works: picking, being assigned, registering", async () => {
-  await call("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Docs", assignee: "frank" } });
-  assert.ok(engine().store.member("frank"), "assigned on the board");
-  assert.ok(engine().store.member("carol"), "opened a session");
+test("nobody becomes a member by working or being assigned: tasks go to members only", async () => {
+  const r = await call<any>("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Docs", assignee: "frank" } });
+  assert.deepEqual([r.status, r.json.error], [400, "frank is not a member of this project"]);
+  assert.equal(engine().store.member("frank"), undefined);
+  assert.equal(engine().store.member("carol"), undefined, "opening a session does not add anyone");
+  engine().store.saveMember("frank", {});
+  assert.equal((await call("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Docs", assignee: "frank" } })).status, 200);
 });
 
-test("old registrations without a board item are adopted once; missing members are added", async () => {
+test("old registrations without a board item are adopted once", async () => {
   const { store, board } = engine();
   const now = new Date().toISOString();
   const row = (id: string, title: string, status: string) =>
@@ -115,10 +118,7 @@ test("old registrations without a board item are adopted once; missing members a
   assert.equal(store.task("task_old2")!.board_id, csv.id);
   assert.deepEqual([csv.source, csv.status, csv.assignee], ["agent", "in_progress", "gina"]);
   assert.equal(board.get(store.task("task_old3")!.board_id!)!.status, "cancelled");
-
-  assert.equal(store.member("gina"), undefined);
-  assert.ok(store.backfillMembers() >= 1);
-  assert.ok(store.member("gina"));
+  assert.equal(store.member("gina"), undefined, "nobody becomes a member by working");
 });
 
 test("'đang làm' counts people with work in progress and a session that has not ended", async () => {

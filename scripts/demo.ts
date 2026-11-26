@@ -71,8 +71,17 @@ await call(
   },
   { method: "PATCH" },
 );
-await call("/api/users/minh", { role: "manager", password: "minh-demo-123" }, { method: "PUT" });
-await call("/api/users/khach", { role: "viewer", password: "khach-demo-123" }, { method: "PUT" });
+// One account per person; passwords are set directly here (people normally use the activation link).
+const person = async (name: string, password: string | null, access: "manager" | "developer" | "viewer") => {
+  await call("/api/users", { name, role: name === "hoc" ? "admin" : "member", projects: [{ id: "mini-shop", access }] });
+  if (password) srv.hub.accounts.setPassword(name, password);
+};
+await person("hoc", "hoc-demo-123", "manager");
+await person("minh", "minh-demo-123", "manager");
+await person("khach", "khach-demo-123", "viewer");
+await person("alice", "alice-demo-123", "developer");
+await person("bob", null, "developer");
+await person("carol", null, "developer");
 for (const [dev, role, level, note] of [
   ["alice", "tech lead", "lead", "Phụ trách đơn hàng và thanh toán"],
   ["bob", "backend", "mid", "Phụ trách đăng nhập"],
@@ -276,9 +285,10 @@ const link = await call<{ code: string }>("/api/projects/mini-shop/share-links",
 const url = `http://localhost:${srv.port}`;
 console.log(`
 gtv demo is running: ${url}
-  Admin token          ${ADMIN}
-  Manager account      minh / minh-demo-123
-  Viewer account       khach / khach-demo-123
+  Admin                hoc / hoc-demo-123   (or the admin token ${ADMIN})
+  Manager              minh / minh-demo-123
+  Developer            alice / alice-demo-123
+  Viewer               khach / khach-demo-123
   Read-only link       ${url}/s/${link.code}
 Data: ${DATA} (recreated on every run). Stop with Ctrl+C.
 `);

@@ -55,7 +55,10 @@ test("setup", async () => {
     listen: false,
   });
   assert.equal((await call("/api/projects", { method: "POST", body: { id: "shop", repo_url: origin.bare } })).status, 200);
-  for (const d of ["alice", "bob", "carol"]) await start(d);
+  for (const d of ["alice", "bob", "carol"]) {
+    engine().store.saveMember(d, {}); // work goes to members only
+    await start(d);
+  }
 });
 
 after(async () => {

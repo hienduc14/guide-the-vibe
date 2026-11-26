@@ -58,6 +58,7 @@ export class Engine {
     opts.db.ensureColumn("board_notes", "summary", "TEXT");
     opts.db.ensureColumn("tickets", "options", "TEXT");
     opts.db.ensureColumn("tasks", "summary", "TEXT");
+    opts.db.ensureColumn("members", "access", "TEXT NOT NULL DEFAULT 'developer'");
     this.store = new Store(opts.db);
     this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);
@@ -66,10 +67,9 @@ export class Engine {
     this.brain = opts.brain;
     this.cfg = opts.cfg;
     this.store.features = () => this.features();
-    // One-off repairs for data written before the board and automatic members existed; no-ops afterwards.
+    // One-off repair for data written before the board existed; a no-op afterwards.
     const adopted = this.board.adoptOrphans();
-    const members = this.store.backfillMembers();
-    if (adopted || members) log("engine", `repaired: ${adopted} board item(s) for old registrations, ${members} member(s) added`);
+    if (adopted) log("engine", `repaired: ${adopted} board item(s) for old registrations`);
   }
 
   // ---- feature flags --------------------------------------------------------
@@ -165,8 +165,6 @@ export class Engine {
       case "session_start": {
         const session = this.store.upsertSession({ ...ev.session, dev });
         this.store.logEvent("session_start", dev, ev.session);
-        // Everyone who works on the project is a member; a manager sets their role and level on the dashboard.
-        this.store.ensureMember(dev);
         return { session, briefing: this.briefing(session) };
       }
       case "session_end":
@@ -310,7 +308,6 @@ export class Engine {
       board_id,
       task.id,
     );
-    this.store.ensureMember(session.dev);
     // The session moved on to other work: its previous item goes back to To do (unless another agent is on it).
     if (previous?.board_id && previous.board_id !== board_id) this.board.onRegistrationClosed(previous, "abandoned");
     this.board.onRegistered(task, session);

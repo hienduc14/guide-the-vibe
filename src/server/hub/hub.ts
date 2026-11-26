@@ -1,11 +1,10 @@
-// The hub owns all projects (one repo each), developers and their tokens, the shared brain and its
+// The hub owns all projects (one repo each), accounts and their computers, who may do what in each project, the shared brain and its
 // usage statistics. HTTP routes resolve a ProjectRuntime through it.
 
-import { createHash, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { Db, parseJson } from "../../shared/db.ts";
 import { HUB_SCHEMA } from "./hub-db.ts";
-import { Accounts } from "./accounts.ts";
+import { Accounts, hashToken, type Principal } from "./accounts.ts";
 import { ProjectRuntime, type ProjectRecord } from "../project/runtime.ts";
 import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
 import { PiBrain } from "../brain/pi.ts";
@@ -15,7 +14,9 @@ import { log, nowIso } from "../../shared/util.ts";
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
 
-const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+/** A caller's access in one project: members.access, or none. */
+export type ProjectAccess = "manager" | "developer" | "viewer" | "none";
+export const ACCESS_RANK: Record<ProjectAccess, number> = { none: 0, viewer: 1, developer: 2, manager: 3 };
 
 /** "owner/repo" style key of a remote URL or path, for matching daemons' remotes to projects. */
 export function repoKey(url: string): string {
@@ -53,14 +54,11 @@ export class Hub {
     this.brain = brain;
     this.db = new Db(cfg.dataDir === ":memory:" ? ":memory:" : join(cfg.dataDir, "hub.db"), HUB_SCHEMA);
     this.db.ensureColumn("projects", "charter", "TEXT NOT NULL DEFAULT '{}'");
+    this.upgradeUsersTable();
     this.accounts = new Accounts(this.db);
   }
 
   async init(): Promise<void> {
-    // Env tokens (GTV_TOKENS) become developers.
-    for (const [token, dev] of this.cfg.tokens) {
-      this.db.run(`INSERT OR IGNORE INTO devs (name, token_hash, created_at) VALUES (?,?,?)`, dev, hashToken(token), nowIso());
-    }
     // Backwards compatible single-repo setup: GTV_REPO_URL creates the "default" project once.
     if (this.cfg.repoUrl && !this.records(true).length) {
       this.saveRecord({ id: this.cfg.defaultProject, repo_url: this.cfg.repoUrl, main_branch: this.cfg.mainBranch, name: this.cfg.defaultProject });
@@ -72,6 +70,12 @@ export class Hub {
     if (thinking && this.brain instanceof PiBrain) this.brain.setThinking(thinking);
     for (const r of this.records()) {
       await this.runtime(r.id).catch((e) => log("hub", `project ${r.id} failed to open: ${(e as Error).message}`));
+    }
+    this.migrateAccounts();
+    // Env tokens (GTV_TOKENS: scripts, sandboxes) are computers of accounts of that name.
+    for (const [token, dev] of this.cfg.tokens) {
+      if (!this.accounts.user(dev)) this.accounts.createUser(dev, "member", "GTV_TOKENS");
+      this.accounts.addDevice(dev, hashToken(token), "GTV_TOKENS", "unknown");
     }
   }
 
@@ -168,55 +172,65 @@ export class Hub {
     return this.records().find((p) => [p.repo_url, ...p.aliases].some((u) => repoKey(u) === key || u === remote));
   }
 
-  // ---- developers ------------------------------------------------------------------
+  // ---- access ---------------------------------------------------------------------
 
-  devs(): { name: string; created_at: string; last_seen: string | null }[] {
-    return this.db.all(`SELECT name, created_at, last_seen FROM devs ORDER BY name`);
+  /**
+   * What a caller may do in one project. System admins, the admin token and open mode manage every project;
+   * a share link views its own; everyone else has the access of their membership, or none.
+   */
+  projectAccess(p: Principal, projectId: string): ProjectAccess {
+    if (p.kind === "share") return p.project === projectId ? "viewer" : "none";
+    if (p.role === "admin" || p.kind === "admin_token" || p.kind === "open") return "manager";
+    return this.live(projectId)?.engine.store.member(p.name)?.access ?? "none";
   }
 
-  /** Create or rotate a developer token. Returns the plain token (shown once). */
-  issueToken(name: string): string {
-    checkDevName(name);
-    const token = `gtv_${randomBytes(18).toString("base64url")}`;
-    this.db.run(
-      `INSERT INTO devs (name, token_hash, created_at) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET token_hash = excluded.token_hash`,
-      name,
-      hashToken(token),
-      nowIso(),
-    );
-    return token;
+  /** Projects a caller can see, with their access in each. */
+  myProjects(p: Principal): { record: ProjectRecord; access: Exclude<ProjectAccess, "none"> }[] {
+    return this.records().flatMap((record) => {
+      const access = this.projectAccess(p, record.id);
+      return access === "none" ? [] : [{ record, access }];
+    });
   }
 
-  /** A one-time code for `gtv join`, valid for 24 hours. */
-  createInvite(name: string): { code: string; expires_at: string } {
-    checkDevName(name);
-    const code = randomBytes(18).toString("base64url");
-    const expires_at = new Date(Date.now() + 24 * 3600_000).toISOString();
-    this.db.run(`DELETE FROM invites WHERE expires_at < ?`, nowIso());
-    this.db.run(`INSERT INTO invites (code_hash, dev, expires_at, created_at) VALUES (?,?,?,?)`, hashToken(code), name, expires_at, nowIso());
-    return { code, expires_at };
+  // ---- one-off move to accounts ------------------------------------------------------------
+
+  /** Old databases: users.pass_hash was NOT NULL and created_by did not exist. */
+  private upgradeUsersTable(): void {
+    const cols = this.db.all<{ name: string; notnull: number }>(`PRAGMA table_info(users)`);
+    if (!cols.find((c) => c.name === "pass_hash")?.notnull) return;
+    this.db.tx(() => {
+      this.db.raw.exec(`ALTER TABLE users RENAME TO users_old`);
+      this.db.raw.exec(HUB_SCHEMA.match(/CREATE TABLE IF NOT EXISTS users \([^;]*\);/)![0]);
+      this.db.raw.exec(`INSERT INTO users (name, role, pass_hash, created_at, last_login) SELECT name, role, pass_hash, created_at, last_login FROM users_old`);
+      this.db.raw.exec(`DROP TABLE users_old`);
+    });
   }
 
-  /** Uses up the invite and issues (or rotates) the dev's token. */
-  redeemInvite(code: string): { dev: string; token: string } {
-    const row = this.db.get<{ dev: string; expires_at: string }>(`SELECT dev, expires_at FROM invites WHERE code_hash = ?`, hashToken(code));
-    this.db.run(`DELETE FROM invites WHERE code_hash = ?`, hashToken(code));
-    if (!row || row.expires_at < nowIso()) throw new Error("invite link is invalid, used or expired: ask for a new one");
-    return { dev: row.dev, token: this.issueToken(row.dev) };
-  }
-
-  removeDev(name: string): void {
-    this.db.run(`DELETE FROM devs WHERE name = ?`, name);
-  }
-
-  devForToken(token: string): string | undefined {
-    const row = this.db.get<{ name: string }>(`SELECT name FROM devs WHERE token_hash = ?`, hashToken(token));
-    if (row) this.db.run(`UPDATE devs SET last_seen = ? WHERE name = ?`, nowIso(), row.name);
-    return row?.name;
-  }
-
-  hasDevs(): boolean {
-    return (this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM devs`)?.n ?? 0) > 0;
+  /**
+   * Developers (token per dev) and dashboard users (admin/manager/viewer) become one account per person, once:
+   * each dev becomes an account with its token as a computer (running daemons keep working); old managers manage
+   * every project and old viewers view every project.
+   */
+  migrateAccounts(): void {
+    if (this.setting("accounts_migrated") === "1") return;
+    const projects = this.records().flatMap((r) => this.live(r.id) ?? []);
+    this.db.tx(() => {
+      for (const d of this.db.all<{ name: string; token_hash: string; created_at: string; last_seen: string | null }>(`SELECT * FROM devs`)) {
+        if (!this.accounts.user(d.name))
+          this.db.run(`INSERT INTO users (name, role, pass_hash, created_at, created_by) VALUES (?, 'member', NULL, ?, 'migration')`, d.name, d.created_at);
+        this.accounts.addDevice(d.name, d.token_hash, "máy cũ", "unknown", d.created_at, d.last_seen);
+      }
+      for (const u of this.db.all<{ name: string; role: string }>(`SELECT name, role FROM users WHERE role IN ('manager', 'viewer')`)) {
+        this.db.run(`UPDATE users SET role = 'member' WHERE name = ?`, u.name);
+        for (const rt of projects) {
+          const m = rt.engine.store.member(u.name);
+          if (u.role === "manager") rt.engine.store.saveMember(u.name, { access: "manager" });
+          else if (!m) rt.engine.store.saveMember(u.name, { access: "viewer" });
+        }
+      }
+      this.setSetting("accounts_migrated", "1");
+    });
+    log("hub", "accounts: developers and dashboard users moved to one account per person");
   }
 
   // ---- settings & brain stats ---------------------------------------------------------
@@ -298,8 +312,4 @@ function cleanCharter(c: Charter): Charter {
   const stack = (c.stack ?? []).map((s) => String(s).trim()).filter(Boolean);
   if (stack.length) out.stack = stack.slice(0, 30);
   return out;
-}
-
-function checkDevName(name: string): void {
-  if (!/^[a-zA-Z0-9._-]{1,40}$/.test(name)) throw new Error("dev name: letters, digits, . _ -");
 }

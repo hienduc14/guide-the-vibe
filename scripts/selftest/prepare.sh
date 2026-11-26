@@ -2,7 +2,8 @@
 # Prepare a clean RealWorld self-test run (Git Bash / Linux / macOS):
 #   1. upstream repo mirrored as sandbox/realworld/origin.git (cloned once from GitHub)
 #   2. origin master reset to the pinned upstream commit, no snapshot refs, clean clones alice/bob
-#   3. fresh Operator data: projects realworld + mini-shop, dev tokens for alice/bob written to their GTV_HOME
+#   3. fresh Operator data: projects realworld + mini-shop, accounts alice/bob (members) whose computer keys
+#      (GTV_TOKENS) are written to their GTV_HOME
 # Afterwards start the two daemons and run: node scripts/selftest/realworld.ts
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -33,7 +34,9 @@ node bin/gtv.mjs install codex sandbox/realworld/bob --daemon http://127.0.0.1:7
 $COMPOSE stop operator > /dev/null 2>&1 || true
 $COMPOSE rm -f operator > /dev/null 2>&1 || true
 docker volume rm docker_gtv-data > /dev/null 2>&1 || true
-$COMPOSE up -d operator > /dev/null
+# Each dev's computer key: GTV_TOKENS makes an account with that key at start.
+declare -A KEY=([alice]="gtvd_selftest_alice_$RANDOM$RANDOM" [bob]="gtvd_selftest_bob_$RANDOM$RANDOM")
+GTV_TOKENS="alice:${KEY[alice]},bob:${KEY[bob]}" $COMPOSE up -d operator > /dev/null
 for _ in $(seq 1 60); do curl -sf -m 2 http://127.0.0.1:7390/health > /dev/null && break; sleep 1; done
 
 # MSYS_NO_PATHCONV: Git Bash would rewrite /repos/... in the JSON body into C:/Program Files/Git/repos/...
@@ -42,8 +45,9 @@ api POST /api/projects '{"id":"realworld","name":"RealWorld API (Node/Express)",
 [ -d sandbox/origin.git ] && api POST /api/projects '{"id":"mini-shop","name":"mini-shop sample","repo_url":"/repos/origin.git","main_branch":"main"}' > /dev/null
 for d in alice bob; do
   port=$([ $d = alice ] && echo 7391 || echo 7392)
-  token=$(api POST /api/devs "{\"name\":\"$d\"}" | node -e "let s='';process.stdin.on('data',x=>s+=x).on('end',()=>console.log(JSON.parse(s).token))")
-  GTV_HOME="$ROOT/sandbox/.home-$d" node bin/gtv.mjs init --dev $d --server http://127.0.0.1:7390 --port $port --token "$token" > /dev/null
+  for p in realworld mini-shop; do api PUT /api/projects/$p/members/$d '{"access":"developer"}' > /dev/null || true; done
+  mkdir -p "sandbox/.home-$d"
+  printf '{ "dev": "%s", "server": "http://127.0.0.1:7390", "port": %s, "token": "%s" }\n' $d $port "${KEY[$d]}" > "sandbox/.home-$d/config.json"
 done
 echo "Ready. Start the daemons (one terminal each), then: GTV_ADMIN_TOKEN=... node scripts/selftest/realworld.ts"
 echo "  GTV_SNAPSHOT_DEBOUNCE_MS=20000 GTV_HOME=$ROOT/sandbox/.home-alice node bin/gtv.mjs daemon"

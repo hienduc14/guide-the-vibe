@@ -21,7 +21,7 @@ import type {
   Ticket,
   Workspace,
 } from "../../shared/types.ts";
-import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_LEVELS } from "../../shared/types.ts";
+import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_ACCESS, MEMBER_LEVELS, type MemberAccess } from "../../shared/types.ts";
 import { newId, nowIso, normPath } from "../../shared/util.ts";
 
 const SESSION_IDLE_MS = 5 * 60_000;
@@ -309,15 +309,17 @@ export class Store extends EventEmitter {
     return this.db.get<Member>(`SELECT * FROM members WHERE dev = ?`, dev);
   }
 
-  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string }): Member {
+  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string; access?: MemberAccess }): Member {
     if (!/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) throw new Error("dev name: letters, digits, . _ -");
     if (input.level && !MEMBER_LEVELS.includes(input.level)) throw new Error(`level must be one of ${MEMBER_LEVELS.join(", ")}`);
+    if (input.access && !MEMBER_ACCESS.includes(input.access)) throw new Error(`access must be one of ${MEMBER_ACCESS.join(", ")}`);
     const prev = this.member(dev);
     const now = nowIso();
     const m: Member = {
       dev,
       role: (input.role ?? prev?.role ?? "developer").trim() || "developer",
       level: input.level ?? prev?.level ?? "mid",
+      access: input.access ?? prev?.access ?? "developer",
       note: input.note ?? prev?.note,
       created_at: prev?.created_at ?? now,
       updated_at: now,
@@ -325,29 +327,6 @@ export class Store extends EventEmitter {
     this.db.upsert("members", m as unknown as Record<string, unknown>);
     this.changed();
     return m;
-  }
-
-  /**
-   * Everyone who works on the project is a member: called when a dev opens a session, registers, picks or is
-   * given a task. Adds a default row once; a manager sets role and level on the dashboard.
-   */
-  ensureMember(dev: string | undefined): void {
-    if (!dev || this.member(dev) || !/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) return;
-    this.saveMember(dev, {});
-  }
-
-  /** One-off repair for projects created before members were added automatically everywhere. */
-  backfillMembers(): number {
-    const devs = this.db.all<{ dev: string }>(
-      `SELECT dev FROM sessions UNION SELECT dev FROM tasks UNION SELECT assignee AS dev FROM board_tasks WHERE assignee IS NOT NULL`,
-    );
-    let added = 0;
-    for (const { dev } of devs) {
-      if (this.member(dev)) continue;
-      this.ensureMember(dev);
-      if (this.member(dev)) added++;
-    }
-    return added;
   }
 
   removeMember(dev: string): void {

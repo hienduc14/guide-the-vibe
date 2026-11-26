@@ -8,7 +8,6 @@ import { api } from "../../api/endpoints";
 import type { ChatEntry, Incident, Thread } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Av, Avs, Blank, usePc } from "../../components/pj";
 import { Loading } from "../../components/Empty";
@@ -135,7 +134,7 @@ const FILTERS: [string, string][] = [
 
 export function TalkPage() {
   const { id, detail } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const pc = usePc();
   const [params, setParams] = useSearchParams();
@@ -272,7 +271,7 @@ export function TalkPage() {
                 </div>
               ))}
             </div>
-            {can("manager") && (
+            {manage && (
               <form
                 className="composer"
                 onSubmit={async (e) => {

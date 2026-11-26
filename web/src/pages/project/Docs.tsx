@@ -7,7 +7,6 @@ import { api } from "../../api/endpoints";
 import type { KbListItem } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Blank } from "../../components/pj";
 import { Loading } from "../../components/Empty";
@@ -161,7 +160,7 @@ function AddDocs({ onAdded, onClose }: { onAdded: (id: string) => void; onClose:
 
 function DocView({ docId, onBack, onChanged }: { docId: string; onBack: () => void; onChanged: () => void }) {
   const { id } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const { data, reload } = usePoll(() => api.kb.get(id, docId), [id, docId], 0);
   const [edit, setEdit] = useState<{ title: string; body: string; type: string }>();
@@ -171,7 +170,6 @@ function DocView({ docId, onBack, onChanged }: { docId: string; onBack: () => vo
     onChanged();
   };
   const fromRepo = data.source === "repo";
-  const manage = can("manager");
   return (
     <>
       <button type="button" className="linkbtn" onClick={onBack} style={{ display: "inline-flex", gap: 6, alignItems: "center", marginBottom: 12 }}>
@@ -314,7 +312,7 @@ const FILTERS: [Filter, string][] = [
 
 export function DocsSection() {
   const { id, reload: reloadProject } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -364,7 +362,7 @@ export function DocsSection() {
             Tìm
           </button>
         </form>
-        {can("manager") && (
+        {manage && (
           <button type="button" className="p-btn primary" onClick={() => setAdding(true)}>
             <Plus />
             Thêm tài liệu

@@ -75,19 +75,12 @@ export type ProjectEntry = ProjectSummary | ProjectStub;
 
 export const isLoaded = (p: ProjectEntry): p is ProjectSummary => !("error" in p && p.error);
 
-export interface Dev {
-  name: string;
-  created_at: string;
-  last_seen: string | null;
-}
-
 export interface Overview {
   open_mode: boolean;
   commit: string | null;
   brain: { backend: string; model: string | null; ok: boolean; detail?: string; failing?: { count: number; error: string | null } };
   brain_stats: BrainStats;
   projects: ProjectEntry[];
-  devs: Dev[];
 }
 
 export interface Policy {
@@ -112,6 +105,7 @@ export interface ProjectRecord {
 export interface ProjectDetail extends ProjectSummary {
   record: ProjectRecord;
   graph: { files: number; symbols: number; refs: number };
+  my_access: ProjectAccess;
 }
 
 export interface TaskResource {
@@ -409,9 +403,12 @@ export interface BrainInfo {
   stats: BrainStats;
 }
 
-// ---- dashboard accounts -----------------------------------------------------------------
+// ---- accounts ----------------------------------------------------------------------------
 
-export type Role = "admin" | "manager" | "viewer";
+/** System role: admins manage accounts, the AI and projects; members do what their project access allows. */
+export type Role = "admin" | "member";
+/** Access in one project. */
+export type ProjectAccess = "manager" | "developer" | "viewer";
 
 export interface Me {
   name: string;
@@ -420,13 +417,37 @@ export interface Me {
   project: string | null;
   open_mode: boolean;
   has_users: boolean;
+  projects: { id: string; name: string; access: ProjectAccess }[];
 }
 
 export interface User {
   name: string;
   role: Role;
+  activated: boolean;
   created_at: string;
+  created_by: string | null;
   last_login: string | null;
+  /** Latest time one of their computers talked to the server. */
+  last_seen: string | null;
+  devices: number;
+  projects: { id: string; name: string; access: ProjectAccess }[];
+}
+
+/** A computer connected to an account (gtv login). */
+export interface Device {
+  id: string;
+  user: string;
+  name: string;
+  platform: string;
+  created_at: string;
+  last_seen: string | null;
+}
+
+export interface Session {
+  token: string;
+  name: string;
+  role: Role;
+  expires_at: string;
 }
 
 export interface ShareLink {
@@ -448,6 +469,7 @@ export interface Member {
   dev: string;
   role: string;
   level: MemberLevel;
+  access: ProjectAccess;
   note?: string | null;
   created_at: string;
   updated_at: string;

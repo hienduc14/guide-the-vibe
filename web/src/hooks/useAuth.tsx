@@ -3,14 +3,14 @@ import { getShareToken, getToken, setShareToken, setToken, UNAUTHORIZED_EVENT } 
 import { api } from "../api/endpoints";
 import type { Me, Role } from "../api/types";
 
-const RANK: Record<Role, number> = { viewer: 0, manager: 1, admin: 2 };
+const RANK: Record<Role, number> = { member: 0, admin: 1 };
 
 interface AuthState {
   token: string | null;
   needsLogin: boolean;
   /** Who is logged in; undefined while loading. */
   me: Me | undefined;
-  /** True when the caller's role is at least `role`. */
+  /** True when the caller's system role is at least `role` (project access: useProject().access). */
   can: (role: Role) => boolean;
   shared: boolean;
   login: (token: string) => void;
@@ -57,12 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, [token, needsLogin]);
 
-  // Role-dependent CSS: .manage-only and .admin-only controls disappear for lower roles.
+  // Role-dependent CSS: .admin-only controls disappear for members.
   // Until /me answers, keep the role from the last visit so the sidebar does not flash
   // admin items away and back on every reload; the server still refuses what a role may not do.
   useEffect(() => {
     if (!me) {
-      if (!document.body.dataset.role) document.body.dataset.role = readRole() ?? "viewer";
+      if (!document.body.dataset.role) document.body.dataset.role = readRole() ?? "member";
       return;
     }
     document.body.dataset.role = me.role;
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTok(null);
     setMe(undefined);
     writeRole(null);
-    document.body.dataset.role = "viewer";
+    document.body.dataset.role = "member";
     setNeedsLogin(true);
   }, []);
 

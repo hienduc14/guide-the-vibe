@@ -6,10 +6,10 @@ import { Check, RotateCcw, Send, Sparkles } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { Incident, Plan } from "../../api/types";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useOverview } from "../../hooks/useOverview";
 import { Av, usePc } from "../../components/pj";
 import { clock } from "../../lib/format";
+import { useProject } from "./ProjectLayout";
 
 interface Draft {
   plan: number;
@@ -64,7 +64,7 @@ export function FixBar({ projectId, inc, onOpen }: { projectId: string; inc: Inc
 }
 
 export function FixBox({ projectId, inc, onChanged, onCollapse }: { projectId: string; inc: Incident; onChanged: () => void; onCollapse?: () => void }) {
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const pc = usePc();
   const { plans, waiting } = usePlans(projectId, inc);
@@ -117,7 +117,7 @@ export function FixBox({ projectId, inc, onChanged, onCollapse }: { projectId: s
                 : "Một trong hai bên đã đổi hướng hoặc code đã vào nhánh chính."}
           </p>
         )}
-        {can("manager") && inc.closed_reason !== "resolved" && (
+        {manage && inc.closed_reason !== "resolved" && (
           <div className="acts" style={{ marginTop: 4 }}>
             <button
               type="button"
@@ -136,7 +136,6 @@ export function FixBox({ projectId, inc, onChanged, onCollapse }: { projectId: s
   }
 
   const to = [inc.dev_a, inc.dev_b].filter((w) => d.to[w]);
-  const manage = can("manager");
   return (
     <section className="fix">
       <div className="fix-draft">

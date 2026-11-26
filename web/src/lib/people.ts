@@ -1,4 +1,11 @@
-import type { Member } from "../api/types";
+import type { Member, ProjectAccess } from "../api/types";
+
+export const ACCESS_LABEL: Record<ProjectAccess, string> = { manager: "Quản lý", developer: "Developer", viewer: "Người xem" };
+export const ACCESS_HINT: Record<ProjectAccess, string> = {
+  manager: "Làm được mọi thứ trong project: giao việc, thành viên, thiết lập.",
+  developer: "Agent của họ làm việc trong project; trên web trả lời câu hỏi gửi cho mình và sửa việc của mình.",
+  viewer: "Chỉ xem. Agent của họ không được kết nối vào project.",
+};
 
 /** Six person colours (tokens --c-*), given in the order members joined the project, then reused. */
 const COLORS = ["amber", "violet", "teal", "green", "pink", "sky"] as const;

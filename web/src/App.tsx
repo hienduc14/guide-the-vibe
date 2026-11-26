@@ -13,8 +13,8 @@ import { TalkPage } from "./pages/project/TalkPage";
 import { KnowledgePage } from "./pages/project/KnowledgePage";
 import { SettingsPage } from "./pages/project/SettingsPage";
 import { BrainPage } from "./pages/brain/BrainPage";
-import { DevsPage } from "./pages/devs/DevsPage";
-import { UsersPage } from "./pages/users/UsersPage";
+import { PeoplePage } from "./pages/people/PeoplePage";
+import { AccountPage, ActivatePage, ConnectPage } from "./pages/account/AccountPages";
 import { ShareEntry } from "./pages/share/ShareEntry";
 
 /** Redirect inside a project, keeping the query (e.g. ?task=…). */
@@ -26,8 +26,10 @@ function Moved({ to, extra }: { to: string; extra?: string }) {
 }
 
 function Gate() {
-  const { needsLogin } = useAuth();
+  const { needsLogin, me } = useAuth();
   if (needsLogin) return <LoginPage />;
+  // No account and no admin token: the server is open until someone creates the first admin.
+  if (me?.kind === "open" && !me.has_users) return <LoginPage first />;
   return (
     <OverviewProvider>
       <Routes>
@@ -59,8 +61,11 @@ function Gate() {
             <Route path="*" element={<Moved to="" />} />
           </Route>
           <Route path="brain" element={<BrainPage />} />
-          <Route path="devs" element={<DevsPage />} />
-          <Route path="users" element={<UsersPage />} />
+          <Route path="people" element={<PeoplePage />} />
+          <Route path="me" element={<AccountPage />} />
+          <Route path="connect" element={<ConnectPage />} />
+          <Route path="devs" element={<Navigate to="/people" replace />} />
+          <Route path="users" element={<Navigate to="/people" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -73,6 +78,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/s/:code" element={<ShareEntry />} />
+        <Route path="/activate/:code" element={<ActivatePage />} />
         <Route
           path="*"
           element={

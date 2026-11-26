@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronDown, GitBranch, Inbox, MessagesSquare, Moon, SlidersHorizontal, Activity, SquareKanban, Sun } from "lucide-react";
 import { api } from "../../api/endpoints";
-import type { ProjectDetail } from "../../api/types";
+import type { ProjectAccess, ProjectDetail } from "../../api/types";
 import { isLoaded } from "../../api/types";
 import { usePoll, type Poll } from "../../hooks/usePoll";
 import { useOverview } from "../../hooks/useOverview";
@@ -17,6 +17,10 @@ import { FileSheet } from "./FileSheet";
 interface ProjectCtx {
   id: string;
   detail: ProjectDetail;
+  /** The caller's access in this project. */
+  access: ProjectAccess;
+  /** Manager access: change anything in the project. */
+  manage: boolean;
   reload: Poll<ProjectDetail>["reload"];
   /** Open the file sheet over the current page (?file=…). */
   openFile: (path: string) => void;
@@ -93,7 +97,6 @@ function ThemeButton() {
 
 export function ProjectLayout() {
   const { id = "" } = useParams();
-  const { can } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { data, error, reload } = usePoll(() => api.projects.detail(id), [id], 5000);
@@ -122,7 +125,7 @@ export function ProjectLayout() {
     </NavLink>
   );
   return (
-    <Ctx.Provider value={{ id, detail: data, reload, openFile }}>
+    <Ctx.Provider value={{ id, detail: data, reload, openFile, access: data.my_access, manage: data.my_access === "manager" }}>
       <PeopleProvider members={data.members}>
         <div className="pj">
           <header className="p-top">
@@ -162,7 +165,7 @@ export function ProjectLayout() {
               {tab(`/p/${id}/talk`, "Trao đổi", MessagesSquare)}
               {tab(`/p/${id}/knowledge`, "Tri thức", BookOpen)}
               <span className="gap" />
-              {can("manager") && tab(`/p/${id}/settings`, "Thiết lập", SlidersHorizontal)}
+              {data.my_access === "manager" && tab(`/p/${id}/settings`, "Thiết lập", SlidersHorizontal)}
             </nav>
           </header>
           <main className="screen">
@@ -177,10 +180,8 @@ export function ProjectLayout() {
 
 /** Settings need a manager: others are sent back to the project's first page. */
 export function ManagerOnly({ children }: { children: JSX.Element }) {
-  const { can, me } = useAuth();
-  const { id } = useProject();
-  if (!me) return <Loading />;
-  if (!can("manager")) {
+  const { id, manage } = useProject();
+  if (!manage) {
     return (
       <div className="p-empty">
         <b>Cần quyền quản lý</b>

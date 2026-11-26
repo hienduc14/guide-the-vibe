@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useOverview } from "../../hooks/useOverview";
+import { useAuth } from "../../hooks/useAuth";
 import { PageHead } from "../../components/Layout";
 import { Card } from "../../components/Card";
 import { AvatarStack, EmptyState, Kpi, Ring, StatusDot } from "../../components/Visual";
@@ -81,6 +82,7 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
 
 export function OverviewPage() {
   const { data, error, reload } = useOverview();
+  const { can } = useAuth();
   const [adding, setAdding] = useState(false);
   if (error && !data) return <ErrorNotice error={error} />;
   if (!data) return <Loading />;
@@ -164,10 +166,16 @@ export function OverviewPage() {
         </h2>
         {data.projects.length === 0 ? (
           <Card>
-            <EmptyState icon={FolderGit2} title="Chưa có dự án">
-              Bắt đầu trong 3 bước: 1. Bấm “Thêm project” và dán URL repo. 2. Ở trang Developers, bấm “Tạo lệnh mời” và gửi lệnh cho từng dev chạy trong repo
-              của họ. 3. Quay lại đây để xem ai đang làm gì.
-            </EmptyState>
+            {can("admin") ? (
+              <EmptyState icon={FolderGit2} title="Chưa có dự án">
+                Bắt đầu trong 3 bước: 1. Bấm “Thêm project” và dán URL repo. 2. Ở trang Người, thêm từng thành viên và gửi họ link kích hoạt. 3. Mỗi người kết
+                nối máy theo trang Tài khoản của tôi, rồi quay lại đây để xem ai đang làm gì.
+              </EmptyState>
+            ) : (
+              <EmptyState icon={FolderGit2} title="Bạn chưa ở project nào">
+                Nhờ quản trị thêm bạn. Trong lúc chờ, bạn có thể <Link to="/me">kết nối máy của mình</Link>.
+              </EmptyState>
+            )}
           </Card>
         ) : (
           <div className="project-grid">

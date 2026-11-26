@@ -15,7 +15,6 @@ import type {
   FileDetail,
   Incident,
   Plan,
-  Dev,
   FeatureMode,
   KbDoc,
   KbHit,
@@ -40,7 +39,10 @@ import type {
   Me,
   Member,
   MemberLevel,
+  ProjectAccess,
+  Device,
   Role,
+  Session,
   ShareLink,
   User,
 } from "./types";
@@ -64,14 +66,31 @@ export const api = {
 
   auth: {
     me: () => get<Me>("/api/me"),
-    login: (name: string, password: string) => post<{ token: string; name: string; role: Role; expires_at: string }>("/api/login", { name, password }),
+    login: (name: string, password: string) => post<Session>("/api/login", { name, password }),
     logout: () => post<{ ok: boolean }>("/api/logout"),
+    activation: (code: string) => get<{ user: string; kind: "activate" | "reset" }>(`/api/activate/${encodeURIComponent(code)}`),
+    activate: (code: string, password: string) => post<Session>(`/api/activate/${encodeURIComponent(code)}`, { password }),
+    changePassword: (current: string, password: string) => put<Session>("/api/me/password", { current, password }),
+    devices: () => get<Device[]>("/api/me/devices"),
+    revokeDevice: (deviceId: string) => del<{ ok: boolean }>(`/api/me/devices/${encodeURIComponent(deviceId)}`),
   },
+
+  connect: {
+    get: (code: string) => get<{ device_name: string; platform: string; created_at: string }>(`/api/connect/${encodeURIComponent(code)}`),
+    decide: (code: string, action: "approve" | "deny") => post<{ ok: boolean }>(`/api/connect/${encodeURIComponent(code)}/${action}`),
+  },
+
+  people: () => get<{ name: string }[]>("/api/people"),
 
   users: {
     list: () => get<User[]>("/api/users"),
-    save: (name: string, input: { role?: Role; password?: string }) => put<User>(`/api/users/${encodeURIComponent(name)}`, input),
+    create: (input: { name: string; role: Role; projects: { id: string; access: ProjectAccess }[] }) =>
+      post<{ user: User; activation_url: string; expires_at: string }>("/api/users", input),
+    setRole: (name: string, role: Role) => patch<User>(`/api/users/${encodeURIComponent(name)}`, { role }),
     remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
+    activation: (name: string) => post<{ activation_url: string; expires_at: string }>(`/api/users/${encodeURIComponent(name)}/activation`),
+    devices: (name: string) => get<Device[]>(`/api/users/${encodeURIComponent(name)}/devices`),
+    revokeDevice: (name: string, deviceId: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}/devices/${encodeURIComponent(deviceId)}`),
   },
 
   board: {
@@ -85,7 +104,7 @@ export const api = {
 
   members: {
     list: (id: string) => get<Member[]>(`${a(id)}/members`),
-    save: (id: string, dev: string, input: { role?: string; level?: MemberLevel; note?: string }) =>
+    save: (id: string, dev: string, input: { role?: string; level?: MemberLevel; note?: string; access?: ProjectAccess }) =>
       put<Member>(`${a(id)}/members/${encodeURIComponent(dev)}`, input),
     remove: (id: string, dev: string) => del<{ ok: boolean }>(`${a(id)}/members/${encodeURIComponent(dev)}`),
   },
@@ -135,8 +154,7 @@ export const api = {
 
   tickets: {
     list: (id: string) => get<Ticket[]>(`${p(id)}/tickets`),
-    reply: (id: string, ticketId: string, answer: string, as?: string) =>
-      post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }, { as }),
+    reply: (id: string, ticketId: string, answer: string) => post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }),
   },
 
   kb: {
@@ -158,13 +176,6 @@ export const api = {
     symbols: (id: string, q: string, view: string) => get<SymbolRow[]>(`${p(id)}/graph/symbols?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
     callers: (id: string, q: string, view: string) =>
       get<{ symbol: string; callers: CallerHit[] }[]>(`${p(id)}/graph/callers?q=${encodeURIComponent(q)}&view=${encodeURIComponent(view)}`),
-  },
-
-  devs: {
-    list: () => get<Dev[]>("/api/devs"),
-    issue: (name: string) => post<{ name: string; token: string }>("/api/devs", { name }),
-    invite: (name: string) => post<{ name: string; code: string; expires_at: string }>("/api/devs/invite", { name }),
-    remove: (name: string) => del<{ ok: boolean }>(`/api/devs/${encodeURIComponent(name)}`),
   },
 
   brain: {

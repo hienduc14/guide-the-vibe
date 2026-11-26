@@ -4,8 +4,7 @@
  */
 
 /* Controls a role may not use are hidden; the server refuses them anyway. */
-body:not([data-role="admin"]) .admin-only,
-body[data-role="viewer"] .manage-only {
+body:not([data-role="admin"]) .admin-only {
   display: none !important;
 }
 
@@ -171,3 +170,12 @@ button.chip {
 }
 
 /* ---- code map -------------------------------------------------------------------------------- */
+
+/* The account chip in the rail links to "my account". */
+.sidebar a.who {
+  text-decoration: none;
+}
+.sidebar a.who:hover,
+.sidebar a.who.active {
+  box-shadow: inset 0 0 0 1px var(--nav-line);
+}

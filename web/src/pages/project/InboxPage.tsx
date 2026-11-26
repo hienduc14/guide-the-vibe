@@ -137,10 +137,12 @@ function IncidentDetail({ inc, state, onChanged }: { inc: Incident; state?: Team
 }
 
 function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionItem; onChanged: () => void }) {
-  const { id } = useProject();
-  const { can, me } = useAuth();
+  const { id, manage, access } = useProject();
+  const { me } = useAuth();
   const run = useAction();
   const pc = usePc();
+  // Developers answer questions sent to them or to the whole team; everything else needs a manager.
+  const canAnswer = manage || (access === "developer" && (!t.to_dev || t.to_dev === me?.name));
   const [pick, setPick] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [keep, setKeep] = useState(true);
@@ -195,14 +197,14 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
           <span className="sect">Trả lời{t.answered_by ? ` · ${t.answered_by}` : ""}</span>
           <p className="pre">{t.answer}</p>
         </div>
-      ) : can("manager") ? (
+      ) : canAnswer ? (
         <form
           className="block"
           onSubmit={async (e) => {
             e.preventDefault();
-            const ok = await run(() => api.tickets.reply(id, t.id, answer, me?.name ?? "admin"), `Đã gửi trả lời cho agent của ${t.from_dev}`);
+            const ok = await run(() => api.tickets.reply(id, t.id, answer), `Đã gửi trả lời cho agent của ${t.from_dev}`);
             if (!ok) return;
-            if (keep) {
+            if (keep && manage) {
               // The answer becomes a Q&A document waiting for confirmation: confirm it now.
               const docs = await api.kb.list(id).catch(() => []);
               const doc = docs.find((d) => d.ticket_id === t.id && d.status === "unverified");
@@ -236,15 +238,17 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
             placeholder={t.options?.length ? "Hoặc viết câu trả lời khác" : "Viết câu trả lời cho agent"}
             aria-label="Câu trả lời"
           />
-          <label className="check">
-            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Lưu vào Tri thức, lần sau AI tự trả lời câu tương tự
-          </label>
+          {manage && (
+            <label className="check">
+              <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Lưu vào Tri thức, lần sau AI tự trả lời câu tương tự
+            </label>
+          )}
           <div className="acts">
             <button type="submit" className="p-btn primary" disabled={!answer}>
               <Send />
               Gửi trả lời cho agent của {t.from_dev}
             </button>
-            {t.to_dev && (
+            {t.to_dev && manage && (
               <button
                 type="button"
                 className="p-btn"
@@ -261,7 +265,7 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
           </div>
         </form>
       ) : (
-        <p className="p-hint block">Cần quyền quản lý để trả lời.</p>
+        <p className="p-hint block">{access === "developer" ? `Câu này gửi cho ${to}: cần quyền quản lý để trả lời thay.` : "Cần quyền quản lý để trả lời."}</p>
       )}
     </>
   );
@@ -269,7 +273,7 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
 
 function OtherDetail({ a, onChanged }: { a: AttentionItem; onChanged: () => void }) {
   const { id, detail } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const board = usePoll(() => api.board.get(id, a.ref), [id, a.ref], 10_000);
   const t = board.data;
@@ -297,7 +301,7 @@ function OtherDetail({ a, onChanged }: { a: AttentionItem; onChanged: () => void
         <dd>{a.detail}</dd>
       </dl>
       <div className="acts">
-        {can("manager") &&
+        {manage &&
           a.kind === "unassigned" &&
           detail.members.map((m) => (
             <button
@@ -312,7 +316,7 @@ function OtherDetail({ a, onChanged }: { a: AttentionItem; onChanged: () => void
               Giao cho {m.dev}
             </button>
           ))}
-        {can("manager") && a.kind === "stale" && (
+        {manage && a.kind === "stale" && (
           <>
             {t.assignee && (
               <button

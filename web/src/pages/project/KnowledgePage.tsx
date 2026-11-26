@@ -7,7 +7,6 @@ import { BookOpen, Check, CircleHelp, Pencil, Target } from "lucide-react";
 import { api } from "../../api/endpoints";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Blank } from "../../components/pj";
 import { Loading } from "../../components/Empty";
@@ -105,7 +104,7 @@ function CharterEditor({ charter, onDone }: { charter: Charter; onDone: () => vo
 
 function CharterView() {
   const { detail } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const [edit, setEdit] = useState(false);
   const c = detail.charter;
   if (edit) return <CharterEditor charter={c} onDone={() => setEdit(false)} />;
@@ -165,7 +164,7 @@ function CharterView() {
           {field("Ghi chú", c.notes)}
         </div>
       )}
-      {can("manager") && (
+      {manage && (
         <div className="acts">
           <button type="button" className="p-btn" onClick={() => setEdit(true)}>
             <Pencil />
@@ -179,7 +178,7 @@ function CharterView() {
 
 function Review() {
   const { id, reload } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const list = usePoll(() => api.kb.list(id), [id], 10_000);
   if (!list.data) return <Loading />;
@@ -205,7 +204,7 @@ function Review() {
               </span>
               <b>{d.title}</b>
               <small>{d.source === "ticket" ? `Hỏi đáp · ${ago(d.created_at)}` : `${d.source} · ${ago(d.created_at)}`}</small>
-              {can("manager") && (
+              {manage && (
                 <span className="r">
                   <button type="button" className="p-btn sm primary" onClick={() => void act(d.id, "confirm")}>
                     <Check />

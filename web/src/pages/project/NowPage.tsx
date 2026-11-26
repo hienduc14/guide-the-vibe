@@ -8,7 +8,6 @@ import { api } from "../../api/endpoints";
 import type { AttentionItem, Incident, TeamState } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useColorOf } from "../../hooks/usePeople";
 import { useProject } from "./ProjectLayout";
 import { Av, Avs, Seg, State, base, dirOf } from "../../components/pj";
@@ -276,7 +275,7 @@ function SideHome({ attention }: { attention: AttentionItem[] | undefined }) {
 
 function SideWho({ a, onClose }: { a: AgentCard; onClose: () => void }) {
   const { id } = useProject();
-  const { can } = useAuth();
+  const { manage } = useProject();
   const run = useAction();
   const [text, setText] = useState("");
   const boardId = a.task?.board_id ?? undefined;
@@ -348,7 +347,7 @@ function SideWho({ a, onClose }: { a: AgentCard; onClose: () => void }) {
           </ul>
         </div>
       )}
-      {can("manager") && (
+      {manage && (
         <form
           className="block"
           onSubmit={async (e) => {

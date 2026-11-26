@@ -1,10 +1,10 @@
 // The sections of Thiết lập: members, repository, share links and the system log.
 
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Copy, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "../../api/endpoints";
-import type { ActivityEvent, Level, Member, MemberLevel } from "../../api/types";
+import type { ActivityEvent, Level, Member, MemberLevel, ProjectAccess } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction, useToast } from "../../hooks/useToast";
 import { useAuth } from "../../hooks/useAuth";
@@ -16,6 +16,7 @@ import { ConfirmButton } from "../../components/ConfirmButton";
 import { LEVELS, LEVEL_LABEL, ROLE_SUGGESTIONS } from "../../components/Member";
 import { agentName } from "../../components/Badge";
 import { ago, clock, parseJson } from "../../lib/format";
+import { ACCESS_HINT, ACCESS_LABEL } from "../../lib/people";
 
 const DANGER = "p-btn sm danger";
 
@@ -99,26 +100,28 @@ function MemberEdit({ m, onDone }: { m: Member; onDone: () => void }) {
 
 export function MembersSection() {
   const { id, detail, reload } = useProject();
-  const { data: overview } = useOverview();
   const { can } = useAuth();
   const run = useAction();
   const [editing, setEditing] = useState<string>();
-  const [add, setAdd] = useState({ dev: "", role: "", level: "mid" as MemberLevel });
-  const [invite, setInvite] = useState({ name: "", cmd: "" });
+  const [add, setAdd] = useState({ dev: "", role: "", level: "mid" as MemberLevel, access: "developer" as ProjectAccess });
+  const { data: accounts } = usePoll(api.people, [], 60_000);
   const people = new Map(detail.people.map((p) => [p.dev, p]));
   const members = [...detail.members].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || a.dev.localeCompare(b.dev));
-  const candidates = (overview?.devs ?? []).map((d) => d.name).filter((n) => !detail.members.some((m) => m.dev === n));
+  const candidates = (accounts ?? []).map((u) => u.name).filter((n) => !detail.members.some((m) => m.dev === n));
   return (
     <>
       <h2>Thành viên</h2>
-      <p className="lede">Mỗi thành viên cài gtv một lần trong bản clone của mình. Vai trò và trình độ giúp AI chọn cách trả lời và người để hỏi.</p>
+      <p className="lede">
+        Quyền quyết định ai làm gì: Quản lý làm được mọi thứ, Developer cho agent của mình làm việc ở đây, Người xem chỉ xem. Vai trò và trình độ giúp AI chọn
+        cách trả lời và người để hỏi.
+      </p>
       <datalist id="gtv-roles">
         {ROLE_SUGGESTIONS.map((r) => (
           <option key={r} value={r} />
         ))}
       </datalist>
       <div className="p-members">
-        {members.length === 0 && <Blank title="Chưa có thành viên">Thành viên tự xuất hiện khi agent của họ mở phiên đầu tiên.</Blank>}
+        {members.length === 0 && <Blank title="Chưa có thành viên">Thêm người đã có tài khoản ở dưới.</Blank>}
         {members.map((m) => {
           const p = people.get(m.dev);
           const agent = p?.agents[0];
@@ -138,20 +141,35 @@ export function MembersSection() {
                 {p?.tasks[0] ?? ""}
                 {p && p.conflicts > 0 && <small className="bad">đang đụng việc người khác</small>}
               </div>
-              <span className="p-chip lvl">{LEVEL_LABEL[m.level]}</span>
+              <select
+                className="p-input sm"
+                style={{ width: "auto" }}
+                value={m.access}
+                title={ACCESS_HINT[m.access]}
+                aria-label={`Quyền của ${m.dev}`}
+                onChange={async (e) => {
+                  await run(() => api.members.save(id, m.dev, { access: e.target.value as ProjectAccess }), `Đã đổi quyền của ${m.dev}`);
+                  void reload();
+                }}
+              >
+                {ACCESS.map((a) => (
+                  <option key={a} value={a}>
+                    {ACCESS_LABEL[a]}
+                  </option>
+                ))}
+              </select>
               <span className="mstate">
+                <span className="p-chip lvl">{LEVEL_LABEL[m.level]}</span>
                 <State status={p?.status ?? "ended"} />
-                {can("manager") && (
-                  <button
-                    type="button"
-                    className="iconbtn"
-                    title={`Sửa ${m.dev}`}
-                    aria-label={`Sửa ${m.dev}`}
-                    onClick={() => setEditing(editing === m.dev ? undefined : m.dev)}
-                  >
-                    <Pencil />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="iconbtn"
+                  title={`Sửa ${m.dev}`}
+                  aria-label={`Sửa ${m.dev}`}
+                  onClick={() => setEditing(editing === m.dev ? undefined : m.dev)}
+                >
+                  <Pencil />
+                </button>
               </span>
               {editing === m.dev && (
                 <MemberEdit
@@ -166,90 +184,68 @@ export function MembersSection() {
           );
         })}
       </div>
-      {can("manager") && (
-        <form
-          className="block"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (await run(() => api.members.save(id, add.dev.trim(), { role: add.role.trim() || "developer", level: add.level }), `Đã thêm ${add.dev}`)) {
-              setAdd({ dev: "", role: "", level: "mid" });
-              void reload();
-            }
-          }}
-        >
-          <span className="sect">Thêm thành viên đã có token</span>
-          <div className="inline-form">
-            <input
-              className="p-input"
-              list="gtv-cands"
-              required
-              value={add.dev}
-              onChange={(e) => setAdd({ ...add, dev: e.target.value })}
-              placeholder="Tên developer"
-              aria-label="Tên developer"
-            />
-            <datalist id="gtv-cands">
-              {candidates.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
-            <input
-              className="p-input"
-              list="gtv-roles"
-              value={add.role}
-              onChange={(e) => setAdd({ ...add, role: e.target.value })}
-              placeholder="Vai trò, ví dụ backend"
-              aria-label="Vai trò"
-            />
-            <select className="p-input" value={add.level} onChange={(e) => setAdd({ ...add, level: e.target.value as MemberLevel })} aria-label="Trình độ">
-              {LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {LEVEL_LABEL[l]}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="p-btn">
-              Thêm
-            </button>
-          </div>
-        </form>
-      )}
-      {can("admin") && (
-        <form
-          className="block"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const r = await run(() => api.devs.invite(invite.name.trim()), "Đã tạo lệnh mời, có hiệu lực 24 giờ");
-            if (r) setInvite({ name: "", cmd: `npx guide-the-vibe join ${location.origin}/j/${r.code}` });
-          }}
-        >
-          <span className="sect">Mời người mới</span>
-          <div className="inline-form">
-            <input
-              className="p-input"
-              required
-              value={invite.name}
-              onChange={(e) => setInvite({ ...invite, name: e.target.value })}
-              placeholder="Tên developer"
-              aria-label="Tên người được mời"
-            />
-            <button type="submit" className="p-btn primary">
-              Tạo lệnh mời
-            </button>
-          </div>
-          {invite.cmd && (
+      <form
+        className="block"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const input = { role: add.role.trim() || "developer", level: add.level, access: add.access };
+          if (await run(() => api.members.save(id, add.dev, input), `Đã thêm ${add.dev}`)) {
+            setAdd({ dev: "", role: "", level: "mid", access: "developer" });
+            void reload();
+          }
+        }}
+      >
+        <span className="sect">Thêm thành viên</span>
+        <div className="inline-form">
+          <select className="p-input" required value={add.dev} onChange={(e) => setAdd({ ...add, dev: e.target.value })} aria-label="Người">
+            <option value="">{candidates.length ? "Chọn người" : "Không còn ai để thêm"}</option>
+            {candidates.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <select className="p-input" value={add.access} onChange={(e) => setAdd({ ...add, access: e.target.value as ProjectAccess })} aria-label="Quyền">
+            {ACCESS.map((a) => (
+              <option key={a} value={a}>
+                {ACCESS_LABEL[a]}
+              </option>
+            ))}
+          </select>
+          <input
+            className="p-input"
+            list="gtv-roles"
+            value={add.role}
+            onChange={(e) => setAdd({ ...add, role: e.target.value })}
+            placeholder="Vai trò, ví dụ backend"
+            aria-label="Vai trò"
+          />
+          <select className="p-input" value={add.level} onChange={(e) => setAdd({ ...add, level: e.target.value as MemberLevel })} aria-label="Trình độ">
+            {LEVELS.map((l) => (
+              <option key={l} value={l}>
+                {LEVEL_LABEL[l]}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="p-btn" disabled={!add.dev}>
+            Thêm
+          </button>
+        </div>
+        <p className="faint" style={{ marginTop: 6 }}>
+          {can("admin") ? (
             <>
-              <CopyLine text={invite.cmd} />
-              <p className="faint" style={{ marginTop: 6 }}>
-                Người đó chạy lệnh này một lần trong bản clone của repo. Lệnh chỉ dùng được một lần.
-              </p>
+              Người mới chưa có tài khoản? <Link to="/people">Tạo tài khoản ở trang Người</Link>.
             </>
+          ) : (
+            "Người mới chưa có tài khoản: nhờ quản trị tạo, rồi thêm ở đây."
           )}
-        </form>
-      )}
+        </p>
+      </form>
     </>
   );
 }
+
+const ACCESS: ProjectAccess[] = ["manager", "developer", "viewer"];
 
 // ---- repository ------------------------------------------------------------------------------
 

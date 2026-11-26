@@ -7,8 +7,8 @@ import { api } from "../../api/endpoints";
 import type { BoardDetail, BoardInput, BoardStatus, BoardView, Priority } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
+import { useAuth } from "../../hooks/useAuth";
 import { Av, Seg, State } from "../../components/pj";
 import { Loading } from "../../components/Empty";
 import { PRIORITIES, PRIORITY_INFO, STATUS_INFO } from "../../components/Task";
@@ -161,10 +161,9 @@ function AddTask({ onDone }: { onDone: () => void }) {
 const TAG_CHIP: Record<string, string> = { blocker: "clash", question: "warn", done: "ok" };
 
 function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
-  const { id, detail } = useProject();
-  const { can } = useAuth();
+  const { id, detail, manage, access } = useProject();
+  const { me } = useAuth();
   const run = useAction();
-  const manage = can("manager");
   const { data: t, reload } = usePoll<BoardDetail>(() => api.board.get(id, taskId), [id, taskId], 5000);
   const [note, setNote] = useState("");
   const [desc, setDesc] = useState<string>();
@@ -185,6 +184,8 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   };
   const why = columnOf(t) === "blocked" ? reasons(t) : [];
   const live = t.work.find((w) => w.dev === t.assignee);
+  // A developer updates the tasks assigned to them (status, goal, notes); the rest needs a manager.
+  const own = manage || (access === "developer" && !!me && t.assignee === me.name);
   return (
     <aside className="panel drawer" aria-label={t.title}>
       <div className="dhead">
@@ -196,7 +197,7 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
       <dl className="p-kv">
         <dt>Trạng thái</dt>
         <dd>
-          {manage ? (
+          {own ? (
             <select className="p-input sm" value={t.status} onChange={(e) => void update({ status: e.target.value as BoardStatus })}>
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -262,7 +263,7 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
       )}
       <div className="block">
         <span className="sect">Mục tiêu</span>
-        {manage && desc !== undefined ? (
+        {own && desc !== undefined ? (
           <>
             <textarea className="p-textarea" value={desc} onChange={(e) => setDesc(e.target.value)} />
             <div className="acts" style={{ marginTop: 8 }}>
@@ -284,7 +285,7 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
         ) : (
           <p className="pre">
             {t.description || <span className="faint">Chưa có mô tả.</span>}{" "}
-            {manage && (
+            {own && (
               <button type="button" className="linkbtn" onClick={() => setDesc(t.description ?? "")}>
                 Sửa
               </button>
@@ -335,7 +336,7 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
         ) : (
           <p className="muted">Chưa có ghi chú. Agent ghi lại tiến độ và quyết định ở đây khi bắt đầu làm.</p>
         )}
-        {manage && (
+        {own && (
           <form
             className="acts"
             onSubmit={async (e) => {
@@ -388,10 +389,12 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
 
 export function WorkPage() {
   const { id, detail } = useProject();
-  const { can } = useAuth();
+  const { manage, access } = useProject();
+  const { me } = useAuth();
   const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState(false);
-  const [who, setWho] = useState("");
+  // "Mine" is where a developer starts; it follows the logged-in person.
+  const [who, setWho] = useState(access === "developer" ? "@me" : "");
   const board = usePoll(() => api.board.list(id, "all"), [id], 5000);
   const view = params.get("view") === "progress" ? "progress" : "board";
   const task = params.get("task");
@@ -402,7 +405,9 @@ export function WorkPage() {
     setParams(next);
   };
   const all = (board.data ?? []).filter((t) => t.status !== "cancelled");
-  const shown = all.filter((t) => !who || (who === "-" ? !t.assignee : t.assignee === who));
+  const mine = me?.kind === "user" ? me.name : undefined;
+  const filter = who === "@me" ? (mine ?? "") : who;
+  const shown = all.filter((t) => !filter || (filter === "-" ? !t.assignee : t.assignee === filter));
   const done = all.filter((t) => t.status === "done").length;
   const blocked = all.filter((t) => columnOf(t) === "blocked").length;
   const deadline = detail.charter.deadline;
@@ -428,6 +433,7 @@ export function WorkPage() {
           {view === "board" && (
             <select className="p-input" style={{ width: "auto" }} value={who} onChange={(e) => setWho(e.target.value)} aria-label="Lọc theo người">
               <option value="">Mọi người</option>
+              {mine && <option value="@me">Của tôi</option>}
               <option value="-">Chưa giao</option>
               {people.map((p) => (
                 <option key={p} value={p}>
@@ -445,7 +451,7 @@ export function WorkPage() {
               ["progress", "Tiến độ"],
             ]}
           />
-          {can("manager") && (
+          {manage && (
             <button type="button" className="p-btn primary" onClick={() => setAdding(true)}>
               <Plus />
               Thêm việc

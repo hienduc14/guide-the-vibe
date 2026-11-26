@@ -5,8 +5,8 @@ import { useAuth } from "../hooks/useAuth";
 import { isLoaded } from "../api/types";
 import { Badge } from "./Badge";
 import { Avatar } from "./Member";
-import { RoleBadge } from "../pages/users/UsersPage";
-import { BrainCircuit, LayoutDashboard, LogOut, Menu, ShieldCheck, Users } from "lucide-react";
+import { RoleBadge } from "../pages/people/PeoplePage";
+import { BrainCircuit, LayoutDashboard, LogOut, Menu, Users } from "lucide-react";
 
 /*
  * The app frame: on wide screens a 60px navy rail of icons (labels as tooltips), so a project page gets the
@@ -46,13 +46,9 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
           <span className="nav-label">AI trả lời</span>
           <span className={`dot${brainBad ? " bad" : data?.brain.ok ? " on" : ""}`} />
         </NavLink>
-        <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`} title="Developers">
+        <NavLink to="/people" className={({ isActive }) => `admin-only ${link({ isActive })}`} title="Người: tài khoản, quyền, máy">
           <Users className="nav-icon" />
-          <span className="nav-label">Developers</span>
-        </NavLink>
-        <NavLink to="/users" className={({ isActive }) => `admin-only ${link({ isActive })}`} title="Tài khoản dashboard">
-          <ShieldCheck className="nav-icon" />
-          <span className="nav-label">Tài khoản</span>
+          <span className="nav-label">Người</span>
         </NavLink>
       </nav>
 
@@ -78,7 +74,9 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
             </NavLink>
           );
         })}
-        {data && data.projects.length === 0 && <span className="xs muted nav-label">Chưa có project. Thêm ở trang Tổng quan.</span>}
+        {data && data.projects.length === 0 && (
+          <span className="xs muted nav-label">{me?.role === "admin" ? "Chưa có project. Thêm ở trang Tổng quan." : "Bạn chưa ở project nào."}</span>
+        )}
       </nav>
 
       <div className="spacer" />
@@ -95,17 +93,23 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
           </a>
         )}
         {data?.open_mode && (
-          <Badge tone="danger-outline" title="Không có admin token và chưa có developer nào: mọi người đều truy cập được">
+          <Badge tone="danger-outline" title="Server chạy không cần đăng nhập: mọi người đều truy cập được">
             open
           </Badge>
         )}
-        {me && me.kind !== "open" && (
-          <div className="who" title={`${me.name} · ${me.role}${shared ? " · link xem chỉ đọc" : ""}`}>
+        {me && me.kind !== "open" && !shared && (
+          <NavLink to="/me" className={({ isActive }) => `who${isActive ? " active" : ""}`} title={`${me.name}: tài khoản của tôi, kết nối máy`}>
             <Avatar name={me.name} size={28} />
             <span className="nav-label row" style={{ gap: 8 }}>
               <b className="truncate">{me.name}</b>
               <RoleBadge role={me.role} />
             </span>
+          </NavLink>
+        )}
+        {shared && me && (
+          <div className="who" title="Link xem chỉ đọc">
+            <Avatar name={me.name} size={28} />
+            <span className="nav-label truncate">{me.name}</span>
           </div>
         )}
         {token && !shared && (

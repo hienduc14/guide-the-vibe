@@ -44,12 +44,7 @@ export async function startServer(cfg: ServerConfig, opts: { brain?: ProjectScop
     hub,
     port,
     async close() {
-      await new Promise<void>((r) => {
-        if (!server) return r();
-        server.close(() => r());
-        // Daemon event streams never end on their own; without this the process lingers and daemons stay on it.
-        if ("closeAllConnections" in server) server.closeAllConnections();
-      });
+      await new Promise<void>((r) => (server ? server.close(() => r()) : r()));
       await hub.close();
     },
   };
@@ -58,6 +53,8 @@ export async function startServer(cfg: ServerConfig, opts: { brain?: ProjectScop
 if (import.meta.main) {
   const running = await startServer(loadConfig());
   const stop = async () => {
+    // Daemon event streams never end on their own, so close() would wait forever and daemons would stay on this process.
+    setTimeout(() => process.exit(0), 2000);
     await running.close();
     process.exit(0);
   };

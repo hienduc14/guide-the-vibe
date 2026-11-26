@@ -1,6 +1,6 @@
 {
   "name": "gtv",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Project Operator: coordinate several devs' AI coding agents on one repo",
   "type": "module",

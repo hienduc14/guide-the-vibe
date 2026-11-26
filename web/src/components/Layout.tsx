@@ -26,11 +26,11 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         </NavLink>
         <NavLink to="/brain" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
           <BrainCircuit className="nav-icon" />
-          Brain
+          AI trả lời
           <span
             className={`dot${data?.brain.ok ? " on" : data && data.brain.backend !== "null" ? " bad" : ""}`}
             style={{ marginLeft: "auto" }}
-            title={data?.brain.ok ? "Brain sẵn sàng" : data?.brain.backend === "null" ? "Brain đang tắt" : "Brain chưa chạy được"}
+            title={data?.brain.ok ? "AI đã kết nối" : data?.brain.backend === "null" ? "Chưa bật AI" : "AI chưa chạy được"}
           />
         </NavLink>
         <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`}>

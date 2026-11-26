@@ -52,9 +52,9 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
       </div>
       <div className="pcard-foot">
         <span className="metrics">
-          <span className={`metric t-${conflictTone}`} title="Conflict đang mở">
+          <span className={`metric t-${conflictTone}`} title="Xung đột đang mở">
             <Zap />
-            {p.counts.conflicts_open} conflict
+            {p.counts.conflicts_open} xung đột
           </span>
           <span className={`metric${p.counts.tickets_waiting ? " t-warning" : ""}`} title="Câu hỏi chờ người">
             <MessageCircleQuestion />
@@ -101,6 +101,7 @@ export function OverviewPage() {
     <>
       <PageHead
         title="Tổng quan"
+        subtitle="gtv theo dõi các AI agent (Claude Code, Codex) của cả nhóm trên cùng một repo: ai đang sửa gì, và báo sớm khi hai người sửa trùng nhau."
         actions={
           <button className="btn primary admin-only" type="button" onClick={() => setAdding((v) => !v)}>
             {adding ? "Đóng" : "Thêm project"}
@@ -125,15 +126,27 @@ export function OverviewPage() {
           label="Người đang làm"
           aside={people.size ? <AvatarStack people={[...people].map((name) => ({ name }))} max={3} size={24} /> : undefined}
         />
-        <Kpi icon={Zap} tone={serious ? "high" : conflicts ? "warning" : "neutral"} value={conflicts} label="Conflict" />
-        <Kpi icon={MessageCircleQuestion} tone={waiting ? "warning" : "neutral"} value={waiting} label="Chờ trả lời" />
+        <Kpi
+          icon={Zap}
+          tone={serious ? "high" : conflicts ? "warning" : "neutral"}
+          value={conflicts}
+          label="Xung đột"
+          title="Hai người đang sửa trùng file, hàm hoặc API"
+        />
+        <Kpi
+          icon={MessageCircleQuestion}
+          tone={waiting ? "warning" : "neutral"}
+          value={waiting}
+          label="Chờ trả lời"
+          title="Câu hỏi của agent đang chờ một người trả lời"
+        />
         <Kpi icon={SquareKanban} value={`${done}/${total}`} label="Việc xong" aside={total ? <Ring value={done} total={total} size={40} /> : undefined} />
         <Kpi
           icon={BrainCircuit}
           to="/brain"
           tone={bs.totals.failed ? "high" : "neutral"}
           value={bs.totals.jobs}
-          label="Brain · 7 ngày"
+          label="Câu AI trả lời · 7 ngày"
           title={bs.totals.jobs > 0 ? (bs.totals.failed ? `${bs.totals.failed} lỗi` : `thường mất ${ms(bs.totals.p50_ms)}`) : undefined}
         />
       </div>
@@ -143,12 +156,12 @@ export function OverviewPage() {
           <BrainCircuit />
           <span>
             {data.brain.backend === "null"
-              ? "Brain đang tắt: câu hỏi của agent sẽ chờ người trả lời."
-              : `Brain chưa chạy được: ${data.brain.detail ?? "chưa kết nối provider hoặc chưa chọn model"}.`}
+              ? "Chưa kết nối AI: câu hỏi của agent sẽ chờ người trả lời. Phát hiện trùng việc vẫn chạy."
+              : `AI chưa chạy được: ${data.brain.detail ?? "chưa kết nối nhà cung cấp hoặc chưa chọn model"}.`}
           </span>
           <span className="spacer" />
-          <Link to="/brain" className="btn sm">
-            Mở Brain
+          <Link to="/brain" className="btn sm admin-only">
+            Kết nối AI
           </Link>
         </div>
       )}
@@ -156,12 +169,13 @@ export function OverviewPage() {
       <section className="stack tight">
         <h2 className="section-title">
           <FolderGit2 />
-          Projects
+          Dự án
         </h2>
         {data.projects.length === 0 ? (
           <Card>
-            <EmptyState icon={FolderGit2} title="Chưa có project">
-              Dán URL repo để bắt đầu.
+            <EmptyState icon={FolderGit2} title="Chưa có dự án">
+              Bắt đầu trong 3 bước: 1. Bấm “Thêm project” và dán URL repo. 2. Ở trang Developers, bấm “Tạo lệnh mời” và gửi lệnh cho từng dev chạy trong repo
+              của họ. 3. Quay lại đây để xem ai đang làm gì.
             </EmptyState>
           </Card>
         ) : (

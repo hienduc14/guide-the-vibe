@@ -11,6 +11,7 @@ import type {
   BrainProvider,
   CallerHit,
   Conflict,
+  FileDetail,
   Dev,
   FeatureMode,
   KbDoc,
@@ -99,6 +100,7 @@ export const api = {
     archive: (id: string) => del<{ ok: boolean }>(a(id)),
     sync: (id: string) => post<{ last_sync: ProjectDetail["last_sync"]; main: string | null }>(`${a(id)}/sync`),
     state: (id: string) => get<TeamState>(`${a(id)}/state`),
+    file: (id: string, path: string) => get<FileDetail>(`${a(id)}/file?path=${encodeURIComponent(path)}`),
     stats: (id: string, days: number) => get<ProjectStats>(`${a(id)}/stats?days=${days}`),
     layers: (id: string) => get<Layer[]>(`${a(id)}/layers`),
     activity: (id: string, limit = 60, type?: string) =>

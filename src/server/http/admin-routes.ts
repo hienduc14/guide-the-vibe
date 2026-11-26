@@ -12,6 +12,8 @@ import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
 import { attention, conversations } from "../project/conversations.ts";
+import { loadSymbolChanges } from "../detect/l2.ts";
+import { globMatch, normPath } from "../../shared/util.ts";
 
 type Env = { Variables: AuthVars };
 
@@ -320,6 +322,45 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   app.get("/projects/:id/attention", async (c) => c.json(attention((await rt(c.req.param("id"))).engine)));
 
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));
+  /**
+   * One file seen through the team's work: who touched it, who registered it, the conflicts about it,
+   * and each workspace's diff of it at its latest WIP snapshot (not live keystrokes).
+   */
+  app.get("/projects/:id/file", async (c) => {
+    const p = await rt(c.req.param("id"));
+    const path = normPath(c.req.query("path") ?? "");
+    if (!path) throw new Error("path is required");
+    const state = p.engine.store.teamState();
+    const sessionAgent = new Map(state.sessions.map((s) => [s.id, s.agent]));
+    const conflicts = state.conflicts.filter(
+      (x) => (x.status === "open" || x.status === "acked") && (x.subject === path || x.subject.startsWith(`${path}#`) || x.message.includes(path)),
+    );
+    const workspaces = [];
+    for (const ws of state.workspaces) {
+      const footprint = state.footprints.find((f) => f.workspace_id === ws.id && f.path === path);
+      const tasks = state.tasks.filter((t) => t.workspace_id === ws.id && t.resources.some((r) => r.kind === "path" && globMatch(r.value, path)));
+      let diff = "";
+      if (p.engine.repo && ws.snapshot_sha && ws.snapshot_base) diff = await p.engine.repo.diffFile(ws.snapshot_base, ws.snapshot_sha, path);
+      if (!footprint && !tasks.length && !diff) continue;
+      const symbols = loadSymbolChanges(p.db, ws.id).filter((s) => s.symbol_id.startsWith(`${path}#`));
+      workspaces.push({
+        workspace_id: ws.id,
+        label: ws.label,
+        dev: ws.dev,
+        agent: (footprint && sessionAgent.get(footprint.session_id)) ?? state.sessions.find((s) => s.workspace_id === ws.id)?.agent ?? "other",
+        footprint: footprint ?? null,
+        tasks: tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          ops: t.resources.filter((r) => r.kind === "path" && globMatch(r.value, path)).map((r) => r.op ?? ""),
+        })),
+        snapshot_at: ws.snapshot_sha ? ws.updated_at : null,
+        diff: diff.length > 60_000 ? diff.slice(0, 60_000) + "\n… (cắt bớt)" : diff,
+        symbols,
+      });
+    }
+    return c.json({ path, conflicts, workspaces });
+  });
   app.get("/projects/:id/stats", async (c) => c.json(stats(hub, await rt(c.req.param("id")), Number(c.req.query("days") ?? 7))));
   app.get("/projects/:id/layers", async (c) => c.json(layers(await rt(c.req.param("id")))));
 

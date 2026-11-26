@@ -3,7 +3,7 @@
 // a conflict between them, questions between their agents and notes from the lead.
 // Every run starts from scratch in a temp folder. Usage: npm run demo  (GTV_PORT, default 7395)
 
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { startServer } from "../src/server/main.ts";
@@ -158,6 +158,7 @@ await call(
       { kind: "path", value: "src/orders/**", op: "modify" },
       { kind: "symbol", value: "OrderService.refund", op: "create" },
       { kind: "contract", value: "GET /api/orders/:id", op: "modify" },
+      { kind: "path", value: "docs/business/refund-policy.md", op: "read" },
     ],
   },
   { dev: "alice" },
@@ -176,8 +177,63 @@ await call(
   },
   { dev: "bob" },
 );
-for (const dev of ["alice", "bob"])
-  await call(`${P}/events`, { type: "edit", session_id: sessions[dev], paths: ["src/orders/service.ts"], phase: "post" }, { dev });
+// What each agent has edited so far, and a WIP snapshot of it (what the daemon pushes to refs/gtv/<dev>/<ws>),
+// so the file view has real diffs: both touch the Order interface, which is where their lines overlap.
+const EDITS: Record<string, { paths: string[]; change: (dir: string) => void }> = {
+  alice: {
+    paths: ["src/orders/service.ts", "src/orders/refund-window.ts", "src/api/routes.ts"],
+    change: (dir) => {
+      edit(dir, "src/orders/service.ts", (s) =>
+        s
+          .replace(`  total: number;\n`, `  total: number;\n  deliveredAt?: string;\n`)
+          .replace(
+            `import { getUser } from "../auth/service.ts";`,
+            `import { getUser } from "../auth/service.ts";\nimport { withinRefundWindow } from "./refund-window.ts";`,
+          )
+          .replace(
+            `  if (!order) throw new Error("order not found");\n`,
+            `  if (!order) throw new Error("order not found");\n  if (!withinRefundWindow(order.deliveredAt)) throw new Error("refund window (14 days) has passed");\n`,
+          ),
+      );
+      writeFileSync(
+        join(dir, "src/orders/refund-window.ts"),
+        `// Refunds are allowed for 14 days after delivery (docs/business/refund-policy.md).\nconst DAYS = 14;\n\nexport function withinRefundWindow(deliveredAt: string | undefined, now = Date.now()): boolean {\n  if (!deliveredAt) return false;\n  return now - Date.parse(deliveredAt) <= DAYS * 86_400_000;\n}\n`,
+      );
+      edit(dir, "src/api/routes.ts", (s) => s.replace(`"POST /api/orders/:id/refund"`, `"POST /api/orders/:id/refund" /* 14-day window */`));
+    },
+  },
+  bob: {
+    paths: ["src/orders/service.ts", "test/orders.test.ts"],
+    change: (dir) => {
+      edit(dir, "src/orders/service.ts", (s) =>
+        s
+          .replace(`  total: number;\n`, `  total: number; // đồng, làm tròn một lần sau giảm giá\n`)
+          .replace(
+            `  const order: Order = { id: orders.length + 1, userId, total: Math.round(total * (1 - discount)), status: "placed" };`,
+            `  const net = total - total * discount;\n  const order: Order = { id: orders.length + 1, userId, total: Math.round(net), status: "placed" };`,
+          ),
+      );
+      edit(dir, "test/orders.test.ts", (s) => s + `\ntest("rounds once after the discount", () => {\n  assert.equal(placeOrder(1, 1005).total, 905);\n});\n`);
+    },
+  },
+};
+function edit(dir: string, path: string, f: (s: string) => string) {
+  const before = readFileSync(join(dir, path), "utf8");
+  const after = f(before);
+  if (after === before) throw new Error(`demo edit to ${path} did not apply (has the sample repo changed?)`);
+  writeFileSync(join(dir, path), after);
+}
+for (const dev of ["alice", "bob"]) {
+  await call(`${P}/events`, { type: "edit", session_id: sessions[dev], paths: EDITS[dev].paths, phase: "post" }, { dev });
+  const wt = join(DATA, `wt-${dev}`);
+  await git(DATA, ["clone", "-q", "-c", "core.autocrlf=false", origin, wt]); // keep LF so the edits below match on Windows
+  EDITS[dev].change(wt);
+  await git(wt, ["add", "-A"]);
+  await git(wt, ["-c", "user.name=gtv-snapshot", "-c", "user.email=gtv@localhost", "commit", "-q", "-m", "gtv wip snapshot"]);
+  await git(wt, ["push", "-q", "-f", origin, `HEAD:refs/gtv/${dev}/ws_${dev}`]);
+  const sha = (await git(wt, ["rev-parse", "HEAD"])).stdout.trim();
+  await call(`${P}/events`, { type: "snapshot", workspace_id: `ws_${dev}`, sha, branch: "main" }, { dev });
+}
 
 await call(`${P}/board/${refund.id}/notes`, { body: "Refund window counted from delivery date, not order date (refund-policy.md)." }, { dev: "alice" });
 await call(

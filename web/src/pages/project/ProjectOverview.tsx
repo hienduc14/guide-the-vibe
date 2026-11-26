@@ -19,7 +19,6 @@ import {
   MessageCircleQuestion,
   MessagesSquare,
   Moon,
-  Network,
   OctagonAlert,
   SquareKanban,
   UserX,
@@ -30,6 +29,7 @@ import {
 import { Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { ActivityFeed } from "./ActivityFeed";
+import { WorkMap } from "./WorkMap";
 import { CharterCard } from "./CharterCard";
 import { ThreadRow } from "./Chat";
 import { TaskCard } from "./BoardTab";
@@ -76,7 +76,15 @@ interface Strip {
   since: string;
   conflicts: Conflict[];
   editing: number;
+  status?: Session["status"];
+  lastSeen?: string;
 }
+
+const SESSION_STATUS: Record<Session["status"], { tone: Tone; label: string }> = {
+  active: { tone: "ok", label: "Đang chạy" },
+  idle: { tone: "neutral", label: "Tạm nghỉ" },
+  ended: { tone: "neutral", label: "Đã thoát" },
+};
 
 function strips(s: TeamState): Strip[] {
   const session = new Map(s.sessions.map((x) => [x.id, x]));
@@ -100,6 +108,8 @@ function strips(s: TeamState): Strip[] {
     since: t.created_at,
     conflicts: touching(t.workspace_id),
     editing: editing(t.workspace_id),
+    status: session.get(t.session_id)?.status,
+    lastSeen: session.get(t.session_id)?.last_seen,
   }));
   // Live sessions that have not registered a task yet still belong on the board.
   const withTask = new Set(s.tasks.map((t) => t.session_id));
@@ -113,6 +123,8 @@ function strips(s: TeamState): Strip[] {
       since: x.last_seen,
       conflicts: touching(x.workspace_id),
       editing: editing(x.workspace_id),
+      status: x.status,
+      lastSeen: x.last_seen,
     });
   return out;
 }
@@ -141,6 +153,14 @@ function Board({ state, projectId, members }: { state: TeamState; projectId: str
               <div style={{ minWidth: 0 }}>
                 <b className="truncate">{r.dev}</b>
                 <span className="truncate">{m ? `${m.role} · ${LEVEL_LABEL[m.level]}` : agentName(r.agent)}</span>
+                {r.status && (
+                  <StatusDot
+                    tone={SESSION_STATUS[r.status].tone}
+                    title={`${agentName(r.agent)} ${SESSION_STATUS[r.status].label.toLowerCase()}${r.lastSeen ? ` · hoạt động lần cuối ${ago(r.lastSeen)}` : ""}`}
+                  >
+                    {SESSION_STATUS[r.status].label}
+                  </StatusDot>
+                )}
               </div>
             </div>
             <div className="lane-what">
@@ -193,7 +213,7 @@ function Board({ state, projectId, members }: { state: TeamState; projectId: str
 }
 
 const ATTENTION: Record<AttentionItem["kind"], { label: string; icon: LucideIcon }> = {
-  conflict: { label: "Conflict", icon: Zap },
+  conflict: { label: "Xung đột", icon: Zap },
   question: { label: "Câu hỏi", icon: MessageCircleQuestion },
   overdue: { label: "Quá hạn", icon: CalendarClock },
   blocked: { label: "Bị chặn", icon: OctagonAlert },
@@ -232,7 +252,7 @@ function AttentionCard({ projectId, openConflicts }: { projectId: string; openCo
         <EmptyState icon={CircleCheck} title="Không có gì cần xử lý">
           {openConflicts > 0 && (
             <>
-              {openConflicts} conflict còn mở nhưng đã được các bên ghi nhận. <Link to={`/p/${projectId}/conflicts`}>Xem conflict</Link>
+              {openConflicts} xung đột còn mở nhưng các bên đã biết. <Link to={`/p/${projectId}/conflicts`}>Xem xung đột</Link>
             </>
           )}
         </EmptyState>
@@ -360,13 +380,14 @@ export function ProjectOverview() {
     <>
       <CharterCard />
       <div className="kpis">
-        <Kpi icon={Users} tone={c.people_active ? "accent" : "neutral"} value={c.people_active} label="Đang làm" />
+        <Kpi icon={Users} tone={c.people_active ? "accent" : "neutral"} value={c.people_active} label="Đang làm" title="Số người có agent đang chạy" />
         <Kpi
           icon={Zap}
           to={`/p/${id}/conflicts`}
           tone={serious ? "high" : c.conflicts_open ? "warning" : "neutral"}
           value={c.conflicts_open}
-          label="Conflict"
+          label="Xung đột"
+          title="Hai người đang sửa trùng file, hàm hoặc API"
         />
         <Kpi
           icon={MessageCircleQuestion}
@@ -374,6 +395,7 @@ export function ProjectOverview() {
           tone={c.tickets_waiting ? "warning" : "neutral"}
           value={c.tickets_waiting}
           label="Chờ trả lời"
+          title="Câu hỏi của agent đang chờ một người trả lời"
         />
         <Kpi
           icon={SquareKanban}
@@ -383,18 +405,12 @@ export function ProjectOverview() {
           label="Việc xong"
           aside={<Ring value={detail.board.done} total={detail.board.total} size={36} />}
         />
-        <Kpi
-          icon={Network}
-          to={`/p/${id}/graph`}
-          value={detail.graph.symbols}
-          label="Symbol"
-          title={`${detail.graph.files} file, ${detail.graph.refs} tham chiếu`}
-        />
       </div>
 
       <div className="overview-cols">
         <div className="stack">
           <AttentionCard projectId={id} openConflicts={c.conflicts_open} />
+          {state.data && <WorkMap state={state.data} projectId={id} />}
           <section className="stack tight">
             <h2 className="section-title" title="Mỗi hàng là một phiên agent. Ô đỏ: đang đụng người khác. Ô vàng: thay đổi làm hỏng chỗ gọi.">
               <Activity />

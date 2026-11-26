@@ -182,6 +182,23 @@ export interface Conflict {
   updated_at: string;
 }
 
+/** One file seen through the team's work (GET /api/projects/:id/file). */
+export interface FileDetail {
+  path: string;
+  conflicts: Conflict[];
+  workspaces: {
+    workspace_id: string;
+    label: string;
+    dev: string;
+    agent: string;
+    footprint: Footprint | null;
+    tasks: { id: string; title: string; ops: string[] }[];
+    snapshot_at: string | null;
+    diff: string;
+    symbols: { symbol_id: string; name: string; kind: string; change: string; old_sig?: string; new_sig?: string }[];
+  }[];
+}
+
 export interface TeamState {
   version: number;
   workspaces: Workspace[];

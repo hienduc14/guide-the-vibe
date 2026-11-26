@@ -12,7 +12,7 @@ export function Badge({ tone = "default", mono, children, title }: { tone?: Badg
   );
 }
 
-const LEVEL_LABEL: Record<Level, string> = { info: "info", warning: "warning", high: "high", critical: "critical" };
+const LEVEL_LABEL: Record<Level, string> = { info: "Thông tin", warning: "Cảnh báo", high: "Nghiêm trọng", critical: "Rất nghiêm trọng" };
 
 /** Severity uses its own colour ramp: info → warning → high → critical. */
 export function LevelBadge({ level }: { level: Level }) {

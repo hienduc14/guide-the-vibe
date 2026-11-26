@@ -13,27 +13,27 @@ import { Empty, ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 
 const LAYER_TITLE: Record<string, string> = {
-  L0: "L0 · path / scope / khai báo",
-  L1: "L1 · thử merge (git merge-tree)",
-  L2: "L2 · symbol (tree-sitter)",
-  L3: "L3 · ngữ nghĩa (Brain)",
+  L0: "Trùng file hoặc phạm vi đã khai báo",
+  L1: "Thử gộp code thì đụng nhau",
+  L2: "Đổi hàm/lớp mà người khác đang dùng",
+  L3: "AI thấy hai việc mâu thuẫn",
 };
 const RANK = { critical: 0, high: 1, warning: 2, info: 3 };
 /** What the two sides collide on, as a short headline; the server's full sentence stays below it. */
-const KIND_VI: Record<string, string> = {
-  same_contract: "Cùng đụng một contract",
+export const KIND_VI: Record<string, string> = {
+  same_contract: "Cùng sửa một API",
   same_file: "Cùng sửa một file",
   same_module: "Cùng sửa một module",
   scope_overlap: "Phạm vi đăng ký trùng nhau",
-  same_symbol_changed: "Cùng đổi một symbol",
-  same_symbol_declared: "Cùng khai báo một symbol",
-  breaking_change_used: "Đổi symbol mà bên kia đang dùng",
-  semantic: "Brain thấy hai việc xung khắc",
+  same_symbol_changed: "Cùng đổi một hàm/lớp",
+  same_symbol_declared: "Cùng định đổi một hàm/lớp",
+  breaking_change_used: "Đổi hàm/lớp mà bên kia đang dùng",
+  semantic: "AI thấy hai việc xung khắc",
   edit_in_scope: "Sửa file trong phạm vi người khác đã đăng ký",
-  planned_breaking_change: "Định đổi symbol mà bên kia đang dùng",
+  planned_breaking_change: "Định đổi hàm/lớp mà bên kia đang dùng",
   critical_path: "Cùng chạm đường dẫn quan trọng",
-  main: "Không merge sạch được vào nhánh chính",
-  text: "Thử merge thì đụng nhau ở cùng dòng code",
+  main: "Không gộp sạch được vào nhánh chính",
+  text: "Thử gộp code thì đụng nhau ở cùng dòng",
 };
 
 function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" | "reopen") => void }) {
@@ -94,7 +94,7 @@ export function ConflictsTab() {
       <div className="row between">
         <h2 className="section-title" title="Bấm “Đã biết” khi hai bên đã phối hợp; “Bỏ qua” nếu là báo nhầm (không báo lại tới khi bằng chứng thay đổi).">
           <Zap />
-          Conflict
+          Xung đột
         </h2>
         <Segmented
           options={[
@@ -110,13 +110,22 @@ export function ConflictsTab() {
         <Loading />
       ) : data.length === 0 ? (
         <Card>
-          <Empty>Không có conflict {scope === "open" ? "đang mở" : ""}</Empty>
+          <Empty>Không có xung đột {scope === "open" ? "đang mở" : ""}</Empty>
         </Card>
       ) : (
         ["L0", "L1", "L2", "L3"]
           .filter((l) => groups.has(l))
           .map((l) => (
-            <Card key={l} title={LAYER_TITLE[l] ?? l} actions={<span className="xs muted">{groups.get(l)!.length}</span>} flush>
+            <Card
+              key={l}
+              title={
+                <span>
+                  {LAYER_TITLE[l] ?? l} <span className="xs faint">· {l}</span>
+                </span>
+              }
+              actions={<span className="xs muted">{groups.get(l)!.length}</span>}
+              flush
+            >
               {groups.get(l)!.map((c) => (
                 <ConflictRow key={c.id} c={c} onAct={(a) => act(c, a)} />
               ))}

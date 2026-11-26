@@ -1,15 +1,31 @@
-// `gtv install <agent>`: wire an agent's hooks, MCP and skill into a project.
+// Wiring an agent's hooks, MCP server and skill into a repo (and taking them out again), the background daemon,
+// and installing the `gtv` command itself.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, openSync } from "node:fs";
-import { spawn } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  openSync,
+  rmSync,
+  readdirSync,
+  chmodSync,
+  symlinkSync,
+  unlinkSync,
+  lstatSync,
+} from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { homedir } from "node:os";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_DIR, daemonUrl, loadDaemonConfig, tokenFingerprint } from "./config.ts";
 
 // Set by scripts/build-npm.mjs: the npm package is one bundled file with the skill inlined.
 declare const __GTV_SKILL__: string | undefined;
 declare const __GTV_TASKS_SKILL__: string | undefined;
-const BUNDLED = typeof __GTV_SKILL__ === "string";
+declare const __GTV_VERSION__: string | undefined;
+export const BUNDLED = typeof __GTV_SKILL__ === "string";
 
 export const GTV_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 /** What hooks and MCP run. The npm build copies itself to ~/.gtv/bin, so npx's cache can be cleared. */
@@ -18,12 +34,82 @@ const skillText = () => (BUNDLED ? __GTV_SKILL__! : readFileSync(join(GTV_ROOT, 
 /** The /gtv skill: pick work from the task board. */
 const tasksSkillText = () => (BUNDLED ? __GTV_TASKS_SKILL__! : readFileSync(join(GTV_ROOT, "src", "adapters", "skill", "gtv", "SKILL.md"), "utf8"));
 
+export const GTV_VERSION: string =
+  typeof __GTV_VERSION__ === "string" ? __GTV_VERSION__ : (JSON.parse(readFileSync(join(GTV_ROOT, "package.json"), "utf8")) as { version: string }).version;
+
+/** True when this process runs the copy in ~/.gtv/bin (the installed `gtv`), not npx's download. */
+export const isInstalledCopy = () => !BUNDLED || resolve(fileURLToPath(import.meta.url)) === resolve(GTV_BIN);
+
 function ensureBin(): void {
   if (!BUNDLED) return;
   mkdirSync(dirname(GTV_BIN), { recursive: true });
   const self = fileURLToPath(import.meta.url);
   if (resolve(self) !== resolve(GTV_BIN)) copyFileSync(self, GTV_BIN);
 }
+
+export const onPath = (cmd: string) => spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" }).status === 0;
+
+/**
+ * `npx guide-the-vibe`: copy the bundle to ~/.gtv/bin and put a `gtv` command on the PATH. Returns what it did,
+ * as lines for the person. Running it again updates the copy.
+ */
+export function installSelf(): { bin: string; path: string } {
+  ensureBin();
+  const binDir = dirname(GTV_BIN);
+  const dirs = (process.env.PATH ?? "").split(delimiter).map((d) => resolve(d));
+  if (process.platform === "win32") {
+    // WindowsApps is on every user's PATH; a .cmd there runs the copy in ~/.gtv/bin.
+    const apps = join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Microsoft", "WindowsApps");
+    const shim = join(binDir, "gtv.cmd");
+    const body = `@echo off\r\nnode "${GTV_BIN.replace(/\//g, "\\")}" %*\r\n`;
+    writeFileSync(shim, body);
+    try {
+      writeFileSync(join(apps, "gtv.cmd"), body);
+      return { bin: shim, path: "Added gtv to your PATH (open a new terminal if `gtv` is not found)" };
+    } catch {
+      return { bin: shim, path: `Could not add gtv to your PATH. Run this once, then open a new terminal: setx PATH "%PATH%;${binDir}"` };
+    }
+  }
+  const sh = join(binDir, "gtv");
+  writeFileSync(sh, `#!/bin/sh\nexec node "${GTV_BIN}" "$@"\n`);
+  chmodSync(sh, 0o755);
+  if (dirs.includes(resolve(binDir))) return { bin: sh, path: "gtv is on your PATH" };
+  const local = join(homedir(), ".local", "bin");
+  if (dirs.includes(resolve(local))) {
+    const link = join(local, "gtv");
+    try {
+      if (lstatExists(link)) unlinkSync(link);
+      mkdirSync(local, { recursive: true });
+      symlinkSync(sh, link);
+      return { bin: sh, path: `Added gtv to your PATH (${link.replace(homedir(), "~")})` };
+    } catch {
+      // fall through to the shell profiles
+    }
+  }
+  const line = `export PATH="${binDir === join(homedir(), ".gtv", "bin") ? "$HOME/.gtv/bin" : binDir}:$PATH"`;
+  const edited: string[] = [];
+  for (const rc of [".bashrc", ".zshrc"].map((f) => join(homedir(), f))) {
+    if (!existsSync(rc)) continue;
+    const text = readFileSync(rc, "utf8");
+    if (!text.includes(line)) writeFileSync(rc, `${text}${text.endsWith("\n") || !text ? "" : "\n"}\n# gtv\n${line}\n`);
+    edited.push(rc.replace(homedir(), "~"));
+  }
+  return {
+    bin: sh,
+    path: edited.length
+      ? `Added gtv to your PATH in ${edited.join(" and ")} (open a new terminal if \`gtv\` is not found)`
+      : `Add this line to your shell profile, then open a new terminal: ${line}`,
+  };
+}
+
+const lstatExists = (p: string) => {
+  try {
+    lstatSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export interface DaemonHealth {
   pid?: number;
@@ -98,12 +184,140 @@ function writeJson(path: string, value: unknown): void {
  */
 export function mergeHooks(existing: Record<string, any[]> | undefined, add: Record<string, any[]>): Record<string, any[]> {
   const out: Record<string, any[]> = { ...(existing ?? {}) };
-  const isGtv = (group: any) => {
-    const s = JSON.stringify(group);
-    return s.includes("gtv") || /https?:\/\/(127\.0\.0\.1|localhost):\d+\/hook\//.test(s);
-  };
-  for (const [event, groups] of Object.entries(add)) out[event] = [...(out[event] ?? []).filter((g) => !isGtv(g)), ...groups];
+  for (const [event, groups] of Object.entries(add)) out[event] = [...(out[event] ?? []).filter((g) => !isGtvHook(g)), ...groups];
   return out;
+}
+
+export function isGtvHook(group: unknown): boolean {
+  const s = JSON.stringify(group);
+  return s.includes("gtv") || /https?:\/\/(127\.0\.0\.1|localhost):\d+\/hook\//.test(s);
+}
+
+// ---- taking gtv out of a repo (gtv off): only gtv's entries go, files are deleted only when nothing else is left ----
+
+/** Hooks without gtv's groups; events left empty disappear. */
+export function stripHooks(hooks: Record<string, any[]> | undefined): Record<string, any[]> | undefined {
+  if (!hooks) return undefined;
+  const out = Object.fromEntries(
+    Object.entries(hooks)
+      .map(([event, groups]) => [event, (groups ?? []).filter((g) => !isGtvHook(g))] as const)
+      .filter(([, groups]) => groups.length),
+  );
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Codex config without the [mcp_servers.gtv] table. */
+export const stripCodexToml = (toml: string) => toml.replace(/\n?\[mcp_servers\.gtv\][\s\S]*?(?=\n\[|$)/, "");
+
+/** Rewrites (or deletes, when empty) a JSON file; returns whether it changed. */
+function editJson(path: string, edit: (v: Record<string, any>) => Record<string, any>): boolean {
+  if (!existsSync(path)) return false;
+  const before = readJson(path);
+  const after = edit(structuredClone(before));
+  if (JSON.stringify(after) === JSON.stringify(before)) return false;
+  if (Object.keys(after).length) writeJson(path, after);
+  else rmSync(path);
+  return true;
+}
+
+/** Removes empty folders upwards, stopping at the repo. */
+function pruneDirs(dir: string, stop: string): void {
+  while (resolve(dir) !== resolve(stop) && existsSync(dir) && !readdirSync(dir).length) {
+    rmSync(dir, { recursive: true });
+    dir = dirname(dir);
+  }
+}
+
+function removeSkills(project: string, base: string): string[] {
+  const removed: string[] = [];
+  for (const name of ["gtv-collaboration", "gtv"]) {
+    const dir = join(project, base, "skills", name);
+    if (!existsSync(dir)) continue;
+    rmSync(dir, { recursive: true });
+    removed.push(dir);
+    pruneDirs(dirname(dir), project);
+  }
+  return removed;
+}
+
+export function uninstallClaude(project: string): string[] {
+  const removed: string[] = [];
+  const settingsPath = join(project, ".claude", "settings.local.json");
+  const changed = editJson(settingsPath, (v) => {
+    const hooks = stripHooks(v.hooks);
+    if (hooks) v.hooks = hooks;
+    else delete v.hooks;
+    if (v.statusLine && JSON.stringify(v.statusLine).includes("gtv")) delete v.statusLine;
+    return v;
+  });
+  if (changed) removed.push(`${settingsPath} (gtv hooks)`);
+  const mcpPath = join(project, ".mcp.json");
+  if (
+    editJson(mcpPath, (v) => {
+      if (v.mcpServers) delete v.mcpServers.gtv;
+      if (v.mcpServers && !Object.keys(v.mcpServers).length) delete v.mcpServers;
+      return v;
+    })
+  )
+    removed.push(`${mcpPath} (gtv MCP server)`);
+  removed.push(...removeSkills(project, ".claude"));
+  pruneDirs(join(project, ".claude"), project);
+  return removed;
+}
+
+export function uninstallCodex(project: string): string[] {
+  const removed: string[] = [];
+  const hooksPath = join(project, ".codex", "hooks.json");
+  if (
+    editJson(hooksPath, (v) => {
+      const hooks = stripHooks(v.hooks);
+      if (hooks) v.hooks = hooks;
+      else delete v.hooks;
+      return v;
+    })
+  )
+    removed.push(`${hooksPath} (gtv hooks)`);
+  const tomlPath = join(project, ".codex", "config.toml");
+  if (existsSync(tomlPath)) {
+    const before = readFileSync(tomlPath, "utf8");
+    const after = stripCodexToml(before);
+    if (after !== before) {
+      if (after.trim()) writeFileSync(tomlPath, after.replace(/\n*$/, "\n"));
+      else rmSync(tomlPath);
+      removed.push(`${tomlPath} (gtv MCP server)`);
+    }
+  }
+  removed.push(...removeSkills(project, ".codex"));
+  pruneDirs(join(project, ".codex"), project);
+  return removed;
+}
+
+/**
+ * Whether a repo's setup for an agent is what this version writes: "missing" (never set up), "ok", or "stale"
+ * (written by an older version, for another daemon, or with duplicated hooks).
+ */
+export function setupState(project: string, agent: "claude" | "codex", daemon = daemonUrl()): "missing" | "ok" | "stale" {
+  const hooksPath = agent === "claude" ? join(project, ".claude", "settings.local.json") : join(project, ".codex", "hooks.json");
+  const hooks = (readJsonSafe(hooksPath).hooks ?? {}) as Record<string, any[]>;
+  const gtvGroups = Object.values(hooks).flatMap((groups) => (groups ?? []).filter(isGtvHook));
+  if (!gtvGroups.length) return "missing";
+  const want = agent === "claude" ? `${daemon}/hook/claude` : cmd(daemon, "hook", "codex");
+  const perEvent = Object.values(hooks).map((groups) => (groups ?? []).filter(isGtvHook).length);
+  const mcp =
+    agent === "claude" ? JSON.stringify(readJsonSafe(join(project, ".mcp.json")).mcpServers?.gtv ?? "") : readText(join(project, ".codex", "config.toml"));
+  const skill = existsSync(join(project, agent === "claude" ? ".claude" : ".codex", "skills", "gtv-collaboration", "SKILL.md"));
+  const dupes = perEvent.some((n) => n > 1);
+  const commands = gtvGroups.flatMap((g) => (g.hooks ?? []).map((x: { url?: string; command?: string }) => x.url ?? x.command ?? ""));
+  return commands.some((c) => c.startsWith(want)) && mcp.includes(GTV_BIN) && skill && !dupes ? "ok" : "stale";
+}
+
+const readText = (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : "");
+function readJsonSafe(path: string): Record<string, any> {
+  try {
+    return readJson(path);
+  } catch {
+    return {};
+  }
 }
 
 function installSkill(dir: string, text = skillText()): string {

@@ -28,7 +28,7 @@ export class ServerClient {
       });
       const text = await res.text();
       const json = text ? JSON.parse(text) : undefined;
-      if (!res.ok) throw new Error(json?.error ?? `${res.status} ${res.statusText}`);
+      if (!res.ok) throw Object.assign(new Error(json?.error ?? `${res.status} ${res.statusText}`), { status: res.status });
       return json as T;
     } finally {
       clearTimeout(timer);

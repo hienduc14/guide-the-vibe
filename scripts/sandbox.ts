@@ -59,10 +59,10 @@ const bin = join(GTV_ROOT, "bin", "gtv.mjs");
 console.log(`Sandbox ready in ${SANDBOX}
 
 1. Start the operator (docker):   docker compose -f docker/compose.yml --env-file docker/.env up -d --build
-2. Create the project and dev tokens (dashboard http://127.0.0.1:7390, or CLI):
-     MSYS_NO_PATHCONV=1 GTV_ADMIN_TOKEN=<admin> node "${bin}" project add ${PROJECT} --repo /repos/origin.git --branch main
-     dashboard → Developers → alice / bob → copy each token, then per dev:
-     $env:GTV_HOME="${join(SANDBOX, ".home-<dev>")}"; node "${bin}" init --dev <dev> --server http://127.0.0.1:7390 --port <7391|7392> --token <token>
+2. Create the project (dashboard http://127.0.0.1:7390 › Tổng quan › Thêm project, repo /repos/origin.git), then
+   connect each dev's sandbox home to an account (People: add alice and bob as developers of ${PROJECT}), per dev:
+     $env:GTV_HOME="${join(SANDBOX, ".home-<dev>")}"; node "${bin}" login http://127.0.0.1:7390
+   (or start the operator with GTV_TOKENS=alice:<key>,bob:<key> and put "token": "<key>" in each config.json)
 3. Start one daemon per dev (separate terminals, PowerShell):
 ${DEVS.map((d) => `     $env:GTV_HOME="${join(SANDBOX, `.home-${d.dev}`)}"; node "${bin}" daemon`).join("\n")}
 4. Agents:

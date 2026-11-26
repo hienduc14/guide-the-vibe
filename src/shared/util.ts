@@ -124,3 +124,15 @@ export function log(scope: string, ...args: unknown[]): void {
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max) + `… (${text.length - max} more chars)`;
 }
+
+/** "owner/repo" style key of a remote URL or path, for matching daemons' remotes to projects. */
+export function repoKey(url: string): string {
+  const cleaned = url
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^[a-z]+:\/\/([^@/]+@)?/i, "")
+    .replace(/^git@([^:]+):/, "$1/")
+    .replace(/\.git\/?$/, "")
+    .replace(/\/+$/, "");
+  return cleaned.split("/").slice(-2).join("/").toLowerCase();
+}

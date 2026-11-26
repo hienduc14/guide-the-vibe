@@ -37,6 +37,8 @@ export class Daemon {
   private waitTokens = new Map<string, symbol>();
   private sendChain: Promise<unknown> = Promise.resolve();
   private healthTimer?: NodeJS.Timeout;
+  /** Agent sessions the server refused (not a member): told once, then left alone. */
+  private refused = new Set<string>();
   private server?: ReturnType<typeof serve>;
 
   constructor(cfg: DaemonConfig) {
@@ -131,7 +133,6 @@ export class Daemon {
     const key = `${agent}:${agentSessionId}`;
     const known = this.sessions.get(key);
     if (known) return { session: known, briefing: undefined as string | undefined };
-    this.link(ws.project);
     const res = await this.client.call<{ results: { session: Session; briefing: string }[] }>("POST", `/v1/p/${ws.project}/events`, {
       type: "session_start",
       session: {
@@ -144,6 +145,7 @@ export class Daemon {
         branch: ws.branch,
       },
     } satisfies GtvEvent);
+    this.link(ws.project); // after the server accepted us: a refused computer must not keep a stream retrying
     const s = res.results[0].session;
     const session = {
       id: s.id,
@@ -209,11 +211,23 @@ export class Daemon {
     const h = normalize(agent, raw);
     const ws = await this.workspaces.get(h.cwd);
     if (!ws) return undefined; // not a gtv project: stay out of the way
+    const key = `${agent}:${h.agentSessionId}`;
+    if (this.refused.has(key)) return undefined;
     let ctx: Awaited<ReturnType<Daemon["ensureSession"]>>;
     try {
       ctx = await this.ensureSession(agent, h.agentSessionId, ws, h.cwd);
     } catch (e) {
-      log("daemon", `server unreachable, allowing: ${(e as Error).message}`);
+      const err = e as Error & { status?: number };
+      if (err.status === 403) {
+        // Not a member (or only a viewer) of this project: say so once in this agent session, then stay quiet.
+        const out = formatOutput(h, { decision: "allow", context: `[gtv] ${err.message} Until then gtv does not coordinate this session.` });
+        if (out) {
+          this.refused.add(key);
+          log("daemon", `refused in ${ws.project}: ${err.message}`);
+        }
+        return out;
+      }
+      log("daemon", `server unreachable, allowing: ${err.message}`);
       return undefined; // fail open
     }
     this.lastActive.set(`${agent}|${ws.id}`, `${agent}:${h.agentSessionId}`);

@@ -10,7 +10,7 @@ import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
 import { PiBrain } from "../brain/pi.ts";
 import type { ServerConfig } from "../config.ts";
 import type { Charter, Policy } from "../../shared/types.ts";
-import { log, nowIso } from "../../shared/util.ts";
+import { log, nowIso, repoKey } from "../../shared/util.ts";
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
 
@@ -18,17 +18,7 @@ export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
 export type ProjectAccess = "manager" | "developer" | "viewer" | "none";
 export const ACCESS_RANK: Record<ProjectAccess, number> = { none: 0, viewer: 1, developer: 2, manager: 3 };
 
-/** "owner/repo" style key of a remote URL or path, for matching daemons' remotes to projects. */
-export function repoKey(url: string): string {
-  const cleaned = url
-    .trim()
-    .replace(/\\/g, "/")
-    .replace(/^[a-z]+:\/\/([^@/]+@)?/i, "")
-    .replace(/^git@([^:]+):/, "$1/")
-    .replace(/\.git\/?$/, "")
-    .replace(/\/+$/, "");
-  return cleaned.split("/").slice(-2).join("/").toLowerCase();
-}
+export { repoKey };
 
 export interface ProjectInput {
   id: string;

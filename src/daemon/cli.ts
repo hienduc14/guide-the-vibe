@@ -1,6 +1,9 @@
 // gtv command line. Heavy modules are imported lazily so hook invocations start fast.
+// Person-facing commands live in setup.ts; hook, hook-wait, mcp, statusline, daemon and link are for agents and
+// scripts and stay out of the help.
 
-import { loadDaemonConfig, saveDaemonConfig, daemonUrl, CONFIG_FILE } from "./config.ts";
+import { loadDaemonConfig, daemonUrl, CONFIG_FILE } from "./config.ts";
+import { GTV_VERSION } from "./install.ts";
 
 const argv = process.argv.slice(2);
 const [command, ...rest] = argv;
@@ -34,64 +37,21 @@ async function daemon<T = any>(method: string, path: string, body?: unknown, tim
   }
 }
 
-async function server<T = any>(method: string, path: string, body?: unknown): Promise<T> {
-  const { ServerClient } = await import("./client.ts");
-  return new ServerClient(loadDaemonConfig()).call<T>(method, path, body, 60_000);
-}
+const HELP = `gtv — your AI coding agents, coordinated with your team (gtv ${GTV_VERSION})
 
-/** Project of the current repo: --project, the .git/gtv-project link, or the server's match of the remote. */
-async function project(): Promise<string> {
-  const explicit = flag("project");
-  if (explicit) return explicit;
-  const { readLink, remoteUrl } = await import("./workspace.ts");
-  const { repoTop } = await import("./snapshot.ts");
-  const top = await repoTop(process.cwd());
-  if (top) {
-    const linked = await readLink(top);
-    if (linked) return linked;
-    const url = await remoteUrl(top, loadDaemonConfig().remote);
-    if (url) {
-      const p = await server<{ id: string }>("GET", `/v1/resolve?remote=${encodeURIComponent(url)}`).catch(() => undefined);
-      if (p) return p.id;
-    }
-  }
-  throw new Error("cannot tell which project this is: run inside a linked repo, use --project <id>, or gtv link <id>");
-}
+  gtv login [server]   Connect this computer to your account.
+  gtv on               Set up gtv for this repo (hooks, MCP server, skill) and start the background service.
+  gtv off              Remove gtv from this repo.
+  gtv status           Who you are, this computer, the background service; inside a repo: project, your role,
+                       your tasks, what waits for you.
+  gtv doctor           Check everything and fix what it can.
+  gtv open             Open this repo's project in the browser.
+  gtv answer <id> "…"  Answer a question that waits for you.
+  gtv logout           Disconnect this computer (revokes its key, stops the background service).
+  gtv daemon start|stop|restart|status
+  gtv help | --version
 
-const inProject = async (path: string) => `/v1/p/${await project()}${path}`;
-
-const HELP = `gtv — Project Operator client
-
-Setup (npx guide-the-vibe <command> works the same as gtv <command>)
-  gtv join <invite link>             one-step setup from the link on the dashboard (Developers › Invite)
-  gtv install                        set up another repo: link it, wire the agents, start the daemon
-  gtv init --dev <name> --server <url> [--token <t>] [--port 7391]   manual setup with a dev token
-  gtv daemon start|stop|restart|status   manage the background daemon
-  gtv daemon                         run the daemon in this terminal instead (prints its log)
-  gtv install claude|codex [dir] [--daemon <url>]   only wire hooks + MCP + skill into a project (default: cwd;
-                                     --daemon when several daemons share a machine)
-
-Projects (one per repo)
-  gtv projects                       list projects on the server
-  gtv link <project> [dir]           tie a working copy to a project (otherwise matched by its remote URL)
-  gtv project add <id> --repo <url> [--branch main] [--name <name>]   create a project (needs GTV_ADMIN_TOKEN)
-
-Daily use (inside a linked repo, or pass --project <id>)
-  gtv status                         who is doing what, open conflicts
-  gtv inbox                          questions waiting for you (human decisions)
-  gtv answer <ticket> "<text>"       answer a question as a human
-  gtv ack|dismiss <conflict>         acknowledge / dismiss a conflict
-  gtv kb search "<q>" | gtv kb confirm <id> | gtv kb add <title> <file>
-  gtv features [set <feature> on|shadow|off|default]
-  gtv snapshot                       push a WIP snapshot now
-
-Used by agents
-  gtv hook <agent> [--daemon <url>]  hook entry point (reads JSON on stdin)
-  gtv hook-wait <agent> [--daemon <url>]   Claude asyncRewake waiter
-  gtv mcp [--agent auto|claude|codex] [--daemon <url>]   stdio MCP server
-  gtv statusline [--daemon <url>]    one-line status for agent status bars
-
-Environment: GTV_HOME (config dir, default ~/.gtv), GTV_SERVER, GTV_TOKEN, GTV_DEV, GTV_DAEMON_PORT
+Guide: https://github.com/hienduc14/guide-the-vibe/blob/main/docs/cli.md
 `;
 
 async function main(): Promise<void> {
@@ -151,22 +111,20 @@ async function main(): Promise<void> {
         const { daemonHealth, ensureDaemon, stopDaemon } = await import("./install.ts");
         const url = flag("daemon") ?? daemonUrl();
         if (sub === "stop" || sub === "restart") {
-          if (!(await stopDaemon(url))) throw new Error(`could not stop the daemon on ${url} (started by another user?)`);
-          if (sub === "stop") return console.log("Daemon stopped.");
+          if (!(await stopDaemon(url))) throw new Error(`Could not stop the background service on ${url} (started by another user?)`);
+          if (sub === "stop") return console.log("✔ Background service stopped");
         }
         if (sub !== "status") {
           if (!(await ensureDaemon(url)))
-            throw new Error(
-              `the daemon did not start: run \`npx guide-the-vibe daemon\` to see why (log: ${CONFIG_FILE.replace(/config\.json$/, "daemon.log")})`,
-            );
+            throw new Error(`The background service did not start. See why: gtv daemon (log: ${CONFIG_FILE.replace(/config\.json$/, "daemon.log")})`);
         }
         const h = await daemonHealth(url);
-        if (!h) return console.log(`No daemon running on ${url}. Start it with: npx guide-the-vibe daemon start`);
-        console.log(`Daemon running on ${url} (pid ${h.pid ?? "?"}) as ${h.dev}`);
+        if (!h) return console.log(`No background service on ${url}. Start it: gtv daemon start`);
+        console.log(`Background service running on ${url} (pid ${h.pid ?? "?"}) as ${h.dev}`);
         console.log(`  server   ${h.server} ${h.reachable ? "(reachable)" : "(UNREACHABLE)"}`);
         const projects = Object.entries(h.projects ?? {});
         console.log(
-          `  projects ${projects.length ? projects.map(([id, ok]) => `${id}${ok ? "" : " (disconnected)"}`).join(", ") : "none yet (connects when an agent session starts in a linked repo)"}`,
+          `  projects ${projects.length ? projects.map(([id, ok]) => `${id}${ok ? "" : " (disconnected)"}`).join(", ") : "none yet (connects when an agent session starts in a repo with gtv on)"}`,
         );
         console.log(`  sessions ${h.sessions}`);
         return;
@@ -177,114 +135,59 @@ async function main(): Promise<void> {
       process.on("SIGINT", () => void d.stop().then(() => process.exit(0)));
       return;
     }
-    case "init": {
-      const cfg = saveDaemonConfig({ dev: flag("dev"), server: flag("server"), token: flag("token"), port: flag("port") ? Number(flag("port")) : undefined });
-      console.log(`Saved ${CONFIG_FILE}: dev=${cfg.dev} server=${cfg.server} port=${cfg.port}`);
-      return;
-    }
-    case "join": {
-      if (!rest[0]) throw new Error("usage: gtv join <invite link>");
-      const { join } = await import("./join.ts");
-      await join(rest[0]);
-      return;
-    }
+    case "login":
+      return (await import("./setup.ts")).login(rest[0]);
+    case "on":
+      return (await import("./setup.ts")).on();
     case "install": {
-      if (!rest[0] || rest[0].startsWith("--")) {
-        const { setupRepo } = await import("./join.ts");
-        await setupRepo(process.cwd());
-        return;
-      }
+      // `install claude|codex [dir] [--daemon <url>]`: wire one agent by hand (scripts, sandboxes); otherwise `on`.
+      if (rest[0] !== "claude" && rest[0] !== "codex") return (await import("./setup.ts")).on();
       const { installClaude, installCodex } = await import("./install.ts");
       const dir = rest[1] && !rest[1].startsWith("--") ? rest[1] : process.cwd();
-      const d = flag("daemon");
-      if (rest[0] === "claude")
-        console.log("Wrote:\n  " + installClaude(dir, d).join("\n  ") + "\nRestart Claude Code in this project and approve the gtv MCP server.");
-      else if (rest[0] === "codex")
-        console.log("Wrote:\n  " + installCodex(dir, d).join("\n  ") + "\nIn Codex, trust the project and review the hooks with /hooks.");
-      else console.log("usage: gtv install claude|codex [project-dir]");
+      const written = (rest[0] === "claude" ? installClaude : installCodex)(dir, flag("daemon"));
+      console.log("Wrote:\n  " + written.join("\n  "));
       return;
     }
-    case "status": {
-      try {
-        console.log(await daemon<string>("GET", `/status?cwd=${encodeURIComponent(process.cwd())}`));
-      } catch {
-        const s = await server("GET", await inProject("/state"));
-        console.log(JSON.stringify(s, null, 2));
-      }
-      return;
-    }
-    case "inbox": {
-      const tickets = await server<any[]>("GET", await inProject("/tickets?scope=for_me"));
-      if (!tickets.length) console.log("No questions waiting for you.");
-      for (const t of tickets) console.log(`${t.id} [${t.status}] from ${t.from_dev}: ${t.forwarded_question ?? t.question}`);
-      return;
-    }
-    case "answer": {
-      const [id, ...words] = rest;
-      const t = await server("POST", await inProject(`/tickets/${id}/reply`), { answer: words.join(" ") });
-      console.log(`Answered ${t.id}; it will be delivered to ${t.from_dev}'s agent.`);
-      return;
-    }
-    case "ack":
-    case "dismiss": {
-      const c = await server("POST", await inProject(`/conflicts/${rest[0]}/${command}`), {});
-      console.log(`${c.id} → ${c.status}`);
-      return;
-    }
-    case "kb": {
-      const [sub, ...args] = rest;
-      if (sub === "search")
-        for (const h of await server<any[]>("GET", await inProject(`/kb?q=${encodeURIComponent(args.join(" "))}`)))
-          console.log(`${h.id} [${h.type}/${h.status}] ${h.section}\n  ${h.snippet}`);
-      else if (sub === "confirm" || sub === "reject") console.log(await server("POST", await inProject(`/kb/${args[0]}/${sub}`), {}));
-      else if (sub === "add") {
-        const { readFileSync } = await import("node:fs");
-        console.log(await server("POST", await inProject("/kb"), { title: args[0], body: readFileSync(args[1], "utf8") }));
-      } else for (const d of await server<any[]>("GET", await inProject("/kb"))) console.log(`${d.id} [${d.type}/${d.status}] ${d.title}`);
-      return;
-    }
-    case "features": {
-      if (rest[0] === "set") {
-        const mode = rest[2] === "default" ? null : rest[2];
-        await server("PUT", await inProject("/features"), { feature: rest[1], mode });
-      }
-      const f = await server("GET", await inProject("/features"));
-      for (const [k, v] of Object.entries(f.modes)) console.log(`${k.padEnd(30)} ${v}${f.tripped[k] ? `  (tripped: ${f.tripped[k]})` : ""}`);
-      return;
-    }
-    case "snapshot":
-      console.log(await daemon("POST", "/snapshot", { cwd: process.cwd() }));
-      return;
+    case "off":
+      return (await import("./setup.ts")).off();
+    case "status":
+      return (await import("./setup.ts")).status();
+    case "doctor":
+      return (await import("./setup.ts")).doctor();
+    case "open":
+      return (await import("./setup.ts")).open();
+    case "answer":
+      return (await import("./setup.ts")).answer(rest[0], rest.slice(1).join(" "));
+    case "logout":
+      return (await import("./setup.ts")).logout();
+    case "join":
+      throw new Error("Invite links are gone. Run: gtv login");
     case "link": {
       const { writeLink } = await import("./workspace.ts");
-      if (!rest[0]) throw new Error("usage: gtv link <project> [dir]");
+      if (!rest[0]) throw new Error("Usage: gtv link <project id> [dir]");
       const dir = rest[1] && !rest[1].startsWith("--") ? rest[1] : process.cwd();
-      console.log(`Linked ${dir} to project ${rest[0]} (${await writeLink(dir, rest[0])})`);
+      console.log(`✔ Linked ${dir} to project ${rest[0]} (${await writeLink(dir, rest[0])}). Now run: gtv on`);
       return;
     }
-    case "projects":
-      for (const p of await server<any[]>("GET", "/v1/projects")) console.log(`${p.id.padEnd(20)} ${p.main_branch.padEnd(10)} ${p.repo_url}`);
+    case "--version":
+    case "-v":
+    case "version":
+      console.log(GTV_VERSION);
       return;
-    case "project": {
-      // Admin: gtv project add <id> --repo <url> [--branch main] [--name "Nice name"] (uses GTV_ADMIN_TOKEN or open mode)
-      if (rest[0] !== "add" || !rest[1]) throw new Error("usage: gtv project add <id> --repo <url> [--branch main] [--name <name>]");
-      const cfg = loadDaemonConfig();
-      const res = await fetch(`${cfg.server}/api/projects`, {
-        method: "POST",
-        headers: { "content-type": "application/json", ...(process.env.GTV_ADMIN_TOKEN ? { authorization: `Bearer ${process.env.GTV_ADMIN_TOKEN}` } : {}) },
-        body: JSON.stringify({ id: rest[1], repo_url: flag("repo"), main_branch: flag("branch") ?? "main", name: flag("name") ?? rest[1] }),
-      });
-      const json = (await res.json()) as { error?: string; id?: string };
-      if (!res.ok) throw new Error(json.error);
-      console.log(`Created project ${json.id}`);
+    case undefined: {
+      // `npx guide-the-vibe` with nothing after it installs (or updates) the gtv command; `gtv` alone shows help.
+      const { install, isInstalledCopy } = { ...(await import("./setup.ts")), ...(await import("./install.ts")) };
+      if (!isInstalledCopy()) return install();
+      console.log(HELP);
       return;
     }
     default:
+      if (command !== "help" && command !== "--help" && command !== "-h") console.log(`Unknown command: ${command}\n`);
       console.log(HELP);
   }
 }
 
 await main().catch((e: Error) => {
-  console.error(`gtv: ${e.message}`);
+  console.error(`✘ ${e.message}`);
   process.exit(1);
 });

@@ -1,7 +1,7 @@
 // Working copies: repo root, branch and which gtv project they belong to.
 // Project = `.git/gtv-project` (written by `gtv link`) or the server's match of the remote URL.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { repoTop, currentBranch } from "./snapshot.ts";
 import { git, shortHash } from "../shared/util.ts";
@@ -33,6 +33,13 @@ export async function writeLink(dir: string, project: string): Promise<string> {
   const f = join(await gitCommonDir(top), LINK_FILE);
   writeFileSync(f, project + "\n");
   return f;
+}
+
+export async function removeLink(top: string): Promise<boolean> {
+  const f = join(await gitCommonDir(top), LINK_FILE);
+  if (!existsSync(f)) return false;
+  rmSync(f);
+  return true;
 }
 
 export async function remoteUrl(top: string, remote: string): Promise<string | undefined> {

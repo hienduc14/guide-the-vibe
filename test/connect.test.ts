@@ -49,6 +49,12 @@ test("approve: the poll hands the key over once; the key works for /v1/me and ag
   assert.match(s.json.user_code, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
   assert.match(s.json.verify_url, new RegExp(`/connect\\?code=${s.json.user_code}$`));
   assert.equal(s.json.interval, 2);
+  const tunneled = await call<any>("/v1/connect/start", {
+    method: "POST",
+    headers: { "x-forwarded-proto": "https" },
+    body: { device_name: "t", platform: "linux" },
+  });
+  assert.match(tunneled.json.verify_url, /^https:\/\//, "a tunnel's x-forwarded-proto makes CLI links https");
   assert.deepEqual((await poll(s.json.device_code)).json, { status: "pending" });
 
   assert.equal((await call(`/api/connect/${s.json.user_code}`)).status, 401, "only a logged-in person approves");

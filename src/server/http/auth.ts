@@ -163,7 +163,9 @@ export async function projectDenied(hub: Hub, c: Context<{ Variables: AuthVars &
 export function publicOrigin(c: Context): string {
   const origin = c.req.header("origin");
   if (origin) return origin;
+  // Behind a tunnel (Cloudflare) the request arrives as http with only x-forwarded-proto set; CLI calls carry no Origin.
+  const url = new URL(c.req.url);
   const host = c.req.header("x-forwarded-host");
-  if (host) return `${c.req.header("x-forwarded-proto") ?? "https"}://${host}`;
-  return new URL(c.req.url).origin;
+  const proto = c.req.header("x-forwarded-proto")?.split(",")[0].trim() || (host ? "https" : url.protocol.slice(0, -1));
+  return `${proto}://${host ?? url.host}`;
 }

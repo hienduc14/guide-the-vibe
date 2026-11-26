@@ -11,6 +11,7 @@ import { Segmented } from "../../components/Segmented";
 import { JsonView } from "../../components/JsonView";
 import { Empty, ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
+import { KIND_VI } from "../../components/Message";
 
 const LAYER_TITLE: Record<string, string> = {
   L0: "Trùng file hoặc phạm vi đã khai báo",
@@ -19,22 +20,7 @@ const LAYER_TITLE: Record<string, string> = {
   L3: "AI thấy hai việc mâu thuẫn",
 };
 const RANK = { critical: 0, high: 1, warning: 2, info: 3 };
-/** What the two sides collide on, as a short headline; the server's full sentence stays below it. */
-export const KIND_VI: Record<string, string> = {
-  same_contract: "Cùng sửa một API",
-  same_file: "Cùng sửa một file",
-  same_module: "Cùng sửa một module",
-  scope_overlap: "Phạm vi đăng ký trùng nhau",
-  same_symbol_changed: "Cùng đổi một hàm/lớp",
-  same_symbol_declared: "Cùng định đổi một hàm/lớp",
-  breaking_change_used: "Đổi hàm/lớp mà bên kia đang dùng",
-  semantic: "AI thấy hai việc xung khắc",
-  edit_in_scope: "Sửa file trong phạm vi người khác đã đăng ký",
-  planned_breaking_change: "Định đổi hàm/lớp mà bên kia đang dùng",
-  critical_path: "Cùng chạm đường dẫn quan trọng",
-  main: "Không gộp sạch được vào nhánh chính",
-  text: "Thử gộp code thì đụng nhau ở cùng dòng",
-};
+export { KIND_VI };
 
 function ConflictRow({ c, onAct }: { c: Conflict; onAct: (a: "ack" | "dismiss" | "reopen") => void }) {
   const open = c.status === "open" || c.status === "acked";

@@ -37,6 +37,8 @@ export interface Task extends TaskRegistration {
   status: TaskStatus;
   created_at: string;
   updated_at: string;
+  /** What the agent says it did, given when it finishes (gtv_finish_task). */
+  summary?: string | null;
 }
 
 /** A dev's working copy (one worktree). WIP snapshots and L1/L2 work per workspace. */
@@ -129,6 +131,8 @@ export interface Ticket {
   confidence?: "high" | "medium" | "low";
   to_dev?: string;
   forwarded_question?: string;
+  /** Choices the asker offers when someone has to decide; the dashboard shows them as buttons. */
+  options?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -206,6 +210,10 @@ export interface BoardTask {
   done_at?: string;
 }
 
+/** What an agent's note is about, so the dashboard can show it as an icon and one line. */
+export type NoteTag = "progress" | "decision" | "blocker" | "question" | "done";
+export const NOTE_TAGS: NoteTag[] = ["progress", "decision", "blocker", "question", "done"];
+
 export interface BoardNote {
   id: string;
   board_id: string;
@@ -213,6 +221,15 @@ export interface BoardNote {
   kind: "note" | "system";
   body: string;
   created_at: string;
+  tag?: NoteTag | null;
+  /** One line (≤ 120 chars) for lists; body holds the detail. */
+  summary?: string | null;
+}
+
+/** First line or sentence of a text, cut to `max` characters: the default one-liner for old clients. */
+export function oneLine(text: string, max = 120): string {
+  const first = text.trim().split(/\n|(?<=[.!?])\s/)[0] ?? "";
+  return first.length > max ? `${first.slice(0, max - 1).trimEnd()}…` : first;
 }
 
 export type MemberLevel = "intern" | "junior" | "mid" | "senior" | "lead";
@@ -243,7 +260,11 @@ export interface Charter {
   non_goals?: string;
   quality?: "prototype" | "mvp" | "production";
   notes?: string;
+  /** Language agents write titles, notes, questions and summaries in (default Vietnamese). */
+  language?: "vi" | "en";
 }
+
+export const LANGUAGE_NAME: Record<NonNullable<Charter["language"]>, string> = { vi: "Vietnamese", en: "English" };
 
 const QUALITY_TEXT: Record<NonNullable<Charter["quality"]>, string> = {
   prototype: "prototype — speed over polish, throwaway code is fine",

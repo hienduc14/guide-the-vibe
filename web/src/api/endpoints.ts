@@ -3,6 +3,7 @@
 import { del, get, patch, post, put } from "./client";
 import type {
   ActivityEvent,
+  AiSummary,
   CallMap,
   StructureMap,
   AttentionItem,
@@ -108,6 +109,7 @@ export const api = {
     message: (id: string, to_dev: string, body: string, ref_id?: string) => post(`${a(id)}/messages`, { to_dev, body, ref_id }),
     conversations: (id: string, limit = 40) => get<Thread[]>(`${a(id)}/conversations?limit=${limit}`),
     attention: (id: string) => get<AttentionItem[]>(`${a(id)}/attention`),
+    digest: (id: string) => get<{ digest: AiSummary | null }>(`${a(id)}/digest`),
   },
 
   conflicts: {

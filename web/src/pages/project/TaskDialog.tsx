@@ -12,6 +12,7 @@ import { ConfirmButton } from "../../components/ConfirmButton";
 import { Avatar } from "../../components/Member";
 import { DueChip, PRIORITIES, PRIORITY_INFO, PriorityBadge, STATUS_INFO } from "../../components/Task";
 import { ago } from "../../lib/format";
+import { NoteTagChip } from "../../components/Message";
 
 const STATUSES: BoardStatus[] = ["todo", "in_progress", "blocked", "review", "done", "cancelled"];
 
@@ -161,11 +162,22 @@ export function TaskDialog({ taskId, members, onClose }: { taskId: string; membe
               <span className="label-caps">Nhật ký</span>
               <ol className="timeline">
                 {t.notes.map((n) => (
-                  <li key={n.id} className={n.kind}>
-                    <span className="xs faint">
+                  <li key={n.id} className={`${n.kind}${n.tag ? ` tag-${n.tag}` : ""}`}>
+                    <span className="xs faint row" style={{ gap: 6 }}>
+                      {n.kind === "note" && <NoteTagChip tag={n.tag} />}
                       {n.kind === "note" ? <b className="fg">{n.author}</b> : "gtv"} · {ago(n.created_at)}
                     </span>
-                    <span className="small pre-wrap">{n.body}</span>
+                    {n.kind === "note" && n.summary && n.body.trim().length > n.summary.length + 10 ? (
+                      <>
+                        <span className="small">{n.summary}</span>
+                        <details className="bubble-more">
+                          <summary>Chi tiết</summary>
+                          <span className="small pre-wrap">{n.body}</span>
+                        </details>
+                      </>
+                    ) : (
+                      <span className="small pre-wrap">{n.body}</span>
+                    )}
                   </li>
                 ))}
               </ol>

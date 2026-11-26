@@ -8,7 +8,7 @@ import { LevelBadge } from "../../components/Badge";
 import { DevAvatar, EmptyState } from "../../components/Visual";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
-import { KIND_VI } from "./ConflictsTab";
+import { KIND_VI } from "../../components/Message";
 
 /*
  * One file, opened from the work map: who is on it, the conflicts about it, and each person's change to it at

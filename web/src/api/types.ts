@@ -423,6 +423,7 @@ export interface Charter {
   non_goals?: string;
   quality?: "prototype" | "mvp" | "production";
   notes?: string;
+  language?: "vi" | "en";
 }
 
 // ---- task board -----------------------------------------------------------------------------
@@ -463,7 +464,11 @@ export interface BoardNote {
   kind: "note" | "system";
   body: string;
   created_at: string;
+  tag?: NoteTag | null;
+  summary?: string | null;
 }
+
+export type NoteTag = "progress" | "decision" | "blocker" | "question" | "done";
 
 export interface BoardDetail extends BoardView {
   notes: BoardNote[];
@@ -490,6 +495,15 @@ export interface ChatEntry {
   at: string;
   kind: string;
   body: string;
+  summary?: string;
+  tag?: NoteTag | null;
+}
+
+/** A brain summary of a thread or of the day (cached on the server). */
+export interface AiSummary {
+  text: string;
+  detail: string[];
+  at: string;
 }
 
 export interface Thread {
@@ -502,6 +516,9 @@ export interface Thread {
   started_at: string;
   updated_at: string;
   entries: ChatEntry[];
+  conflict?: { layer: string; kind: string; dev_a: string; dev_b: string; subject: string };
+  options?: string[];
+  ai_summary?: AiSummary;
 }
 
 export interface AttentionItem {
@@ -511,6 +528,7 @@ export interface AttentionItem {
   detail: string;
   ref: string;
   at: string;
+  conflict?: { kind: string; subject: string; dev_a: string; dev_b: string };
 }
 
 // ---- code map -------------------------------------------------------------------------------

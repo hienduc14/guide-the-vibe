@@ -15,7 +15,7 @@ import { type Brain, BrainUnavailable, Semaphore } from "../brain/types.ts";
 import { REGISTRATION_SCHEMA, registrationPrompt, type RegistrationOutput, INTENT_SCHEMA, intentPrompt } from "../brain/prompts.ts";
 import { CircuitBreaker, resolveFeatures, isActive, type FeatureKey, FEATURE_KEYS } from "../../shared/features.ts";
 import type { Conflict, FeatureMode, GtvEvent, Session, Task, TaskRegistration, Workspace, Level } from "../../shared/types.ts";
-import { LEVEL_RANK, charterText } from "../../shared/types.ts";
+import { LANGUAGE_NAME, LEVEL_RANK, charterText } from "../../shared/types.ts";
 import { log, nowIso, truncate } from "../../shared/util.ts";
 
 export interface EngineConfig {
@@ -54,6 +54,10 @@ export class Engine {
     this.db = opts.db;
     opts.db.ensureColumn("tasks", "board_id", "TEXT");
     opts.db.ensureColumn("messages", "from_dev", "TEXT");
+    opts.db.ensureColumn("board_notes", "tag", "TEXT");
+    opts.db.ensureColumn("board_notes", "summary", "TEXT");
+    opts.db.ensureColumn("tickets", "options", "TEXT");
+    opts.db.ensureColumn("tasks", "summary", "TEXT");
     this.store = new Store(opts.db);
     this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);
@@ -188,6 +192,10 @@ export class Engine {
     const mine = state.conflicts.filter((c) => c.workspace_a === session.workspace_id || c.workspace_b === session.workspace_id);
     const waiting = this.store.tickets({ status: ["forwarded", "waiting_human"], to_dev: session.dev });
     const lines = ["gtv Project Operator is active for this repo."];
+    const lang = LANGUAGE_NAME[this.store.charter?.language ?? "vi"];
+    lines.push(
+      `Team language: write task titles (≤ 60 characters), work notes, questions, answers and finish summaries for gtv in ${lang}; keep code names as they are. The lead reads them on a dashboard.`,
+    );
     const charter = charterText(this.store.charter);
     if (charter) lines.push("Project charter — choose technology and solutions that fit it:", charter);
     const core = this.kb.core();

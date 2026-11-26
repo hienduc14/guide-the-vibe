@@ -12,6 +12,9 @@ import {
   PRIORITIES,
   PRIORITY_RANK,
   type BoardNote,
+  type NoteTag,
+  NOTE_TAGS,
+  oneLine,
   type BoardStatus,
   type BoardTask,
   type Level,
@@ -188,13 +191,23 @@ export class Board {
     this.store.changed();
   }
 
-  note(boardId: string, author: string, kind: BoardNote["kind"], body: string): BoardNote {
+  note(boardId: string, author: string, kind: BoardNote["kind"], body: string, extra: { tag?: NoteTag; summary?: string } = {}): BoardNote {
     if (!body.trim()) throw new Error("note is empty");
-    const n: BoardNote = { id: newId("bn"), board_id: boardId, author, kind, body: body.trim().slice(0, 4000), created_at: nowIso() };
+    const text = body.trim().slice(0, 4000);
+    const n: BoardNote = {
+      id: newId("bn"),
+      board_id: boardId,
+      author,
+      kind,
+      body: text,
+      created_at: nowIso(),
+      tag: extra.tag && NOTE_TAGS.includes(extra.tag) ? extra.tag : kind === "note" ? "progress" : null,
+      summary: kind === "note" ? oneLine(extra.summary?.trim() || text) : null,
+    };
     this.db.upsert("board_notes", n as unknown as Record<string, unknown>);
     if (kind === "note") {
       this.db.run(`UPDATE board_tasks SET updated_at = ? WHERE id = ?`, n.created_at, boardId);
-      this.store.logEvent("board_note", author, { board_id: boardId, body: truncate(n.body, 300) });
+      this.store.logEvent("board_note", author, { board_id: boardId, body: truncate(n.body, 300), tag: n.tag, summary: n.summary });
       this.store.changed();
     }
     return n;

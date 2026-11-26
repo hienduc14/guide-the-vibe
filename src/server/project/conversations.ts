@@ -6,16 +6,29 @@
 // Built from tickets, conflicts and the messages table (every message delivered into an agent).
 
 import type { Engine } from "./engine.ts";
-import type { Conflict, Level, Message, Ticket } from "../../shared/types.ts";
+import type { BoardNote, Conflict, Level, Message, Ticket } from "../../shared/types.ts";
+import { oneLine } from "../../shared/types.ts";
 import { parseJson } from "../../shared/db.ts";
+import { cachedSummaries } from "./summaries.ts";
 
 export interface ChatEntry {
   id: string;
   from: string; // a developer (their agent), "operator", "gtv", or a dashboard user
   to: string | null;
   at: string;
-  kind: string; // question | forward | answer | human | conflict | ack | note | task | system
+  kind: string; // question | forward | answer | human | conflict | ack | note | task | work | system
   body: string;
+  /** One line for the bubble header; body is the detail behind it. */
+  summary?: string;
+  /** What a work note is about (progress, decision, blocker, question, done). */
+  tag?: string | null;
+}
+
+/** A brain summary of a thread or a day, cached in the summaries table. */
+export interface AiSummary {
+  text: string;
+  detail: string[];
+  at: string;
 }
 
 export interface Thread {
@@ -28,6 +41,11 @@ export interface Thread {
   started_at: string;
   updated_at: string;
   entries: ChatEntry[];
+  /** Conflict threads: the facts, so the dashboard writes its own headline instead of gtv's sentence. */
+  conflict?: { layer: string; kind: string; dev_a: string; dev_b: string; subject: string };
+  /** Questions: the choices the asker offered, shown as buttons while a person has to decide. */
+  options?: string[];
+  ai_summary?: AiSummary;
 }
 
 const strip = (body: string) => body.replace(/^\[gtv[^\]]*\]\s*/, "").replace(/\n\(conflict [^)]*\)$/, "");
@@ -41,6 +59,7 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
       at: t.created_at,
       kind: "question",
       body: t.question + (t.context ? `\n\n${t.context}` : ""),
+      summary: oneLine(t.question, 160),
     },
   ];
   for (const m of msgs) {
@@ -53,7 +72,7 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
       .replace(/^Q: [\s\S]*?\nA: /, ""); // answers repeat the question: the thread already shows it
     // A question asked straight to a teammate is delivered word for word: the asker's bubble already says it.
     if (kind === "forward" && body.trim() === t.question.trim()) continue;
-    entries.push({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind, body });
+    entries.push({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind, body, summary: oneLine(body, 160) });
   }
   // A synchronous answer (gtv_ask returned it directly) has no message: take it from the ticket.
   if (t.answer && (t.status === "answered" || t.status === "closed" || t.status === "expired") && !entries.some((e) => e.kind === "answer"))
@@ -64,6 +83,7 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
       at: t.updated_at,
       kind: "answer",
       body: t.answer,
+      summary: oneLine(t.answer, 160),
     });
   return finish({
     id: t.id,
@@ -74,6 +94,7 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
     started_at: t.created_at,
     updated_at: t.updated_at,
     entries,
+    options: t.options?.length ? t.options : undefined,
   });
 }
 
@@ -95,6 +116,7 @@ function conflictThread(c: Conflict, msgs: Message[], acks: { ts: string; actor:
     title: `${c.dev_a} ↔ ${c.dev_b}: ${c.subject}`,
     status: c.status,
     level: c.level,
+    conflict: { layer: c.layer, kind: c.kind, dev_a: c.dev_a, dev_b: c.dev_b, subject: c.subject },
     participants: [c.dev_a, c.dev_b].filter((d) => d !== "main"),
     started_at: c.created_at,
     updated_at: c.updated_at,
@@ -138,19 +160,43 @@ export function conversations(engine: Engine, limit = 40): Thread[] {
     if (c.level === "info" && !msgs.length) continue; // info is never sent to agents: not a conversation
     threads.push(conflictThread(c, msgs, acks.get(c.id) ?? []));
   }
+  // Work notes agents and people wrote on board items (gtv_log_work, finish summaries): part of that task's thread.
+  const notesByItem = new Map<string, BoardNote[]>();
+  for (const n of db.all<BoardNote>(`SELECT * FROM board_notes WHERE kind = 'note' ORDER BY created_at DESC LIMIT 400`).reverse())
+    notesByItem.set(n.board_id, [...(notesByItem.get(n.board_id) ?? []), n]);
   // Board tasks handed out, and notes sent about something.
-  for (const [ref, msgs] of byRef) {
+  for (const ref of new Set([...byRef.keys(), ...notesByItem.keys()])) {
+    const msgs = byRef.get(ref) ?? [];
+    const notes = notesByItem.get(ref) ?? [];
     const item = engine.board.get(ref);
+    if (!item && !msgs.length) continue;
+    const entries: ChatEntry[] = [
+      ...msgs.map((m) => {
+        const body = strip(m.body);
+        return { id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind: item ? "task" : "note", body, summary: oneLine(body, 160) };
+      }),
+      ...notes.map((n) => ({
+        id: n.id,
+        from: n.author,
+        to: null,
+        at: n.created_at,
+        kind: "work",
+        body: n.body,
+        summary: n.summary ?? oneLine(n.body, 160),
+        tag: n.tag ?? "progress",
+      })),
+    ];
+    const times = entries.map((e) => e.at).sort();
     threads.push(
       finish({
         id: ref,
         kind: item ? "task" : "note",
         title: item ? item.title : `Ghi chú về ${ref}`,
         status: item?.status ?? "sent",
-        participants: [],
-        started_at: msgs[0].created_at,
-        updated_at: msgs.at(-1)!.created_at,
-        entries: msgs.map((m) => ({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind: item ? "task" : "note", body: strip(m.body) })),
+        participants: item?.assignee ? [item.assignee] : [],
+        started_at: times[0],
+        updated_at: times.at(-1)!,
+        entries,
       }),
     );
   }
@@ -170,7 +216,16 @@ export function conversations(engine: Engine, limit = 40): Thread[] {
         entries: msgs.map((m) => ({ id: m.id, from: m.from_dev!, to: m.to_dev, at: m.created_at, kind: "note", body: strip(m.body) })),
       }),
     );
-  return threads.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, limit);
+  const out = threads.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, limit);
+  const cached = cachedSummaries(
+    db,
+    out.map((t) => t.id),
+  );
+  for (const t of out) {
+    const s = cached.get(t.id);
+    if (s) t.ai_summary = s;
+  }
+  return out;
 }
 
 export interface AttentionItem {
@@ -180,6 +235,8 @@ export interface AttentionItem {
   detail: string;
   ref: string;
   at: string;
+  /** Conflicts: the facts, so the dashboard writes a short headline instead of gtv's sentence. */
+  conflict?: { kind: string; subject: string; dev_a: string; dev_b: string };
 }
 
 /** What a lead should look at now, most serious first. */
@@ -187,7 +244,15 @@ export function attention(engine: Engine): AttentionItem[] {
   const out: AttentionItem[] = [];
   for (const c of engine.store.conflicts("open"))
     if (c.status === "open" && (c.level === "high" || c.level === "critical"))
-      out.push({ kind: "conflict", level: c.level, title: `${c.dev_a} ↔ ${c.dev_b}: ${c.subject}`, detail: c.message, ref: c.id, at: c.updated_at });
+      out.push({
+        kind: "conflict",
+        level: c.level,
+        title: `${c.dev_a} ↔ ${c.dev_b}: ${c.subject}`,
+        detail: c.message,
+        ref: c.id,
+        at: c.updated_at,
+        conflict: { kind: c.kind, subject: c.subject, dev_a: c.dev_a, dev_b: c.dev_b },
+      });
   for (const t of engine.store.tickets({ status: ["waiting_human"] }))
     out.push({
       kind: "question",

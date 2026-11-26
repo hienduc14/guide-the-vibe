@@ -61,9 +61,11 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
       description:
         "Register the task you are about to do BEFORE editing files, so teammates' agents and the Project Operator know. Returns overlaps with other developers' work, relevant team knowledge and advice. Re-register when starting a new task.",
       inputSchema: {
-        title: z.string(),
+        title: z.string().max(80).describe("Short title in the team's language from the briefing, at most 60 characters"),
         goal: z.string().optional(),
-        resources: z.array(RESOURCE).describe("Files/globs, modules, symbols and contracts you expect to touch"),
+        resources: z
+          .array(RESOURCE)
+          .describe("Files/globs, modules, symbols and contracts you expect to touch. Name concrete files when you know them, not only globs"),
         board_task_id: z
           .string()
           .optional()
@@ -88,7 +90,13 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
   );
   server.registerTool(
     "gtv_finish_task",
-    { description: "Mark your registered task finished (done) or abandoned.", inputSchema: { status: z.enum(["done", "abandoned"]).optional() } },
+    {
+      description: "Mark your registered task finished (done) or abandoned, with a short summary the lead reads on the dashboard.",
+      inputSchema: {
+        status: z.enum(["done", "abandoned"]).optional(),
+        summary: z.string().optional().describe("1-3 short lines in the team's language: what you changed, what you tested, what is left (or why you stopped)"),
+      },
+    },
     (args) => call("finish_task", args),
   );
   server.registerTool(
@@ -96,7 +104,16 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     {
       description:
         "Ask the Project Operator a question while coding: what teammates are doing or changing, who calls/owns some code, how a business rule or past decision works. It answers from the code graph, team docs and other developers' WIP, or forwards the question to the right teammate's agent (then the answer is delivered to you later). Set to_dev to ask a specific teammate directly.",
-      inputSchema: { question: z.string(), context: z.string().optional().describe("What you are doing and why you ask"), to_dev: z.string().optional() },
+      inputSchema: {
+        question: z.string().describe("The question alone, one or two sentences, in the team's language"),
+        context: z.string().optional().describe("What you are doing and why you ask"),
+        to_dev: z.string().optional(),
+        options: z
+          .array(z.string().max(80))
+          .max(5)
+          .optional()
+          .describe("When someone has to choose, the choices (2-5 short phrases): the lead can pick one with a click"),
+      },
     },
     (args) => call("ask", args),
   );
@@ -150,8 +167,15 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
   server.registerTool(
     "gtv_log_work",
     {
-      description: "Add a short note to your board task's work log: progress, a decision, a blocker. Managers read it on the dashboard.",
-      inputSchema: { note: z.string(), task_id: z.string().optional().describe("Defaults to the board task of your registered work") },
+      description:
+        "Add a note to your board task's work log: progress, a decision, a blocker or an open question. The lead reads the one-line summary on the dashboard.",
+      inputSchema: {
+        kind: z.enum(["progress", "decision", "blocker", "question"]).optional().describe("What the note is about (default progress)"),
+        summary: z.string().max(140).optional().describe("One line, at most 120 characters, in the team's language"),
+        detail: z.string().optional().describe("Longer explanation if needed"),
+        note: z.string().optional().describe("Older form of summary + detail in one text"),
+        task_id: z.string().optional().describe("Defaults to the board task of your registered work"),
+      },
     },
     (args) => call("log_work", args),
   );

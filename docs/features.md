@@ -20,6 +20,7 @@
 | `policy.ask`                  | on                         |                        |                                       |
 | `coord.priority`              | on                         |                        |                                       |
 | `notify.desktop`              | on                         |                        |                                       |
+| `brain.summary`               | on                         | `brain`                | `summaries` (bảng cùng tên)           |
 | `brain`                       | on                         |                        | — (off khi `BRAIN_BACKEND=null`)      |
 
 ## Đăng ký task
@@ -81,6 +82,12 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 - **qa.tier1_answer** — Brain trả lời (`ANSWER_SCHEMA`). `confidence: low` không được coi là câu trả lời. `shadow` = chạy Brain, ghi log, nhưng chuyển tiếp như chưa trả lời.
 - **qa.tier2_relay** — chuyển câu hỏi vào agent của `forward_to_dev` (message `ticket_question`).
 - **qa.tier3_human** — `escalate` hoặc quá `qa.tier2_timeout_min` ⇒ hỏi người (`human_request`, thông báo desktop, `gtv answer`); quá `qa.tier3_timeout_h` ⇒ `expired`.
+
+## Tin nhắn có cấu trúc và tóm tắt
+
+- Agent gửi lên có trường riêng để dashboard hiển thị gọn: `gtv_log_work` có `kind` (progress / decision / blocker / question) và `summary` một dòng, `gtv_ask` có `options` (người quyết bấm chọn trên dashboard), `gtv_finish_task` có `summary` (thành thẻ "Hoàn thành" trong nhật ký việc). Agent cũ không gửi các trường này thì server lấy câu đầu làm một dòng.
+- Ngôn ngữ của nhóm (`charter.language`, mặc định tiếng Việt) nằm trong briefing: agent viết tiêu đề, ghi chú, câu hỏi và tóm tắt bằng ngôn ngữ đó.
+- **brain.summary** — Brain viết một câu (kèm tối đa 5 ý) cho mỗi cuộc trao đổi đã có kết quả và một bản tóm tắt trong ngày. Chạy nền, lưu trong bảng `summaries`, chỉ viết lại khi nội dung đổi, tối đa 80 lần/ngày. Tắt thì dashboard vẫn đủ nhờ các trường có cấu trúc.
 
 ## Góc nhìn manager (v0.8, SPEC mục 25)
 

@@ -64,7 +64,7 @@ export function describe(e: ActivityEvent): { text: string; level?: Level } {
     case "board_update":
       return { text: `cập nhật việc ${p.board_id ?? ""}${Array.isArray(p.changes) && p.changes.length ? `: ${p.changes.join(", ")}` : ""}` };
     case "board_note":
-      return { text: `ghi chú vào việc ${p.board_id ?? ""}: ${p.body ?? ""}` };
+      return { text: `ghi chú vào việc ${p.board_id ?? ""}: ${p.summary ?? p.body ?? ""}` };
     case "board_pick":
       return { text: `nhận việc ${p.board_id ?? ""}` };
     case "board_delete":

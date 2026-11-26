@@ -65,6 +65,11 @@ CREATE TABLE IF NOT EXISTS board_notes (
   id TEXT PRIMARY KEY, board_id TEXT NOT NULL, author TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS board_notes_board ON board_notes(board_id, created_at);
+-- Brain summaries, cached: one per conversation thread (ref = thread id) and one per day (ref = 'day:YYYY-MM-DD').
+-- source_hash is what was summarised, so a thread that changed gets a fresh summary.
+CREATE TABLE IF NOT EXISTS summaries (
+  ref TEXT PRIMARY KEY, kind TEXT NOT NULL, text TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '[]', source_hash TEXT NOT NULL, created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS feature_overrides (feature TEXT PRIMARY KEY, mode TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS event_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, type TEXT NOT NULL, actor TEXT, payload TEXT NOT NULL

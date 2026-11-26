@@ -16,8 +16,8 @@ progress without asking.
 3. Call `gtv_pick_task` with the chosen id. Read its description and notes.
 4. Plan the change, then call `gtv_register_task` with the files/symbols you will touch. It links to the
    board task by itself.
-5. While working, log progress, decisions and blockers with `gtv_log_work` (a sentence each, not a diary).
-6. When done, call `gtv_finish_task`. The task moves to review and to done once the code reaches main.
+5. While working, log decisions and blockers with `gtv_log_work` (`kind` + a one-line `summary` in the team language; not a diary).
+6. When done, call `gtv_finish_task` with a 1-3 line `summary`. The task moves to review and to done once the code reaches main.
 
 If the board is empty, say so and offer to register the user's own work with `gtv_register_task` (gtv adds it
 to the board).

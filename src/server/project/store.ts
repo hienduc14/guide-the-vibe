@@ -434,5 +434,5 @@ function rowToConflict(r: Record<string, unknown>): Conflict {
 }
 
 function rowToTicket(r: Record<string, unknown>): Ticket {
-  return { ...(r as unknown as Ticket), sources: parseJson(r.sources, []) };
+  return { ...(r as unknown as Ticket), sources: parseJson(r.sources, []), options: r.options ? parseJson<string[]>(r.options, []) : undefined };
 }

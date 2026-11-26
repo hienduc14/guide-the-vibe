@@ -12,6 +12,7 @@ import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
 import { attention, conversations } from "../project/conversations.ts";
+import { summarizer } from "../project/summaries.ts";
 import { loadSymbolChanges } from "../detect/l2.ts";
 import { globMatch, normPath } from "../../shared/util.ts";
 
@@ -316,9 +317,14 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({ ok: true });
   });
 
-  app.get("/projects/:id/conversations", async (c) =>
-    c.json(conversations((await rt(c.req.param("id"))).engine, Math.min(200, Number(c.req.query("limit") ?? 40)))),
-  );
+  app.get("/projects/:id/conversations", async (c) => {
+    const { engine } = await rt(c.req.param("id"));
+    const threads = conversations(engine, Math.min(200, Number(c.req.query("limit") ?? 40)));
+    summarizer(engine).threads(threads);
+    return c.json(threads);
+  });
+  /** Today's brain digest (cached; null until the first one is written or when the brain is off). */
+  app.get("/projects/:id/digest", async (c) => c.json({ digest: summarizer((await rt(c.req.param("id"))).engine).day() ?? null }));
   app.get("/projects/:id/attention", async (c) => c.json(attention((await rt(c.req.param("id"))).engine)));
 
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));

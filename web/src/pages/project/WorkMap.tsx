@@ -22,7 +22,7 @@ type LinkKind = "editing" | "edited" | "declared";
 export type FileStatus = "conflict" | "editing" | "edited" | "declared";
 
 export const FILE_STATUS: Record<FileStatus, { label: string; tone: Tone; hint: string }> = {
-  conflict: { label: "Xung đột", tone: "high", hint: "Từ hai người trở lên đang sửa file này" },
+  conflict: { label: "Xung đột", tone: "high", hint: "Hai người cùng sửa file này, hoặc có xung đột đang mở về nó" },
   editing: { label: "Đang sửa", tone: "accent", hint: "Có agent sửa file này trong 30 phút qua" },
   edited: { label: "Đã sửa", tone: "ok", hint: "Đã có thay đổi, agent không sửa thêm trong 30 phút qua" },
   declared: { label: "Đã khai báo", tone: "neutral", hint: "Agent nói sẽ sửa nhưng chưa chạm vào" },
@@ -90,11 +90,15 @@ export function buildMap(s: TeamState, now = Date.now()) {
   return { agents: [...agents.values()], files, edges: [...edges.values()] };
 }
 
+/** The file name always shows in full; a long folder shrinks to its last part ("…/auth/"). */
 function FileName({ path }: { path: string }) {
   const i = path.lastIndexOf("/");
+  const dir = i >= 0 ? path.slice(0, i + 1) : "";
+  const parts = dir.split("/").filter(Boolean);
+  const shortDir = parts.length > 1 ? `…/${parts.at(-1)}/` : dir;
   return (
     <span className="wm-name" title={path}>
-      {i >= 0 && <span className="wm-dir">{path.slice(0, i + 1)}</span>}
+      {dir && <span className="wm-dir">{shortDir}</span>}
       <b>{path.slice(i + 1)}</b>
     </span>
   );
@@ -157,7 +161,7 @@ export function WorkMap({ state, projectId }: { state: TeamState; projectId: str
           <i className="wm-line declared" /> mới khai báo
         </span>
         <span>
-          <i className="wm-line clash" /> hai người cùng sửa
+          <i className="wm-line clash" /> có xung đột
         </span>
       </div>
       <div className="wm" style={{ height }} onMouseLeave={() => setFocus(null)}>

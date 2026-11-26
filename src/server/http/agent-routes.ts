@@ -4,7 +4,8 @@ import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
-import type { FeatureMode, GtvEvent, Message, Session, TaskRegistration, TaskResource } from "../../shared/types.ts";
+import type { FeatureMode, GtvEvent, Message, NoteTag, Session, TaskRegistration, TaskResource } from "../../shared/types.ts";
+import { oneLine } from "../../shared/types.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import { callMap, structureMap } from "../../codeintel/map.ts";
 import { FEATURES } from "../../shared/features.ts";
@@ -96,13 +97,18 @@ export function agentRoutes(): Hono<ProjectEnv> {
       resources?: TaskResource[];
       add_resources?: TaskResource[];
       status?: "done" | "abandoned" | "pr_open";
+      summary?: string;
     };
     const t = engine.store.task(c.req.param("id"));
     if (!t || (t.dev !== c.get("dev") && !c.get("admin"))) throw new Error("unknown task");
     const resources =
       body.resources ??
       (body.add_resources ? [...t.resources, ...body.add_resources.map((r) => ({ ...r, value: r.kind === "path" ? normPath(r.value) : r.value }))] : undefined);
-    const next = engine.store.updateTask(t.id, { title: body.title, goal: body.goal, resources, status: body.status } as never);
+    const summary = body.summary?.trim().slice(0, 2000) || undefined;
+    const next = engine.store.updateTask(t.id, { title: body.title, goal: body.goal, resources, status: body.status, summary } as never);
+    // What the agent says it did lands on the board item's log as a "done" card.
+    if (summary && t.board_id && engine.board.get(t.board_id))
+      engine.board.note(t.board_id, c.get("dev"), "note", summary, { tag: body.status === "abandoned" ? "blocker" : "done", summary: oneLine(summary) });
     if (body.status === "done" || body.status === "abandoned") engine.tasksClosed([t.id]);
     else engine.runL0();
     if (body.status && body.status !== t.status) engine.board.onRegistrationClosed(t, body.status);
@@ -131,9 +137,9 @@ export function agentRoutes(): Hono<ProjectEnv> {
   });
   app.post("/board/:id/notes", async (c) => {
     const { board } = c.get("rt").engine;
-    const { body } = (await c.req.json()) as { body?: string };
+    const { body, tag, summary } = (await c.req.json()) as { body?: string; tag?: NoteTag; summary?: string };
     if (!board.get(c.req.param("id"))) throw new Error("unknown board task");
-    return c.json(board.note(c.req.param("id"), c.get("dev"), "note", String(body ?? "")));
+    return c.json(board.note(c.req.param("id"), c.get("dev"), "note", String(body || summary || ""), { tag, summary }));
   });
   /** An agent takes an item (gtv_pick_task). */
   app.post("/board/:id/pick", async (c) => {
@@ -192,10 +198,14 @@ export function agentRoutes(): Hono<ProjectEnv> {
 
   app.post("/tickets", async (c) => {
     const { tickets } = c.get("rt");
-    const body = (await c.req.json()) as { session_id: string; question: string; context?: string; to_dev?: string };
+    const body = (await c.req.json()) as { session_id: string; question: string; context?: string; to_dev?: string; options?: string[] };
     const session = sessionOf(c, body.session_id);
     if (!body.question?.trim()) throw new Error("question is required");
-    const t = await tickets.ask({ session, question: body.question, context: body.context, to_dev: body.to_dev });
+    const options = (body.options ?? [])
+      .map((o) => String(o).trim().slice(0, 80))
+      .filter(Boolean)
+      .slice(0, 5);
+    const t = await tickets.ask({ session, question: body.question, context: body.context, to_dev: body.to_dev, options });
     tickets.detach(t.id);
     return c.json({ ...t, formatted: t.answer ? tickets.formatAnswer(t) : undefined });
   });

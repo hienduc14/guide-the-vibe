@@ -44,7 +44,7 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
     case "finish_task": {
       const t = myTask();
       if (!t) return "No open task for this session (it may already be finished).";
-      await client.call("PATCH", `${p}/tasks/${t.id}`, { status: args.status ?? "done" });
+      await client.call("PATCH", `${p}/tasks/${t.id}`, { status: args.status ?? "done", summary: args.summary });
       ctx.snapshotSoon();
       return `Task ${t.id} marked ${args.status ?? "done"}.`;
     }
@@ -52,7 +52,7 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       const t = await client.call<Ticket & { formatted?: string }>(
         "POST",
         `${p}/tickets`,
-        { session_id: session.id, question: args.question, context: args.context, to_dev: args.to_dev },
+        { session_id: session.id, question: args.question, context: args.context, to_dev: args.to_dev, options: args.options },
         120_000,
       );
       if (t.status === "answered" || t.status === "closed") return t.formatted ?? t.answer ?? "(no answer)";
@@ -130,7 +130,10 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       const t = myTask();
       const boardId = args.task_id ?? t?.board_id;
       if (!boardId) return "No board task for this session. Pick one with gtv_pick_task or register your work with gtv_register_task first.";
-      await client.call("POST", `${p}/board/${encodeURIComponent(boardId)}/notes`, { body: args.note });
+      const summary = args.summary ?? undefined;
+      const body = args.detail ?? args.note ?? summary;
+      if (!body) return "Nothing to log: give a summary (and optionally detail).";
+      await client.call("POST", `${p}/board/${encodeURIComponent(boardId)}/notes`, { body, summary, tag: args.kind });
       return `Logged on ${boardId}.`;
     }
     case "ack": {

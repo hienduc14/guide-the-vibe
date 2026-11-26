@@ -7,8 +7,9 @@ import { Avatar } from "../../components/Member";
 import { LevelBadge, StatusBadge } from "../../components/Badge";
 import { STATUS_INFO } from "../../components/Task";
 import { ago } from "../../lib/format";
+import { AiSummaryBox, NoteTagChip, conflictHeadline } from "../../components/Message";
 
-export const KIND_LABEL: Record<Thread["kind"], string> = { question: "Câu hỏi", conflict: "Conflict", task: "Giao việc", note: "Ghi chú" };
+export const KIND_LABEL: Record<Thread["kind"], string> = { question: "Câu hỏi", conflict: "Xung đột", task: "Việc", note: "Ghi chú" };
 
 const ENTRY_LABEL: Record<string, string> = {
   question: "hỏi",
@@ -19,14 +20,42 @@ const ENTRY_LABEL: Record<string, string> = {
   ack: "",
   note: "ghi chú",
   task: "giao việc",
+  work: "",
 };
+
+/** The thread's headline: conflicts get one built from their facts, not gtv's sentence to the agents. */
+export const threadTitle = (t: Thread) => (t.conflict ? conflictHeadline(t.conflict) : t.title);
+
+/** A message as one line, with the full text behind "Chi tiết" when there is more to it. */
+function EntryText({ e }: { e: ChatEntry }) {
+  // What gtv told each side about a conflict is long and written for agents: keep it, folded.
+  if (e.kind === "conflict")
+    return (
+      <details className="bubble-more">
+        <summary>{e.to ? `gtv đã báo cho ${e.to}` : "gtv phát hiện"}</summary>
+        <div className="bubble-text">{e.body}</div>
+      </details>
+    );
+  const line = e.summary?.trim();
+  const rest = line && e.body.trim() !== line && e.body.trim().length > line.length + 10;
+  if (!line || !rest) return <div className="bubble-text">{e.body}</div>;
+  return (
+    <>
+      <div className="bubble-text">{line}</div>
+      <details className="bubble-more">
+        <summary>Chi tiết</summary>
+        <div className="bubble-text">{e.body}</div>
+      </details>
+    </>
+  );
+}
 
 const isSystem = (from: string) => from === "gtv" || from === "operator";
 
 function senderName(e: ChatEntry): string {
   if (e.from === "gtv") return "gtv";
   if (e.from === "operator") return "Operator";
-  if (e.kind === "note" || e.kind === "task") return e.from;
+  if (e.kind === "note" || e.kind === "task" || e.kind === "work") return e.from;
   return `${e.from} · agent`;
 }
 
@@ -67,7 +96,7 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
             {thread.level && <LevelBadge level={thread.level} />}
             <ThreadStatus t={thread} />
           </span>
-          <b className="wrap-anywhere">{thread.title}</b>
+          <b className="wrap-anywhere">{threadTitle(thread)}</b>
         </div>
         <span className="spacer" />
         <span className="row" style={{ gap: 2 }}>
@@ -81,6 +110,7 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
         </span>
       </header>
       <div className="chat-body">
+        {thread.ai_summary && <AiSummaryBox s={thread.ai_summary} />}
         {thread.entries.map((e) => {
           if (e.kind === "ack")
             return (
@@ -96,16 +126,35 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
                 <div className="bubble-meta">
                   <b>{senderName(e)}</b>
                   {e.to && e.to !== e.from && <span>→ {e.to}</span>}
-                  {ENTRY_LABEL[e.kind] && <span className="faint">{ENTRY_LABEL[e.kind]}</span>}
+                  {e.kind === "work" ? <NoteTagChip tag={e.tag} /> : ENTRY_LABEL[e.kind] && <span className="faint">{ENTRY_LABEL[e.kind]}</span>}
                   <span className="faint" title={new Date(e.at).toLocaleString()}>
                     {ago(e.at)}
                   </span>
                 </div>
-                <div className="bubble-text">{e.body}</div>
+                <EntryText e={e} />
               </div>
             </div>
           );
         })}
+        {thread.options && thread.status === "waiting_human" && can("manager") && (
+          <div className="chat-options">
+            <span className="xs muted">Chọn một phương án để trả lời thẳng vào agent của {thread.participants.find((p) => !isSystem(p)) ?? "người hỏi"}:</span>
+            <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+              {thread.options.map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  className="btn sm"
+                  onClick={async () => {
+                    if (await run(() => api.tickets.reply(projectId, thread.id, o), "Đã trả lời")) onSent();
+                  }}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={end} />
       </div>
       {can("manager") && (
@@ -156,11 +205,18 @@ export function ThreadRow({ t, active, onClick }: { t: Thread; active?: boolean;
         <span className="spacer" />
         <span className="xs faint">{ago(t.updated_at)}</span>
       </span>
-      <span className="thread-title">{t.title}</span>
-      {last && (
-        <span className="xs muted truncate">
-          <b>{last.from === "operator" ? "Operator" : last.from}:</b> {last.body.split("\n")[0]}
+      <span className="thread-title">{threadTitle(t)}</span>
+      {t.ai_summary ? (
+        <span className="xs muted truncate" title={t.ai_summary.text}>
+          <b className="ai-mark">AI:</b> {t.ai_summary.text}
         </span>
+      ) : (
+        last && (
+          <span className="xs muted truncate">
+            <b>{last.from === "operator" ? "Operator" : last.from}:</b>{" "}
+            {last.kind === "conflict" ? `gtv báo cho ${last.to ?? "hai bên"}` : (last.summary ?? last.body.split("\n")[0])}
+          </span>
+        )
       )}
     </button>
   );

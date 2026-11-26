@@ -22,6 +22,7 @@ export interface AskInput {
   question: string;
   context?: string;
   to_dev?: string;
+  options?: string[];
 }
 
 export class TicketService {
@@ -58,6 +59,7 @@ export class TicketService {
       from_dev: input.session.dev,
       question: input.question,
       context: input.context,
+      options: input.options?.length ? input.options : undefined,
       tier: 1,
       status: "answering",
       sources: [],
@@ -150,7 +152,7 @@ export class TicketService {
       kind: "ticket_question",
       ref_id: t.id,
       from_dev: t.from_dev,
-      body: `[gtv question ${t.id} from ${t.from_dev}${work}] ${question}\nAnswer with the gtv_reply tool (ticket_id "${t.id}") if you can decide from your task and code; if your user must decide, call gtv_reply with escalate=true and ask them.`,
+      body: `[gtv question ${t.id} from ${t.from_dev}${work}] ${question}${t.options?.length ? `\nOptions: ${t.options.map((o, i) => `(${i + 1}) ${o}`).join("  ")}` : ""}\nAnswer with the gtv_reply tool (ticket_id "${t.id}") if you can decide from your task and code; if your user must decide, call gtv_reply with escalate=true and ask them.`,
     });
     this.notifyAsker(t, `Question ${t.id} was forwarded to ${toDev}. Continue with other work; the answer will be delivered to you.`);
     return t;

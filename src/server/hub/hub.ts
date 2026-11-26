@@ -286,6 +286,7 @@ function cleanCharter(c: Charter): Charter {
   const d = text(c.deadline);
   if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) out.deadline = d;
   if (c.quality && ["prototype", "mvp", "production"].includes(c.quality)) out.quality = c.quality;
+  if (c.language === "vi" || c.language === "en") out.language = c.language;
   const stack = (c.stack ?? []).map((s) => String(s).trim()).filter(Boolean);
   if (stack.length) out.stack = stack.slice(0, 30);
   return out;

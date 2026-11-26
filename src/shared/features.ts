@@ -28,6 +28,11 @@ export const FEATURES = {
     description: "Conflict notices and forwarded questions carry each side's task, priority and due date, and advise the lower-priority side to give way",
   },
   "notify.desktop": { default: "on", description: "Desktop notifications on the dev machine" },
+  "brain.summary": {
+    default: "on",
+    requires: ["brain"],
+    description: "One-line brain summary of each settled conversation and a digest of the day on the dashboard (cached, capped per day)",
+  },
   brain: { default: "on", description: "LLM brain (Pi / null)" },
 } satisfies Record<string, FeatureDef>;
 

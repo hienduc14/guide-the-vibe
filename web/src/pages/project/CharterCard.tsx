@@ -50,6 +50,12 @@ function Editor({ charter, onDone }: { charter: Charter; onDone: () => void }) {
         <Field label="Hạn chót">
           <input className="input" type="date" value={f.deadline ?? ""} onChange={(e) => setF({ ...f, deadline: e.target.value })} />
         </Field>
+        <Field label="Agent viết bằng">
+          <select className="input" value={f.language ?? "vi"} onChange={(e) => setF({ ...f, language: e.target.value as Charter["language"] })}>
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">Tiếng Anh</option>
+          </select>
+        </Field>
         <Field label="Mức chất lượng">
           <select className="input" value={f.quality ?? ""} onChange={(e) => setF({ ...f, quality: (e.target.value || undefined) as Charter["quality"] })}>
             <option value="">—</option>

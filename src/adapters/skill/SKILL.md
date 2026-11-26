@@ -12,13 +12,25 @@ the code graph, the team docs/ADRs and everybody's work in progress. Use it.
 
 The team plans work on the gtv task board. When the user asks what to do next, list it with `gtv_tasks`
 (the `/gtv` skill walks through picking one). `gtv_pick_task` takes a task; your next `gtv_register_task`
-links to it. Work you register without picking a task is added to the board for you. Log progress or
-blockers with `gtv_log_work`.
+links to it. Work you register without picking a task is added to the board for you.
+
+## What the lead sees
+
+Your team lead follows the work on a dashboard, mostly by reading one line per message. Write everything you send
+to gtv (titles, notes, questions, answers, summaries) **in the team language named in the briefing**, short and
+concrete; keep code names as they are.
+
+- `gtv_log_work`: `kind` (`progress`, `decision`, `blocker`, `question`) + `summary` (one line, ≤ 120 characters)
+  - `detail` only when needed. Log decisions and blockers when they happen, not every small step.
+- `gtv_ask` with `options` when someone has to choose (e.g. `["làm tròn lên", "làm tròn kiểu ngân hàng"]`):
+  the lead can pick one with a click.
+- `gtv_finish_task` with `summary`: 1-3 lines — what changed, what you tested, what is left.
 
 ## Before editing
 
-- Call `gtv_register_task` once you know what you will do: a short title, the goal, and the resources you expect to touch
-  (`path` globs like `src/auth/**`, `symbol` like `AuthService.login`, `contract` like `POST /api/login`).
+- Call `gtv_register_task` once you know what you will do: a short title (≤ 60 characters), the goal, and the resources
+  you expect to touch (`path` like `src/auth/session.ts` — name concrete files when you know them, globs like
+  `src/auth/**` otherwise; `symbol` like `AuthService.login`; `contract` like `POST /api/login`).
   Mark breaking changes with `op: "sig_change" | "rename" | "delete"`.
 - Read the reply. If it says `adjust_suggested` or `needs_coordination`, change your plan (e.g. keep a signature
   and add a new function) or ask the teammate via `gtv_ask` before touching the overlapping parts.
@@ -50,4 +62,4 @@ If you start touching files outside your registered scope, call `gtv_update_task
 
 ## When done
 
-Call `gtv_finish_task` (or it closes automatically once your work is merged into main).
+Call `gtv_finish_task` with a `summary` (or it closes automatically once your work is merged into main).

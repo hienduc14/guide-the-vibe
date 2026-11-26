@@ -43,8 +43,8 @@ export function ConversationsTab() {
           options={[
             { value: "all", label: "Tất cả" },
             { value: "question", label: "Câu hỏi" },
-            { value: "conflict", label: "Conflict" },
-            { value: "task", label: "Giao việc" },
+            { value: "conflict", label: "Xung đột" },
+            { value: "task", label: "Việc" },
             { value: "note", label: "Ghi chú" },
           ]}
         />

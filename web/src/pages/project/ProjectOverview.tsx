@@ -30,6 +30,7 @@ import { Loading } from "../../components/Empty";
 import { ago } from "../../lib/format";
 import { ActivityFeed } from "./ActivityFeed";
 import { WorkMap } from "./WorkMap";
+import { AiSummaryBox, KIND_VI, shortSubject } from "../../components/Message";
 import { CharterCard } from "./CharterCard";
 import { ThreadRow } from "./Chat";
 import { TaskCard } from "./BoardTab";
@@ -264,8 +265,10 @@ function AttentionCard({ projectId, openConflicts }: { projectId: string; openCo
                 <AttentionIcon kind={a.kind} />
               </span>
               <span className="what">
-                <b className="small">{a.title}</b>
-                <span className="xs muted">{a.detail}</span>
+                <b className="small">{a.conflict ? `${a.conflict.dev_a} ↔ ${a.conflict.dev_b}` : a.title}</b>
+                <span className="xs muted">
+                  {a.conflict ? `${KIND_VI[a.conflict.kind] ?? a.conflict.kind}: ${shortSubject(a.conflict.subject)}` : a.detail}
+                </span>
               </span>
               <span className="xs faint" style={{ whiteSpace: "nowrap" }}>
                 {ATTENTION[a.kind].label} · {ago(a.at)}
@@ -281,6 +284,13 @@ function AttentionCard({ projectId, openConflicts }: { projectId: string; openCo
       )}
     </Card>
   );
+}
+
+/** Today's digest written by the brain (cached on the server); hidden until there is one. */
+function DigestCard({ projectId }: { projectId: string }) {
+  const { data } = usePoll(() => api.projects.digest(projectId), [projectId], 60_000);
+  if (!data?.digest) return null;
+  return <AiSummaryBox s={data.digest} title="Hôm nay · AI tóm tắt" />;
 }
 
 /** Board progress and the most urgent open tasks. */
@@ -420,6 +430,7 @@ export function ProjectOverview() {
           </section>
         </div>
         <div className="stack">
+          <DigestCard projectId={id} />
           <ProgressCard projectId={id} />
           <RecentConversations projectId={id} />
         </div>

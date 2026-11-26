@@ -58,27 +58,27 @@ One page per project, built for the team lead:
 The dashboard is in Vietnamese. Try it with sample data and no AI model: `npm run demo`, then open
 http://localhost:7395.
 
-## Quick start
+## Getting started
 
-**You need:** Docker on a machine your team can reach. Each developer needs Node.js 20+.
+**You need:** Docker on a machine your team can reach. Each developer needs Node.js 20+ and git.
 
-**1. Start the server**
+**1. Start the server** (the admin, once)
 
 ```bash
 git clone https://github.com/hienduc14/guide-the-vibe && cd guide-the-vibe
 cp docker/.env.example docker/.env
 # In docker/.env set two secrets, each from: openssl rand -hex 32
-#   GTV_ADMIN_TOKEN   dashboard password
+#   GTV_ADMIN_TOKEN   rescue key for scripts (the dashboard itself uses accounts)
 #   GTV_SECRET_KEY    encrypts the model credentials you add later
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Open port 7390 and sign in with `GTV_ADMIN_TOKEN`. Put it behind HTTPS before sharing it with the team.
+Put port 7390 behind HTTPS, open it and create the first admin account.
 
 **2. Connect an AI model** (optional, but needed for answers and the smartest conflict check)
 
-On **Brain › Providers**, either sign in with a subscription you already have (Claude Pro/Max, ChatGPT, GitHub
-Copilot…), paste an API key (Anthropic, OpenAI, Google, OpenRouter and ~30 more), or point to any OpenAI- or
+On **AI trả lời**, either sign in with a subscription you already have (Claude Pro/Max, ChatGPT, GitHub Copilot…),
+paste an API key (Anthropic, OpenAI, Google, OpenRouter and ~30 more), or point to any OpenAI- or
 Anthropic-compatible endpoint. A small, fast model is enough.
 
 **3. Add your repository**
@@ -86,17 +86,23 @@ Anthropic-compatible endpoint. A small, fast model is enough.
 On the overview page choose **Thêm project** and paste the repository URL. For a private repository use a URL with
 a read token, e.g. `https://x-access-token:<token>@github.com/org/repo.git`.
 
-**4. Invite each developer**
+**4. Add your people**
 
-On **Developers** choose **Tạo lệnh mời** and send the command to the developer. They run it once inside their
-clone:
+On **Người** (People), add each person with their access in the project (manager, developer or viewer). gtv shows a
+one-time activation link (valid 48 hours): send it to them. The admin never learns anyone's password.
+
+**5. Each developer, once per computer and once per repo**
+
+They open the link, choose a password, and follow the three steps on **Tài khoản của tôi** (My account):
 
 ```bash
-npx guide-the-vibe join https://<your-server>/j/<code>
+npx guide-the-vibe   # installs the gtv command
+gtv login            # asks for your server; approve this computer in the browser
+gtv on               # inside the project's repo: hooks, MCP server and skill for Claude Code / Codex
 ```
 
-It sets up Claude Code and/or Codex in that repository and starts a small background helper. That's it: developers
-keep prompting their agent as usual.
+That's it: they keep prompting their agent as usual. Day to day: `gtv status`, `gtv open`, `gtv answer`; when
+something is off, `gtv doctor`. The CLI guide (in Vietnamese): [docs/cli.md](docs/cli.md).
 
 ## How it works
 
@@ -149,7 +155,7 @@ npm ci && npm run web:install
 node scripts/sandbox.ts
 ```
 
-Manual setup without invites: [docs/agents.md](docs/agents.md).
+Wiring an agent by hand: [docs/agents.md](docs/agents.md).
 
 </details>
 
@@ -158,7 +164,7 @@ Manual setup without invites: [docs/agents.md](docs/agents.md).
 
 | Variable                        | Purpose                                                                       |
 | ------------------------------- | ----------------------------------------------------------------------------- |
-| `GTV_ADMIN_TOKEN`               | Dashboard and admin API password (required by the Docker setup)               |
+| `GTV_ADMIN_TOKEN`               | Rescue key for the admin API and scripts (required by the Docker setup)       |
 | `GTV_SECRET_KEY`                | Encrypts model credentials in the database (required by the Docker setup)     |
 | `GTV_PORT`, `GTV_HOST`          | Listen address, default `0.0.0.0:7390`                                        |
 | `GTV_DATA`                      | Data directory: hub database, one database per project, git mirrors           |
@@ -173,8 +179,11 @@ Full list, deployment notes and troubleshooting: [docs/operations.md](docs/opera
 <details>
 <summary><b>Security</b></summary>
 
-- **Developer tokens**: personal, stored only as a hash. Invite links work once and expire after 24 hours.
-- **Accounts**: admins create manager and viewer accounts; a read-only link can show one project to outsiders.
+- **Accounts**: one per person. Admins create them; people set their own password through a one-time link (48 hours).
+  Each project gives its members manager, developer or viewer access; agents only work where their person is a
+  developer or manager. A read-only link can show one project to outsiders.
+- **Computers**: `gtv login` approves a computer in the browser; each gets its own key, stored only as a hash on the
+  server and revocable from the dashboard. Login, activation and connection codes are rate limited.
 - **Model credentials**: encrypted with `GTV_SECRET_KEY`; the API only ever returns the last four characters.
 - **Daemon**: listens on `127.0.0.1` only and refuses requests from browsers.
 - **Brain**: read-only tools; it can read code, documents and team state but never change the repository.
@@ -185,18 +194,19 @@ Full list, deployment notes and troubleshooting: [docs/operations.md](docs/opera
 
 Detailed docs are in Vietnamese.
 
-| Read this                                                       | To learn                                                          |
-| --------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [Features](docs/features.md)                                    | Every feature and detection layer: behaviour, modes, limits       |
-| [Architecture](docs/architecture.md)                            | Components, data flow, storage, security                          |
-| [Agents](docs/agents.md)                                        | Claude Code and Codex setup, files written by `install`           |
-| [Hooks](docs/hooks.md)                                          | What every hook does, step by step                                |
-| [API](docs/api.md)                                              | Server, daemon and MCP tool reference                             |
-| [Operations](docs/operations.md)                                | Deployment, environment variables, tokens, Brain, troubleshooting |
-| [Dashboard](web/README.md) · [Design](DESIGN.md)                | Dashboard code layout and its design system                       |
-| [Project structure](docs/project-structure.md)                  | Source layout and module ownership                                |
-| [Development](docs/development.md) · [Testing](docs/testing.md) | Conventions, adding features, test suite                          |
-| [Specification](SPEC.md)                                        | Design rationale and evaluation                                   |
+| Read this                                                       | To learn                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [Features](docs/features.md)                                    | Every feature and detection layer: behaviour, modes, limits         |
+| [Architecture](docs/architecture.md)                            | Components, data flow, storage, security                            |
+| [CLI](docs/cli.md)                                              | `gtv login`, `gtv on`, daily commands, troubleshooting              |
+| [Agents](docs/agents.md)                                        | Claude Code and Codex setup, files written by `gtv on`              |
+| [Hooks](docs/hooks.md)                                          | What every hook does, step by step                                  |
+| [API](docs/api.md)                                              | Server, daemon and MCP tool reference                               |
+| [Operations](docs/operations.md)                                | Deployment, environment variables, accounts, Brain, troubleshooting |
+| [Dashboard](web/README.md) · [Design](DESIGN.md)                | Dashboard code layout and its design system                         |
+| [Project structure](docs/project-structure.md)                  | Source layout and module ownership                                  |
+| [Development](docs/development.md) · [Testing](docs/testing.md) | Conventions, adding features, test suite                            |
+| [Specification](SPEC.md)                                        | Design rationale and evaluation                                     |
 
 ## Development
 

@@ -3,29 +3,38 @@
 Mọi agent nói với **daemon local** của dev (`gtv daemon`, mặc định `127.0.0.1:7391`), không nói thẳng với server.
 Daemon tự biết repo thuộc project nào: file `.git/gtv-project` (`gtv link <project>`) hoặc so remote URL với server.
 
-Cách thường dùng: admin bấm **Tạo lệnh mời** trên dashboard, dev chạy lệnh đó trong thư mục repo (cần Node ≥ 20):
+Cách thường dùng (chi tiết: [cli.md](cli.md)), cần Node ≥ 20:
 
 ```bash
-npx guide-the-vibe join https://<server>/j/<code>   # token, project, hook/MCP/skill, daemon nền
-npx guide-the-vibe install                          # thêm repo khác
+npx guide-the-vibe   # cài lệnh gtv
+gtv login            # kết nối máy vào tài khoản (duyệt trên trình duyệt)
+gtv on               # trong repo: hook, MCP, skill cho Claude Code / Codex, giấu khỏi git, bật daemon nền
 ```
 
-Daemon chạy nền (log `~/.gtv/daemon.log`). Quản lý bằng `npx guide-the-vibe daemon start | stop | restart | status`; `npx guide-the-vibe daemon` chạy nó ngay trong terminal để xem log. Nếu nó tắt, phiên agent kế tiếp tự bật lại: `gtv mcp` kiểm tra `/health` khi khởi động và trước lời gọi tool lỗi. Daemon đang chạy với dev/server khác config thì bị tắt và bật lại.
+Agent chỉ làm việc ở project mà người đó có quyền **Developer** hoặc **Quản lý**. Không phải thành viên (hoặc chỉ là
+Người xem) thì server trả 403; daemon báo cho phiên agent một lần (`[gtv] You are not a member of project …`) rồi để
+yên, agent vẫn chạy bình thường.
 
-Từng bước bằng tay (trong repo gtv, `node bin/gtv.mjs` = `gtv`):
+Daemon chạy nền (log `~/.gtv/daemon.log`). Quản lý bằng `gtv daemon start | stop | restart | status`; `gtv daemon` chạy
+nó ngay trong terminal để xem log. Nếu nó tắt, phiên agent kế tiếp tự bật lại: `gtv mcp` kiểm tra `/health` khi khởi
+động và trước lời gọi tool lỗi. Daemon đang chạy với tài khoản/server/khoá khác config thì bị tắt và bật lại.
+
+Từng bước bằng tay (script, sandbox; trong repo gtv, `node bin/gtv.mjs` = `gtv`):
 
 ```bash
-node bin/gtv.mjs init --dev alice --server http://<server>:7390 --token <dev token>
+node bin/gtv.mjs login http://<server>:7390   # hoặc ghi ~/.gtv/config.json: { "dev", "server", "token", "port" }
 node bin/gtv.mjs daemon                      # chạy trong terminal này
-node bin/gtv.mjs install claude [dir]        # hoặc: install codex [dir]
+node bin/gtv.mjs install claude [dir]        # chỉ nối một agent: install claude|codex [dir] [--daemon <url>]
 node bin/gtv.mjs link <project> [dir]        # khi remote của clone không khớp repo_url của project
 ```
 
-Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, cổng riêng) và `install … --daemon http://127.0.0.1:<port>`.
+Khoá cho script: đặt `GTV_TOKENS=<tên>:<khoá>` khi chạy server, tài khoản `<tên>` có máy với khoá đó (vẫn phải là
+thành viên project). Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, cổng riêng) và
+`install … --daemon http://127.0.0.1:<port>`.
 
 ## Claude Code
 
-`gtv install claude` ghi:
+`gtv on` (hoặc `gtv install claude`) ghi:
 
 | File                                        | Nội dung                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,10 +46,12 @@ Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, c�
 - `PreToolUse` chỉ trả `permissionDecision` khi cần `ask`/`deny`, nên không vượt qua quyền của người dùng.
 - `asyncRewake`: khi Claude rảnh, waiter long-poll `/wait`; có tin ⇒ exit 2, nội dung ở stderr đánh thức Claude. Waiter mới thay waiter cũ cùng session. Claude chạy không người (`claude -p`, SDK: `CLAUDE_CODE_SESSION_ATTENDED=0`) thì waiter thoát ngay, vì không có ai để đánh thức và Claude sẽ chờ waiter trước khi thoát (trước đây treo tới 30 phút).
 - Lần đầu mở project: duyệt MCP server `gtv`.
+- `gtv on` thêm các file này vào `.git/info/exclude` (khối `# gtv (managed)`), nên chúng không bị commit; `gtv off` gỡ
+  đúng phần của gtv và giữ phần của người dùng.
 
 ## Codex CLI
 
-`gtv install codex` ghi:
+`gtv on` (hoặc `gtv install codex`) ghi:
 
 | File                                       | Nội dung                                                                                                                                                                                                                              |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -66,11 +77,12 @@ Nhiều dev trên một máy: mỗi người một `GTV_HOME` (config riêng, c�
 
 ## Xử lý sự cố
 
-| Triệu chứng               | Kiểm tra                                                                                                                         |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Agent không nhận briefing | `curl http://127.0.0.1:7391/health` (`reachable`, `projects`); repo có thuộc project không: `node bin/gtv.mjs status` trong repo |
-| "not linked to a project" | `gtv link <project>` hoặc thêm `aliases` cho project (dashboard › Cài đặt)                                                       |
-| Codex không chạy hook     | `/hooks` trong Codex, project đã trust; `features.hooks` không bị tắt                                                            |
-| Statusline "daemon off"   | daemon chưa chạy hoặc sai cổng trong `--daemon`                                                                                  |
-| Không có conflict L1/L2   | snapshot có được đẩy không (log daemon `snapshot … pushed`), remote của clone push được tới repo của server                      |
-| 401 từ daemon             | token dev sai/thiếu: `gtv init --token …` (xem [operations.md](operations.md#token))                                             |
+| Triệu chứng               | Kiểm tra                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Agent không nhận briefing | `gtv doctor`; `gtv status` trong repo (project, quyền của bạn)                                              |
+| "not a member of project" | người quản lý project thêm bạn ở **Thiết lập › Thành viên** với quyền Developer                             |
+| "not linked to a project" | `gtv link <project>` hoặc thêm `aliases` cho project (dashboard › Thiết lập › Repo)                         |
+| Codex không chạy hook     | `/hooks` trong Codex, project đã trust; `features.hooks` không bị tắt                                       |
+| Statusline "daemon off"   | daemon chưa chạy hoặc sai cổng trong `--daemon`                                                             |
+| Không có conflict L1/L2   | snapshot có được đẩy không (log daemon `snapshot … pushed`), remote của clone push được tới repo của server |
+| 401 từ daemon             | khoá của máy bị thu hồi hoặc tài khoản bị xoá: `gtv login`                                                  |

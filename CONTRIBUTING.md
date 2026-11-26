@@ -41,4 +41,4 @@ Nhận việc theo vùng; khi phải đổi giao diện giữa hai vùng (type t
 
 ## Bí mật
 
-Không commit `docker/.env`, token, mật khẩu, `sandbox/`, `.gtv-data/` (đã có trong `.gitignore`). Token dev cấp qua dashboard, mỗi người một token.
+Không commit `docker/.env`, token, mật khẩu, `sandbox/`, `.gtv-data/` (đã có trong `.gitignore`). Mỗi người một tài khoản, mỗi máy một khoá (`gtv login`).

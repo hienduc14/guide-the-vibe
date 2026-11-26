@@ -9,7 +9,7 @@ src/
   codeintel/                tree-sitter: languages, extract, diff, graph, indexer
   server/
     main.ts  config.ts      khởi động: config → hub → HTTP
-    hub/                    nhiều project, dev token, thống kê Brain
+    hub/                    nhiều project, tài khoản, máy, quyền theo project, thống kê Brain
     project/                runtime 1 project: engine, store, repo mirror, schema
     detect/                 L0, L1, L2 (L3 nằm trong project/engine.ts)
     qa/                     ticket hỏi đáp 3 bậc

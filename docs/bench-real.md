@@ -29,24 +29,25 @@ Hai người có thể đổi agent cho nhau, nhưng giữ nguyên lựa chọn 
 1. Thêm bạn B làm collaborator (quyền Write) của `realworld-gtv-bench`. B cần quyền này để đẩy nhánh và snapshot `refs/gtv/*`.
 2. Trên dashboard của server đã deploy:
    - tạo project `realworld-bench`, repo `https://github.com/hienduc14/realworld-gtv-bench.git`, nhánh `master`;
-   - **Developers › Tạo lệnh mời**: mỗi người một link (dùng một lần, hạn 24 giờ).
+   - **Người › Thêm người**: A và B, quyền Developer trong `realworld-bench`; gửi mỗi người link kích hoạt (dùng một lần, hạn 48 giờ).
 3. Brain là tùy chọn. Có Brain thì thêm được L3 và hỏi đáp. Không có thì vẫn có L0–L2, là các lớp bắt conflict chính.
 
 **Mỗi người** clone repo **hai lần**, vì daemon gtv tự bật lại mỗi khi agent mở phiên, nên không thể chỉ tắt nó để chạy vòng off:
 
-| Thư mục      | Dùng cho | gtv               |
-| ------------ | -------- | ----------------- |
-| `bench-off/` | vòng off | không cài gì      |
-| `bench-on/`  | vòng on  | cài bằng lệnh mời |
+| Thư mục      | Dùng cho | gtv          |
+| ------------ | -------- | ------------ |
+| `bench-off/` | vòng off | không cài gì |
+| `bench-on/`  | vòng on  | `gtv on`     |
 
 ```bash
 git clone https://github.com/hienduc14/realworld-gtv-bench.git bench-off
 git clone https://github.com/hienduc14/realworld-gtv-bench.git bench-on
 cd bench-on
-npx guide-the-vibe join https://<server>/j/<code>     # A chọn Claude Code, B chọn Codex
+npx guide-the-vibe && gtv login https://<server>     # một lần mỗi máy
+gtv on                                                # A chọn Claude Code, B chọn Codex
 ```
 
-Lệnh `join` lưu token, nối repo với project, cài hook, MCP và skill, rồi bật daemon chạy nền.
+`gtv on` nối repo với project, cài hook, MCP và skill, giấu chúng khỏi git, rồi bật daemon chạy nền.
 
 **Đổi snapshot xuống 30 giây.** Mặc định là 5 phút, quá chậm cho bài thử: WIP của A chưa tới server thì B chưa được cảnh báo L1/L2.
 

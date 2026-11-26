@@ -54,33 +54,47 @@ l3: { daily_budget: 60 }
 
 ### Daemon / CLI (`src/daemon/config.ts`, file `~/.gtv/config.json`)
 
-| Biến                                 | Mặc định                             |                                                         |
-| ------------------------------------ | ------------------------------------ | ------------------------------------------------------- |
-| `GTV_HOME`                           | `~/.gtv`                             | thư mục config (mỗi dev một thư mục nếu dùng chung máy) |
-| `GTV_DEV`, `GTV_SERVER`, `GTV_TOKEN` | tên user, `http://127.0.0.1:7390`, — |                                                         |
-| `GTV_DAEMON_PORT`                    | `7391`                               |                                                         |
-| `GTV_REMOTE`                         | `origin`                             | remote để push snapshot và nhận diện project            |
-| `GTV_SNAPSHOT_DEBOUNCE_MS`           | `300000` (5 phút)                    |                                                         |
-| `GTV_DAEMON_URL`                     | —                                    | shim `gtv hook` dùng (thay cho `--daemon`)              |
-| `GTV_CWD`                            | cwd                                  | thư mục mà `gtv mcp` coi là repo                        |
-| `GTV_ADMIN_TOKEN`                    | —                                    | `gtv project add` dùng                                  |
+| Biến                                 | Mặc định          |                                                         |
+| ------------------------------------ | ----------------- | ------------------------------------------------------- |
+| `GTV_HOME`                           | `~/.gtv`          | thư mục config (mỗi dev một thư mục nếu dùng chung máy) |
+| `GTV_DEV`, `GTV_SERVER`, `GTV_TOKEN` | từ `gtv login`    | ghi đè `dev`, `server`, `token` trong config (script)   |
+| `GTV_DAEMON_PORT`                    | `7391`            |                                                         |
+| `GTV_REMOTE`                         | `origin`          | remote để push snapshot và nhận diện project            |
+| `GTV_SNAPSHOT_DEBOUNCE_MS`           | `300000` (5 phút) |                                                         |
+| `GTV_DAEMON_URL`                     | —                 | shim `gtv hook` dùng (thay cho `--daemon`)              |
+| `GTV_CWD`                            | cwd               | thư mục mà `gtv mcp` coi là repo                        |
 
 ## Project
 
 - Dashboard: **Tổng quan › Thêm project** (id: chữ thường, số, `-`; repo URL; branch chính; aliases).
-- CLI: `GTV_ADMIN_TOKEN=… node bin/gtv.mjs project add <id> --repo <url> --branch <main> --name "<tên>"`.
+- Script: `curl -X POST <server>/api/projects -H "authorization: Bearer $GTV_ADMIN_TOKEN" -H content-type:application/json -d '{"id":"…","repo_url":"…","main_branch":"main"}'`.
 - **Git Bash**: đặt `MSYS_NO_PATHCONV=1` khi truyền đường dẫn kiểu `/repos/...`, nếu không MSYS đổi thành `C:/Program Files/Git/repos/...`. Sửa sai bằng PATCH `repo_url` (runtime tự mở lại, mirror đổi remote).
 - Project được nhận diện theo `owner/repo` của remote; clone có remote khác ⇒ thêm `aliases` hoặc `gtv link <id>`.
 - Xóa = lưu trữ (`DELETE /api/projects/:id`); dữ liệu còn trong `data/projects/<id>/`.
 
-## Token
+## Tài khoản và máy
 
-- Mời dev: dashboard **Developers › Tạo lệnh mời** → gửi dev lệnh `npx guide-the-vibe join <server>/j/<code>` (dùng một lần, hết hạn sau 24 giờ). Dev chạy trong thư mục repo: lệnh lưu token, nối repo với project, cài hook/MCP/skill và bật daemon nền.
-- Cấp token tay: **Chỉ cấp token** hoặc `POST /api/devs {name}` → token hiện **một lần**; dev chạy `npx guide-the-vibe init --dev … --server … --token …` rồi `npx guide-the-vibe install`.
-- Xoay token = cấp lại cùng tên.
-- Quy tắc mở (`src/server/http/auth.ts`):
-  - `/v1/*` mở (tin `X-Gtv-Dev`) khi `GTV_AUTH=open`, hoặc **chưa có admin token và chưa có dev nào**. Có dev đầu tiên ⇒ phải dùng token.
-  - `/api/*` mở khi `GTV_AUTH=open` hoặc **không đặt `GTV_ADMIN_TOKEN`** (server log cảnh báo).
+- **Một người một tài khoản**, vừa đăng nhập dashboard vừa là danh tính của agent trên máy người đó. Admin thêm người ở
+  trang **Người** (tên, có là Quản trị không, quyền trong từng project) → gtv hiện **link kích hoạt** (dùng một lần, 48
+  giờ) để gửi riêng. Người đó tự đặt mật khẩu; admin không bao giờ biết mật khẩu. Quên mật khẩu: admin bấm **Link đặt
+  lại mật khẩu**.
+- **Quyền trong project** (Thiết lập › Thành viên): Quản lý / Developer / Người xem. Agent chỉ làm việc ở project mà
+  người đó là Developer hoặc Quản lý; giao việc chỉ cho thành viên. Bảng quyền: [api.md](api.md#quyền-hai-tầng).
+- **Kết nối máy**: người dùng chạy `npx guide-the-vibe`, `gtv login`, `gtv on` ([cli.md](cli.md)); `gtv login` mở trang
+  `/connect` để họ bấm Cho phép. Mỗi máy một khoá (`gtvd_…`, server chỉ lưu SHA-256), thu hồi ở **Tài khoản của tôi**
+  hoặc trang **Người**.
+- **Server mới**: chưa có tài khoản nào và không có `GTV_ADMIN_TOKEN` thì dashboard mở trang **Tạo tài khoản quản trị
+  đầu tiên**; có tài khoản đầu tiên là phải đăng nhập.
+- **`GTV_ADMIN_TOKEN`** vẫn dùng được (cứu hộ, script, test): quyền admin trên `/api`, trên `/v1` đóng vai dev ghi trong
+  `X-Gtv-Dev`. Vào dashboard bằng nó: mở `https://<server>/#admin-token=<token>` (giao diện không nhắc tới).
+- **Script, sandbox**: `GTV_TOKENS=alice:<khoá>,bob:<khoá>` khi khởi động server tạo tài khoản `alice`, `bob` (chưa kích
+  hoạt) với máy dùng khoá đó; vẫn phải thêm họ làm thành viên project.
+- **Chế độ mở** (`src/server/http/auth.ts`): khi `GTV_AUTH=open`, hoặc không có `GTV_ADMIN_TOKEN` **và** chưa có tài
+  khoản nào. Lúc đó `/v1` tin header `X-Gtv-Dev`, `/api` không cần đăng nhập.
+- **Chuyển dữ liệu từ bản trước** (một lần khi khởi động, `settings.accounts_migrated = 1`): mỗi dev cũ thành một tài
+  khoản `member` chưa kích hoạt kèm một máy "máy cũ" giữ nguyên token (daemon đang chạy không bị gián đoạn); tài khoản
+  `manager` cũ thành `member` + Quản lý ở mọi project, `viewer` cũ thành Người xem ở mọi project. Bảng `devs`, `invites`
+  được giữ để quay lại bản cũ.
 
 ## Brain (Pi)
 
@@ -187,6 +201,6 @@ curl -s 127.0.0.1:7390/health          # "ok": true và "commit" = commit vừa 
 | Brain trong docker không gọi được LLM trên máy chủ          | dùng `http://host.docker.internal:<port>` (Linux: thêm `extra_hosts: ["host.docker.internal:host-gateway"]`) và mở firewall cho Docker |
 | repo URL thành `C:/Program Files/Git/...`                   | MSYS path conversion → `MSYS_NO_PATHCONV=1`, PATCH lại `repo_url`                                                                      |
 | Dashboard 401                                               | nhập `GTV_ADMIN_TOKEN` (lưu trong localStorage)                                                                                        |
-| Daemon 401                                                  | token dev sai/thiếu sau khi bật token → `gtv init --token …`, khởi động lại daemon                                                     |
+| Daemon 401                                                  | khoá của máy bị thu hồi hoặc tài khoản bị xoá → `gtv login` trên máy đó                                                                |
 | Hook không chạy                                             | xem [agents.md](agents.md#xử-lý-sự-cố)                                                                                                 |
 | `last_sync.ok = false`                                      | repo URL / quyền đọc; xem log `operator`; bấm **Sync now**                                                                             |

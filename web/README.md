@@ -21,16 +21,16 @@ http://localhost:7395.
 
 ## Pages
 
-| Page                         | What it shows                                                                                                   |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Tổng quan (`/`)              | KPI tiles across all projects, one card per project (progress ring, who is working, conflicts, questions)       |
-| Project › Tổng quan          | Charter strip, KPI tiles, "Cần xử lý", progress, one lane per agent session (avatar + agent logo, files, clash) |
-| Project › Việc               | Kanban board; card = priority, due date, assignee with live agent, conflict, notes                              |
-| Project › Trao đổi           | Agent questions, conflict notices, hand-offs as chat threads; count = questions waiting for a person            |
-| Project › Conflict           | Open and past conflicts with evidence, per layer                                                                |
-| Project › Thống kê           | Tasks left over time, done per day, status per person, upcoming deadlines; technical numbers collapsed below    |
-| Project › Khác               | Thành viên, Tài liệu · Nhật ký hỏi đáp, Sơ đồ code, Lớp phát hiện · Cài đặt                                     |
-| Brain, Developers, Tài khoản | Model providers and jobs, developer invites and tokens, dashboard accounts (admin only)                         |
+| Page                | What it shows                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Tổng quan (`/`)     | KPI tiles across all projects, one card per project (progress ring, who is working, conflicts, questions)       |
+| Project › Tổng quan | Charter strip, KPI tiles, "Cần xử lý", progress, one lane per agent session (avatar + agent logo, files, clash) |
+| Project › Việc      | Kanban board; card = priority, due date, assignee with live agent, conflict, notes                              |
+| Project › Trao đổi  | Agent questions, conflict notices, hand-offs as chat threads; count = questions waiting for a person            |
+| Project › Conflict  | Open and past conflicts with evidence, per layer                                                                |
+| Project › Thống kê  | Tasks left over time, done per day, status per person, upcoming deadlines; technical numbers collapsed below    |
+| Project › Khác      | Thành viên, Tài liệu · Nhật ký hỏi đáp, Sơ đồ code, Lớp phát hiện · Cài đặt                                     |
+| Brain, People       | Model providers and jobs; accounts, project access, activation links and computers (admin only)                 |
 
 The project tabs are listed in `pages/project/ProjectLayout.tsx`; an item with `more: "<group>"` goes into the
 "Khác" menu under that heading instead of the tab row.

@@ -3,6 +3,15 @@
 Những ý đã bàn nhưng chưa làm, và lỗi đã biết. Ghi kèm lý do và chỗ trong code để người làm sau khỏi phải tìm lại từ đầu.
 Làm xong mục nào thì xoá khỏi đây và ghi vào commit.
 
+## Tài khoản và CLI (27/11/2026): phần còn lại
+
+- Người chưa kích hoạt (dev cũ `hien`, `khanh`…) cần admin gửi **Link kích hoạt mới** ở trang Người; máy cũ của họ vẫn
+  chạy, nhưng họ chưa đăng nhập dashboard được.
+- `gtv login` chưa có cách đăng nhập không cần trình duyệt trên máy khác (chép mã sang máy có trình duyệt thì vẫn được:
+  trang `/connect` nhận mã gõ tay).
+- Giới hạn tần suất nằm trong bộ nhớ của tiến trình (reset khi khởi động lại), theo `cf-connecting-ip` / `x-forwarded-for`.
+- `gtv doctor` chỉ kiểm tra repo có trong `~/.gtv/repos.json` (repo cài bằng bản cũ: chạy `gtv on` lại một lần trong đó).
+
 ## Bàn giao 26/11/2026
 
 Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, push, rồi deploy qua SSH như
@@ -18,10 +27,9 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
 2. ~~**`/health` báo brain `ok` dù model không gọi được.**~~ Đã có `brain.failing` (27/11). `health()` của backend Pi chỉ kiểm tra cấu hình, không gọi model, nên chấm xanh
    ở menu "AI trả lời" đánh lừa. Nên đưa lỗi gần nhất của `brain_jobs` (bảng trong hub db, `src/server/brain/metered.ts`) vào `/health` và
    trang AI trả lời, ví dụ "3 job lỗi trong 10 phút qua: …".
-3. **Gói npm 0.1.3 chưa phát hành.** `dist/npm` đã build từ `main` (có bản sửa hook nhân bản và các tool MCP có cấu trúc), nhưng npm vẫn là
-   0.1.2 (06/11). Cần người có quyền: `npm login`, rồi `npm publish dist/npm` (build lại bằng `npm run build:npm` nếu `main` đã đổi).
-   Dev đã cài: `npx guide-the-vibe@latest install` trong từng repo, mở phiên agent mới. Trước đó agent của họ vẫn gửi dạng cũ
-   (server tự lấy câu đầu làm một dòng) và vẫn có thể có hook bị nhân bản.
+3. **Gói npm 0.2.0 chưa phát hành** (27/11). `dist/npm` đã build (CLI mới: `gtv login`, `gtv on`…). Cần chủ package:
+   `npm run build:npm`, rồi `cd dist/npm && npm publish --auth-type=web`. Trước khi publish, người dùng chỉ có 0.1.x
+   (lệnh `join` không còn chạy với server mới: `/v1/join` trả 410); máy đã cài trước vẫn chạy nhờ token cũ đã chuyển thành máy.
 
 ### Lỗi đã biết
 
@@ -42,9 +50,9 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
   khởi động lại.
 - **Tóm tắt luồng chỉ được tạo khi có người mở tab Trao đổi** (`summarizer().threads()` gọi từ route conversations, tối đa 2 luồng mỗi lần).
   Đủ cho demo; nếu cần tóm tắt sẵn thì gọi thêm khi ticket đóng / conflict được ack / `gtv_finish_task`.
-- **Nhiều dev trên một máy:** `join` không lưu `GTV_DAEMON_PORT` vào config, và khi hook tự bật lại daemon thì không có `GTV_HOME` của danh
+- **Nhiều dev trên một máy:** `gtv login` không lưu `GTV_DAEMON_PORT` vào config, và khi hook tự bật lại daemon thì không có `GTV_HOME` của danh
   tính thứ hai. Clone test `realworld-gtv-bench-b` chạy được vì `gtv-test.ps1` đặt biến môi trường trước, và port đã được ghi tay vào
-  `.gtv-home/config.json`. Nên để `join`/`init` lưu port, và ghi `GTV_HOME` vào lệnh hook khi khác mặc định (`cmd()` trong
+  `.gtv-home/config.json`. Nên để `gtv login` lưu port, và ghi `GTV_HOME` vào lệnh hook khi khác mặc định (`cmd()` trong
   `src/daemon/install.ts`).
 - **Số lần sửa cũ bị thổi phồng**: trước bản sửa `1cfa64e`, mỗi lần cài lại gtv cộng thêm một bộ hook HTTP, nên footprint `count` của dữ liệu
   cũ (realworld) cao gấp nhiều lần thực tế. Dữ liệu mới đúng.
@@ -70,7 +78,7 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
   Còn thay đổi chưa commit của agent trong `auth.service.ts` (giới hạn username, bio).
 - `D:\Projects\realworld-gtv-bench` (dev **hien**, nhánh `bench/on/X1/c`): còn thay đổi chưa commit của agent trong `auth.service.ts` và
   `utils/validation.ts` (chuẩn hoá email, kiểm tra image). Có `.claude/settings.local.json.bak` (bản trước khi dọn hook nhân bản).
-- Dev `hien-test` có trên server; xoá ở trang Developers khi không cần nữa.
+- Tài khoản `hien-test` có trên server (từ dev cũ); xoá ở trang Người khi không cần nữa.
 - Dữ liệu cũ trên project realworld: xung đột và câu hỏi tiếng Anh từ lượt bench 19 ngày trước, 3 câu hỏi vẫn "chờ người quyết" trong
   "Cần xử lý". Nên đóng/bỏ qua trước khi demo.
 
@@ -113,7 +121,7 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
 ## Dashboard: phần còn lại
 
 - Trang Tổng quan có nhiều khoảng trống khi chỉ có 1–2 project.
-- Vài chữ tiếng Anh còn sót: "Ưu tiên high" ở "Cần xử lý" (`attention()` trong `conversations.ts`), cột "Chờ merge", "Developers" ở menu.
+- Vài chữ tiếng Anh còn sót: "Ưu tiên high" ở "Cần xử lý" (`attention()` trong `conversations.ts`), cột "Chờ merge".
 - Trang "Lớp phát hiện" vẫn dùng thuật ngữ kỹ thuật (`detect.l0_path`, off / shadow / on); nên viết mỗi lớp một câu bắt được gì và đổi "shadow" thành "Chạy thử (chỉ ghi lại)".
 - Trên điện thoại, sơ đồ file để khoảng trống dưới danh sách (chiều cao tính theo cột agent đã bị ẩn).
 - Khung Trao đổi tính chiều cao theo `100dvh - 250px`. Khi có thông báo lỗi đồng bộ ở đầu trang, trang vẫn cuộn thêm khoảng 100px.
@@ -124,5 +132,4 @@ Kế hoạch: `docs/prototype/PLAN.md`.
 
 - "Gộp thử" trong khung xem file chưa có bản gộp do AI viết: chỗ đụng hiện bản của từng người xếp chồng.
 - Mức giám sát "Chặt" (chặn agent sửa file đang đụng cho tới khi có người cho phép): cần cờ mới ở daemon và gói npm mới.
-- Tài khoản dashboard chưa gắn với tên dev; bộ lọc "Liên quan tới" ở Cần xử lý chọn sẵn người khi tên trùng nhau.
 - Khung xem file gộp theo tên dev: một người có hai workspace cùng sửa một file thì chỉ thấy một bản.

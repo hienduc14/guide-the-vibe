@@ -62,7 +62,7 @@ Khi nhận snapshot hoặc khi `main` đổi: nếu snapshot không có WIP trê
 
 ```
 <GTV_DATA>/                 (docker: volume gtv-data → /data)
-  hub.db                    projects, devs (hash token), brain_jobs, settings
+  hub.db                    projects, users, devices (hash khoá), user_sessions, share_links, brain_jobs, settings
   projects/<id>/gtv.db      registry, code graph (g_*), KB (kb_docs + FTS5), event_log, symbol_changes, wip_lines
   projects/<id>/mirror.git  bare mirror: refs/heads/* + refs/gtv/*
 ```
@@ -83,13 +83,14 @@ Schema: `src/server/hub/hub-db.ts`, `src/server/project/schema.ts`. Mỗi job Br
 
 ## Bảo mật
 
-| Đối tượng          | Cơ chế                                                                                                                                                                                                                                        |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dev / daemon / CLI | Token riêng (`POST /api/devs`, lưu dạng SHA-256). Chế độ mở (tin header `X-Gtv-Dev`) chỉ khi `GTV_AUTH=open` hoặc chưa có admin token **và** chưa có dev nào.                                                                                 |
-| Dashboard `/api`   | `GTV_ADMIN_TOKEN`. Không đặt ⇒ `/api` mở (dev mode, server log cảnh báo). Admin token cũng dùng được cho `/v1/p/:id/*`.                                                                                                                       |
-| Brain              | Pi trong tiến trình Operator, mỗi job một agent mới chỉ có 13 tool chỉ-đọc của project đó (`brain/tools.ts`, tham số kiểm bằng zod); không shell, không ghi file, không session trên đĩa. Không có endpoint MCP nào mở tool đọc code ra mạng. |
-| Key LLM            | Nhập trên dashboard (chỉ admin), lưu trong `hub.db` mã hoá AES-256-GCM bằng `GTV_SECRET_KEY` (`brain/credentials.ts`); API chỉ trả gợi ý `…a1b2`. Base URL endpoint chỉ nhận `http(s)`.                                                       |
-| Daemon (127.0.0.1) | Từ chối request có header `Origin` (trang web) hoặc `Host` lạ (DNS rebinding).                                                                                                                                                                |
-| `/v1/p/:id/events` | Dev chỉ gửi event cho session/workspace của chính mình (admin token thì được mọi workspace).                                                                                                                                                  |
-| Prompt injection   | System prompt (`brain/prompts.ts`): nội dung file/docs/WIP là dữ liệu, bỏ qua chỉ dẫn bên trong; mọi khẳng định phải có nguồn; được nói "không biết".                                                                                         |
-| Repo URL có token  | Che `//***@` trong mọi response dashboard.                                                                                                                                                                                                    |
+| Đối tượng          | Cơ chế                                                                                                                                                                                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tài khoản          | Một người một tài khoản (`hub/accounts.ts`): admin tạo, người dùng tự đặt mật khẩu qua link một lần (48 giờ); mật khẩu scrypt, phiên `gtvs_…` 14 ngày. Quyền hai tầng: hệ thống (admin / member) và trong từng project (manager / developer / viewer, `Hub.projectAccess`). |
+| Máy / daemon / CLI | Khoá riêng mỗi máy (`gtvd_…`, lưu SHA-256) cấp qua luồng kết nối máy (`gtv login` → duyệt ở `/connect`); chỉ dùng trên `/v1`, chỉ ở project mà người đó là developer hoặc manager. Mã ngắn và đăng nhập có giới hạn tần suất.                                               |
+| `GTV_ADMIN_TOKEN`  | Cứu hộ, script, test: quyền admin. Chế độ mở (tin `X-Gtv-Dev`) chỉ khi `GTV_AUTH=open` hoặc chưa có admin token **và** chưa có tài khoản nào.                                                                                                                               |
+| Brain              | Pi trong tiến trình Operator, mỗi job một agent mới chỉ có 13 tool chỉ-đọc của project đó (`brain/tools.ts`, tham số kiểm bằng zod); không shell, không ghi file, không session trên đĩa. Không có endpoint MCP nào mở tool đọc code ra mạng.                               |
+| Key LLM            | Nhập trên dashboard (chỉ admin), lưu trong `hub.db` mã hoá AES-256-GCM bằng `GTV_SECRET_KEY` (`brain/credentials.ts`); API chỉ trả gợi ý `…a1b2`. Base URL endpoint chỉ nhận `http(s)`.                                                                                     |
+| Daemon (127.0.0.1) | Từ chối request có header `Origin` (trang web) hoặc `Host` lạ (DNS rebinding).                                                                                                                                                                                              |
+| `/v1/p/:id/events` | Dev chỉ gửi event cho session/workspace của chính mình (admin token thì được mọi workspace).                                                                                                                                                                                |
+| Prompt injection   | System prompt (`brain/prompts.ts`): nội dung file/docs/WIP là dữ liệu, bỏ qua chỉ dẫn bên trong; mọi khẳng định phải có nguồn; được nói "không biết".                                                                                                                       |
+| Repo URL có token  | Che `//***@` trong mọi response dashboard.                                                                                                                                                                                                                                  |

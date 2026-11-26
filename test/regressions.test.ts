@@ -124,3 +124,15 @@ test("headless Claude (claude -p): the asyncRewake waiter exits at once instead 
     hang.close();
   }
 });
+
+test("reinstalling Claude hooks replaces gtv's http hooks instead of adding another copy", async () => {
+  const { mergeHooks } = await import("../src/daemon/install.ts");
+  const ours = { SessionStart: [{ hooks: [{ type: "http", url: "http://127.0.0.1:7391/hook/claude", timeout: 15 }] }] };
+  const theirs = { hooks: [{ type: "command", command: "echo hi" }] };
+  let hooks = mergeHooks({ SessionStart: [theirs] }, ours);
+  hooks = mergeHooks(hooks, ours);
+  hooks = mergeHooks(hooks, { SessionStart: [{ hooks: [{ type: "http", url: "http://127.0.0.1:7392/hook/claude", timeout: 15 }] }] });
+  assert.equal(hooks.SessionStart.length, 2);
+  assert.deepEqual(hooks.SessionStart[0], theirs);
+  assert.match(JSON.stringify(hooks.SessionStart[1]), /7392/);
+});

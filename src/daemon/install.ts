@@ -92,10 +92,16 @@ function writeJson(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
 }
 
-/** Replace any previous gtv entries for each event, keep everything else. */
-function mergeHooks(existing: Record<string, any[]> | undefined, add: Record<string, any[]>): Record<string, any[]> {
+/**
+ * Replace any previous gtv entries for each event, keep everything else. A gtv entry either runs gtv.mjs or
+ * posts to a daemon's /hook/<agent> URL (that one has no "gtv" in it: missing it duplicated hooks on reinstall).
+ */
+export function mergeHooks(existing: Record<string, any[]> | undefined, add: Record<string, any[]>): Record<string, any[]> {
   const out: Record<string, any[]> = { ...(existing ?? {}) };
-  const isGtv = (group: any) => JSON.stringify(group).includes("gtv");
+  const isGtv = (group: any) => {
+    const s = JSON.stringify(group);
+    return s.includes("gtv") || /https?:\/\/(127\.0\.0\.1|localhost):\d+\/hook\//.test(s);
+  };
   for (const [event, groups] of Object.entries(add)) out[event] = [...(out[event] ?? []).filter((g) => !isGtv(g)), ...groups];
   return out;
 }

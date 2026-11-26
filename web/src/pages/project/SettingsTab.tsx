@@ -7,7 +7,6 @@ import { useProject } from "./ProjectLayout";
 import { Card } from "../../components/Card";
 import { Field } from "../../components/Field";
 import { ConfirmButton } from "../../components/ConfirmButton";
-import { ShareLinksCard } from "./ShareLinksCard";
 
 /** "name: glob, glob" per line ⇄ { name: [glob, glob] } */
 const modulesToText = (m: Record<string, string[]>) =>
@@ -29,9 +28,10 @@ function textToModules(text: string): Record<string, string[]> {
   return out;
 }
 
-export function SettingsTab() {
+/** Repository, branch, critical paths and modules; sync and archive. */
+export function RepoSettings() {
   const { id, detail, reload } = useProject();
-  const { data: overview, reload: reloadOverview } = useOverview();
+  const { reload: reloadOverview } = useOverview();
   const run = useAction();
   const navigate = useNavigate();
   const r = detail.record;
@@ -44,7 +44,6 @@ export function SettingsTab() {
     modules: modulesToText(r.policy.modules),
     repo_url: "",
   });
-  const [note, setNote] = useState({ to_dev: "", body: "" });
   const [syncing, setSyncing] = useState(false);
 
   const save = async (e: FormEvent) => {
@@ -75,8 +74,6 @@ export function SettingsTab() {
     void reload();
     void reloadOverview();
   };
-
-  const devs = [...new Set([...(overview?.devs.map((d) => d.name) ?? []), ...detail.people.map((p) => p.dev)])];
 
   return (
     <div className="stack">
@@ -143,44 +140,7 @@ export function SettingsTab() {
         </form>
       </Card>
 
-      <ShareLinksCard id={id} />
-
-      <div className="split">
-        <Card title="Gửi ghi chú cho developer">
-          <form
-            className="stack"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const ok = await run(() => api.projects.message(id, note.to_dev, note.body), "Đã gửi — agent nhận ở lần gọi tool kế tiếp");
-              if (ok) setNote({ ...note, body: "" });
-            }}
-          >
-            <Field label="Tới">
-              <input className="input" list="gtv-devs" required value={note.to_dev} onChange={(e) => setNote({ ...note, to_dev: e.target.value })} />
-              <datalist id="gtv-devs">
-                {devs.map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
-            </Field>
-            <Field label="Nội dung">
-              <textarea
-                className="textarea"
-                style={{ fontFamily: "var(--font)" }}
-                required
-                value={note.body}
-                onChange={(e) => setNote({ ...note, body: e.target.value })}
-                placeholder="Ví dụ: đừng đổi chữ ký AuthService.login trước thứ Sáu"
-              />
-            </Field>
-            <div>
-              <button className="btn" type="submit">
-                Gửi
-              </button>
-            </div>
-          </form>
-        </Card>
-
+      <div>
         <Card title="Vận hành">
           <div className="stack">
             <div className="row between">

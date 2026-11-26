@@ -56,7 +56,7 @@ function MemberCard({ m, person, onSaved }: { m: Member; person?: Person; onSave
             ))}
           </span>
         )}
-        {person && person.conflicts > 0 && <span className="xs danger-text">{person.conflicts} conflict đang mở</span>}
+        {person && person.conflicts > 0 && <span className="xs danger-text">đang đụng việc người khác</span>}
         <span className="xs faint">{person ? `hoạt động ${ago(person.last_seen)}` : "chưa mở phiên agent nào"}</span>
       </div>
       {can("manager") &&

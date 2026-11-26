@@ -9,7 +9,7 @@ import { BarsChart, LineChart, StackBar, type Point, type Segment } from "../../
 import { DevAvatar, EmptyState, Kpi, Ring } from "../../components/Visual";
 import { DueChip, PRIORITY_INFO } from "../../components/Task";
 import { Avatar } from "../../components/Member";
-import { BarChart3, CalendarClock, CircleCheck, Hourglass, OctagonAlert, Timer, TrendingDown, UserX, Users, Wrench } from "lucide-react";
+import { BarChart3, CalendarClock, CircleCheck, Hourglass, OctagonAlert, Timer, TrendingDown, UserX, Users } from "lucide-react";
 import { Segmented } from "../../components/Segmented";
 import { BarChart, HBars, lastDays } from "../../components/Charts";
 import { ErrorNotice, Loading } from "../../components/Empty";
@@ -19,7 +19,7 @@ import { ms } from "../../lib/format";
 const toBars = (rows: KN[], label: (k: string) => string = (k) => k) => rows.map((r) => ({ label: label(r.k), value: r.n }));
 const TIER: Record<string, string> = { "1": "Bậc 1 · Operator", "2": "Bậc 2 · agent đồng đội", "3": "Bậc 3 · người" };
 
-function TechStats({ days }: { days: string }) {
+export function TechStats({ days }: { days: string }) {
   const { id } = useProject();
   const { data, error } = usePoll(() => api.projects.stats(id, Number(days)), [id, days], 10_000);
   if (error && !data) return <ErrorNotice error={error} />;
@@ -183,10 +183,10 @@ function progress(tasks: BoardView[], n: number) {
   return { live, open, done, doneIn: doneIn.length, donePrev, cycle, byPerson, upcoming };
 }
 
-export function StatsTab() {
+/** Progress of the board: the "Tiến độ" view of the Việc page. */
+export function ProgressView() {
   const { id, detail } = useProject();
   const [range, setRange] = useState<Range>("14");
-  const [tech, setTech] = useState(false);
   const board = usePoll(() => api.board.list(id, "all"), [id], 10_000);
   const n = Number(range);
   const p = useMemo(() => (board.data ? progress(board.data, n) : null), [board.data, n]);
@@ -228,8 +228,8 @@ export function StatsTab() {
           }
         />
         <Kpi icon={Timer} value={fmtDays(p.cycle)} label="Thời gian làm" title="Trung vị, từ lúc bắt đầu tới lúc xong, các việc xong trong kỳ" />
-        <Kpi icon={CalendarClock} to={`/p/${id}/board`} tone={b.overdue ? "high" : "neutral"} value={b.overdue} label="Quá hạn" />
-        <Kpi icon={OctagonAlert} to={`/p/${id}/board`} tone={b.blocked ? "high" : "neutral"} value={b.blocked} label="Bị chặn" />
+        <Kpi icon={CalendarClock} to={`/p/${id}/work`} tone={b.overdue ? "high" : "neutral"} value={b.overdue} label="Quá hạn" />
+        <Kpi icon={OctagonAlert} to={`/p/${id}/work`} tone={b.blocked ? "high" : "neutral"} value={b.blocked} label="Bị chặn" />
       </div>
 
       {p.live.length === 0 ? (
@@ -296,7 +296,7 @@ export function StatsTab() {
               ) : (
                 <div className="due-list">
                   {p.upcoming.slice(0, 8).map((x) => (
-                    <Link key={x.id} to={`/p/${id}/board?task=${encodeURIComponent(x.id)}`} className="due-row">
+                    <Link key={x.id} to={`/p/${id}/work?task=${encodeURIComponent(x.id)}`} className="due-row">
                       {x.assignee ? <Avatar name={x.assignee} size={24} /> : <UserX />}
                       <span className="truncate small" title={`${PRIORITY_INFO[x.priority].label} · ${x.title}`}>
                         {x.title}
@@ -310,14 +310,6 @@ export function StatsTab() {
           </div>
         </>
       )}
-
-      <details className="tech-stats" open={tech} onToggle={(e) => setTech((e.target as HTMLDetailsElement).open)}>
-        <summary>
-          <Wrench />
-          Số liệu kỹ thuật (Brain, conflict, hỏi đáp, sự kiện) · {range} ngày
-        </summary>
-        {tech && <TechStats days={range} />}
-      </details>
     </div>
   );
 }

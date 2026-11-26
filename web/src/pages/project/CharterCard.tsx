@@ -8,7 +8,7 @@ import { useProject } from "./ProjectLayout";
 import { Field } from "../../components/Field";
 import { Badge } from "../../components/Badge";
 
-const QUALITY: Record<NonNullable<Charter["quality"]>, string> = { prototype: "Prototype", mvp: "MVP", production: "Production" };
+export const QUALITY: Record<NonNullable<Charter["quality"]>, string> = { prototype: "Prototype", mvp: "MVP", production: "Production" };
 
 /** Days until a YYYY-MM-DD date (negative when past). */
 export function daysUntil(date: string): number {
@@ -17,7 +17,7 @@ export function daysUntil(date: string): number {
 
 type TextKey = "goal" | "users" | "milestones" | "constraints" | "non_goals" | "notes";
 
-function Editor({ charter, onDone }: { charter: Charter; onDone: () => void }) {
+export function CharterEditor({ charter, onDone }: { charter: Charter; onDone: () => void }) {
   const { id, reload } = useProject();
   const run = useAction();
   const [f, setF] = useState({ ...charter, stack: (charter.stack ?? []).join(", ") });
@@ -115,7 +115,7 @@ export function CharterCard() {
     return (
       <section className="charter">
         <span className="label-caps">Tiêu chí project</span>
-        <Editor charter={c} onDone={() => setEditing(false)} />
+        <CharterEditor charter={c} onDone={() => setEditing(false)} />
       </section>
     );
   if (empty)

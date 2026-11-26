@@ -1,27 +1,28 @@
 # Feature và layer
 
 Định nghĩa: `src/shared/features.ts`. Mỗi feature có mode `off | shadow | on` (xem [architecture.md](architecture.md#feature-mode-và-cầu-dao)).
-Đổi mode: dashboard (**Khác › Lớp phát hiện**), `gtv features set <key> <mode|default>`, `PUT /v1/p/:id/features`, hoặc `features:` trong `docker/gtv.config.yml` (áp cho mọi project).
+Đổi mode: dashboard (**Thiết lập › Mức giám sát**), `gtv features set <key> <mode|default>`, `PUT /v1/p/:id/features`, hoặc `features:` trong `docker/gtv.config.yml` (áp cho mọi project).
 
-| Key                           | Mặc định                   | Cần                    | Metric trên dashboard                 |
-| ----------------------------- | -------------------------- | ---------------------- | ------------------------------------- |
-| `registration`                | on                         |                        | `tasks`                               |
-| `registration.auto_from_plan` | shadow                     | `brain`                |                                       |
-| `drift_check`                 | on                         |                        | `drift_events`                        |
-| `detect.l0_path`              | on                         |                        | `open`, `total`, `shadow_detections`  |
-| `detect.l1_merge`             | on                         |                        | như trên                              |
-| `detect.l2_symbol`            | on                         | `knowledge.code_graph` | như trên                              |
-| `detect.l3_semantic`          | shadow (docker config: on) | `brain`                | như trên                              |
-| `knowledge.code_graph`        | on                         |                        | `files`, `symbols`, `refs` (lớp base) |
-| `knowledge.doc_kb`            | on                         |                        | `documents`                           |
-| `qa.tier1_answer`             | on                         | `brain`                | `tickets` (bậc 1)                     |
-| `qa.tier2_relay`              | on                         |                        | `tickets` (bậc 2)                     |
-| `qa.tier3_human`              | on                         |                        | `tickets` (bậc 3)                     |
-| `policy.ask`                  | on                         |                        |                                       |
-| `coord.priority`              | on                         |                        |                                       |
-| `notify.desktop`              | on                         |                        |                                       |
-| `brain.summary`               | on                         | `brain`                | `summaries` (bảng cùng tên)           |
-| `brain`                       | on                         |                        | — (off khi `BRAIN_BACKEND=null`)      |
+| Key                           | Mặc định                   | Cần                    | Metric trên dashboard                       |
+| ----------------------------- | -------------------------- | ---------------------- | ------------------------------------------- |
+| `registration`                | on                         |                        | `tasks`                                     |
+| `registration.auto_from_plan` | shadow                     | `brain`                |                                             |
+| `drift_check`                 | on                         |                        | `drift_events`                              |
+| `detect.l0_path`              | on                         |                        | `open`, `total`, `shadow_detections`        |
+| `detect.l1_merge`             | on                         |                        | như trên                                    |
+| `detect.l2_symbol`            | on                         | `knowledge.code_graph` | như trên                                    |
+| `detect.l3_semantic`          | shadow (docker config: on) | `brain`                | như trên                                    |
+| `knowledge.code_graph`        | on                         |                        | `files`, `symbols`, `refs` (lớp base)       |
+| `knowledge.doc_kb`            | on                         |                        | `documents`                                 |
+| `qa.tier1_answer`             | on                         | `brain`                | `tickets` (bậc 1)                           |
+| `qa.tier2_relay`              | on                         |                        | `tickets` (bậc 2)                           |
+| `qa.tier3_human`              | on                         |                        | `tickets` (bậc 3)                           |
+| `policy.ask`                  | on                         |                        |                                             |
+| `coord.priority`              | on                         |                        |                                             |
+| `notify.desktop`              | on                         |                        |                                             |
+| `brain.summary`               | on                         | `brain`                | `summaries` (bảng cùng tên)                 |
+| `brain.suggest`               | on                         | `brain`                | — (đệm trong bảng `summaries`, `plan:<vụ>`) |
+| `brain`                       | on                         |                        | — (off khi `BRAIN_BACKEND=null`)            |
 
 ## Đăng ký task
 
@@ -91,7 +92,7 @@ Giới hạn: tốn 1 lượt Brain mỗi lần đăng ký; chất lượng ph�
 
 ## Góc nhìn manager (v0.8, SPEC mục 25)
 
-- **Tài khoản và role** (`src/server/hub/accounts.ts`) — `admin` / `manager` / `viewer` đăng nhập bằng tên + mật khẩu (trang **Tài khoản**, chỉ admin). **Link xem chỉ đọc** cho một project (Cài đặt › Link xem chỉ đọc) để trình bày cho người ngoài nhóm. Bảng quyền: [api.md](api.md#tài-khoản-dashboard-và-role-v08).
+- **Tài khoản và role** (`src/server/hub/accounts.ts`) — `admin` / `manager` / `viewer` đăng nhập bằng tên + mật khẩu (trang **Tài khoản**, chỉ admin). **Link xem chỉ đọc** cho một project (Thiết lập › Link chia sẻ) để trình bày cho người ngoài nhóm. Bảng quyền: [api.md](api.md#tài-khoản-dashboard-và-role-v08).
 - **Thành viên** (**Khác › Thành viên**) — dev tự thành thành viên khi mở agent lần đầu; manager đặt vai trò (backend, tech lead, …) và level (`intern` < `junior` < `mid` < `senior` < `lead`). Agent thấy danh sách nhóm trong briefing.
 - **Tiêu chí project** (dải đầu trang Tổng quan, bấm _Chi tiết_ để xem mốc và ràng buộc) — mục tiêu, người dùng, hạn chót, mức chất lượng, công nghệ, mốc, ràng buộc, ngoài phạm vi. Đưa vào briefing, `gtv_status`, prompt trả lời câu hỏi và prompt L3 (`charterText` trong `src/shared/types.ts`).
 - **Bảng việc** (tab **Việc**, `src/server/project/board.ts`) — việc có ưu tiên (`urgent/high/normal/low`), hạn, ước lượng, người nhận; giao việc ⇒ agent của người nhận có tin. Agent: `gtv_tasks`, `gtv_pick_task`, `gtv_log_work`, skill `/gtv` (Codex: `$gtv`). Đăng ký nối vào việc đã nhận, không có thì tự tạo việc. Trạng thái: đăng ký → _Đang làm_; conflict high/critical chưa ack → _Bị chặn_; `gtv_finish_task` → _Chờ merge_; code vào main → _Xong_. Mọi thay đổi ghi vào nhật ký của việc.
@@ -121,3 +122,10 @@ Xem thử với dữ liệu mẫu (không gọi LLM): `npm run demo` → `http:/
 | Đánh thức khi rảnh     | ✅ `asyncRewake` | ❌              | ❌                |
 
 Adapter Cursor/Grok chưa làm (xem [agents.md](agents.md)).
+
+## Vụ đụng nhau và hướng xử lý
+
+- **Vụ đụng nhau** (`src/server/project/incidents.ts`): mọi conflict của cùng một cặp workspace gom thành một vụ; mức của vụ là mức cao nhất trong các conflict còn hiệu lực. Bấm "Đã biết", "Báo nhầm" hay "Mở lại" là áp cho cả vụ; conflict mới xuất hiện sau đó làm vụ mở lại như cũ.
+- "Cần xử lý" đếm theo vụ (mức cao trở lên), không theo từng conflict. Vụ mức thấp hơn vẫn hiện ở Cần xử lý trong nhóm gập "Mức thấp".
+- **Hướng xử lý** (`brain.suggest`): AI soạn 2–3 phương án cho mỗi vụ, người quản lý sửa lời, chọn người nhận và gửi. Gửi xong vụ thành `guided`: agent nhận ở lượt kế tiếp, dashboard hiện ai đã đọc.
+- Việc **bị chặn** khi còn vụ mức cao chưa xử lý, hoặc khi agent đang làm việc đó có câu hỏi chờ người trả lời.

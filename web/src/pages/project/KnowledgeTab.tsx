@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { api } from "../../api/endpoints";
 import type { KbListItem } from "../../api/types";
@@ -326,7 +327,14 @@ export function KnowledgeTab() {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [selected, setSelected] = useState<string>();
+  const [params, setParams] = useSearchParams();
+  const selected = params.get("doc") ?? undefined;
+  const setSelected = (doc: string | undefined) => {
+    const next = new URLSearchParams(params);
+    if (doc) next.set("doc", doc);
+    else next.delete("doc");
+    setParams(next);
+  };
   const [adding, setAdding] = useState(false);
   const list = usePoll(() => api.kb.list(id), [id], 10_000);
   const hits = usePoll(() => (query ? api.kb.search(id, query) : Promise.resolve([])), [id, query], 0);

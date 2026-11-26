@@ -8,75 +8,84 @@ import { Avatar } from "./Member";
 import { RoleBadge } from "../pages/users/UsersPage";
 import { BrainCircuit, LayoutDashboard, LogOut, Menu, ShieldCheck, Users } from "lucide-react";
 
+/*
+ * The app frame: on wide screens a 60px navy rail of icons (labels as tooltips), so a project page gets the
+ * whole width; under 860px the same items open as a labelled drawer from the top bar.
+ */
 function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const { data } = useOverview();
   const { token, logout, me, shared } = useAuth();
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
+  const brainBad = !!data && data.brain.backend !== "null" && (!data.brain.ok || (data.brain.failing?.count ?? 0) > 0);
   return (
     <aside className={`sidebar${open ? " open" : ""}`} onClick={(e) => (e.target as HTMLElement).closest("a") && onNavigate()}>
-      <div className="brand">
+      <div className="brand" title={data?.commit ? `Bản đang chạy ${data.commit.slice(0, 7)}` : "Guide the Vibe"}>
         <BrandMark />
-        <span>Guide the Vibe</span>
+        <span className="nav-label">Guide the Vibe</span>
       </div>
 
       <nav className="nav">
-        <NavLink to="/" end className={link}>
+        <NavLink to="/" end className={link} title="Tổng quan các project">
           <LayoutDashboard className="nav-icon" />
-          Tổng quan
+          <span className="nav-label">Tổng quan</span>
         </NavLink>
-        <NavLink to="/brain" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+        <NavLink
+          to="/brain"
+          className={({ isActive }) => `admin-only ${link({ isActive })}`}
+          title={
+            data?.brain.failing?.count
+              ? `AI trả lời: ${data.brain.failing.count} lần lỗi trong 10 phút qua`
+              : data?.brain.ok
+                ? "AI trả lời: đã kết nối"
+                : data?.brain.backend === "null"
+                  ? "AI trả lời: chưa bật"
+                  : "AI trả lời: chưa chạy được"
+          }
+        >
           <BrainCircuit className="nav-icon" />
-          AI trả lời
-          <span
-            className={`dot${data?.brain.ok ? " on" : data && data.brain.backend !== "null" ? " bad" : ""}`}
-            style={{ marginLeft: "auto" }}
-            title={data?.brain.ok ? "AI đã kết nối" : data?.brain.backend === "null" ? "Chưa bật AI" : "AI chưa chạy được"}
-          />
+          <span className="nav-label">AI trả lời</span>
+          <span className={`dot${brainBad ? " bad" : data?.brain.ok ? " on" : ""}`} />
         </NavLink>
-        <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+        <NavLink to="/devs" className={({ isActive }) => `admin-only ${link({ isActive })}`} title="Developers">
           <Users className="nav-icon" />
-          Developers
+          <span className="nav-label">Developers</span>
         </NavLink>
-        <NavLink to="/users" className={({ isActive }) => `admin-only ${link({ isActive })}`}>
+        <NavLink to="/users" className={({ isActive }) => `admin-only ${link({ isActive })}`} title="Tài khoản dashboard">
           <ShieldCheck className="nav-icon" />
-          Tài khoản
+          <span className="nav-label">Tài khoản</span>
         </NavLink>
       </nav>
 
-      <nav className="nav">
-        <div className="nav-title label-caps">Projects</div>
+      <nav className="nav projects">
+        <div className="nav-title label-caps nav-label">Projects</div>
         {data?.projects.map((p) => {
-          const active = isLoaded(p) && p.counts.people_active > 0;
-          const hot = isLoaded(p) && p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical > 0;
-          const open = isLoaded(p) ? p.counts.conflicts_open : 0;
+          const loaded = isLoaded(p);
+          const active = loaded && p.counts.people_active > 0;
+          const need = loaded ? p.attention : 0;
           return (
             <NavLink
               key={p.id}
               to={`/p/${p.id}`}
               className={link}
-              title={active ? `${isLoaded(p) ? p.counts.people_active : 0} người đang làm` : "Không ai đang làm"}
+              title={`${p.name}${!loaded ? " · không tải được" : need ? ` · ${need} việc cần xử lý` : active ? ` · ${p.counts.people_active} người đang làm` : ""}`}
             >
               <span className="project-mark" aria-hidden="true">
                 {p.name.slice(0, 1).toUpperCase()}
-                <span className={`dot${!isLoaded(p) ? " bad" : active ? " on" : ""}`} />
+                <span className={`dot${!loaded ? " bad" : active ? " on" : ""}`} />
+                {need > 0 && <span className="need">{need}</span>}
               </span>
-              <span className="truncate">{p.name}</span>
-              {open > 0 && <span className={`count${hot ? " alert" : ""}`}>{open}</span>}
+              <span className="truncate nav-label">{p.name}</span>
             </NavLink>
           );
         })}
-        {data && data.projects.length === 0 && (
-          <span className="xs muted" style={{ padding: "0 8px" }}>
-            Chưa có project. Thêm ở trang Tổng quan.
-          </span>
-        )}
+        {data && data.projects.length === 0 && <span className="xs muted nav-label">Chưa có project. Thêm ở trang Tổng quan.</span>}
       </nav>
 
       <div className="spacer" />
       <div className="sidebar-foot">
         {data?.commit && (
           <a
-            className="xs muted"
+            className="xs muted nav-label"
             href={`https://github.com/hienduc14/guide-the-vibe/commit/${data.commit}`}
             target="_blank"
             rel="noreferrer"
@@ -87,23 +96,22 @@ function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }
         )}
         {data?.open_mode && (
           <Badge tone="danger-outline" title="Không có admin token và chưa có developer nào: mọi người đều truy cập được">
-            open dev mode
+            open
           </Badge>
         )}
         {me && me.kind !== "open" && (
-          <div className="who">
-            <span className="row" style={{ gap: 8 }}>
-              <Avatar name={me.name} size={26} />
+          <div className="who" title={`${me.name} · ${me.role}${shared ? " · link xem chỉ đọc" : ""}`}>
+            <Avatar name={me.name} size={28} />
+            <span className="nav-label row" style={{ gap: 8 }}>
               <b className="truncate">{me.name}</b>
               <RoleBadge role={me.role} />
             </span>
-            {shared && <span className="muted">Link xem chỉ đọc</span>}
           </div>
         )}
         {token && !shared && (
-          <button type="button" className="btn sm ghost" onClick={logout} style={{ alignSelf: "flex-start" }}>
-            <LogOut size={14} />
-            Đăng xuất
+          <button type="button" className="btn sm ghost logout" onClick={logout} title="Đăng xuất" aria-label="Đăng xuất">
+            <LogOut size={16} />
+            <span className="nav-label">Đăng xuất</span>
           </button>
         )}
       </div>
@@ -134,8 +142,10 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
+  // A project page draws its own header and uses the full width.
+  const flush = location.pathname.startsWith("/p/");
   return (
-    <div className="shell">
+    <div className={`shell rail${flush ? " flush" : ""}`}>
       <div className="mobile-bar">
         <button type="button" className="btn menu-btn" onClick={() => setOpen(true)} aria-label="Mở menu">
           <Menu size={20} />
@@ -147,10 +157,17 @@ export function Layout() {
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <Sidebar open={open} onNavigate={() => setOpen(false)} />
       <main className="main">
-        <div className="main-inner">
-          <ShareBar />
-          <Outlet />
-        </div>
+        {flush ? (
+          <>
+            <ShareBar />
+            <Outlet />
+          </>
+        ) : (
+          <div className="main-inner">
+            <ShareBar />
+            <Outlet />
+          </div>
+        )}
       </main>
     </div>
   );

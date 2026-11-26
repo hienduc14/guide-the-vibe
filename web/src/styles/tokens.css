@@ -1,63 +1,71 @@
 /*
- * Design tokens (see DESIGN.md). White page, the gtv logo blue as the single action colour, ink text.
- * Light theme only.
+ * Design tokens (see DESIGN.md). Two themes: light by default, dark when the OS asks for it or the
+ * person picks it (data-theme on <html>, set by the theme button and before first paint in index.html).
+ * Components only read these names; no colour is defined anywhere else.
  */
+/* Light palette: the only place a colour gets its first definition. Dark redefines the same names below. */
 :root {
-  /* Three colours. White is the page, the logo blue is the one action colour, ink is the text. */
-  --white: #ffffff; /* page and surfaces: white */
-  --blue: #476be0; /* the gtv logo blue: primary button, active nav and tab, links, focus */
-  --ink: #16181d; /* text and headings */
+  --white: #ffffff;
+  --blue: #476be0;
+  --ink: #131a30;
 
-  /* Roles, derived from the three (cool greys lean toward the logo blue so they sit with it). */
-  --bg: #ffffff;
+  --bg: #f3f5fa;
   --surface: #ffffff;
-  --sunken: #f5f6f9;
-  --fg: #16181d;
-  --muted: #5b6170;
-  --faint: #6b7180; /* ≥ 4.5:1 on white */
-  --line: #e7e9ee;
-  --line-strong: #8d93a1; /* control edges: ≥ 3:1 on white */
-  --hover: #f3f5f9;
-  --accent: #476be0;
-  --accent-hover: #3b5fd6;
+  --raised: #ffffff;
+  --sunken: #eaedf5;
+  --fg: #131a30;
+  --muted: #4f5873;
+  --faint: #5b647f; /* ≥ 4.5:1 on --bg, --surface and --sunken */
+  --line: #e0e4ee;
+  --line-strong: #b9c0d2;
+  --hover: #eef1f7;
+  --accent: #3657d0;
+  --accent-hover: #2f4dbd;
   --accent-ink: #ffffff;
-  --accent-soft: #eef2fd; /* selected nav item, selected rows */
+  --accent-soft: #e9eefc;
 
-  /* Sidebar: one solid navy frame in the logo's hue. Active item = logo blue. */
+  /* App rail: one navy frame in the logo's hue, in both themes. */
   --nav-bg: #16224f;
   --nav-fg: #ffffff;
-  --nav-muted: #b9c2db; /* 8.5:1 on --nav-bg */
-  --nav-faint: #9aa5c4; /* 6.2:1 on --nav-bg */
+  --nav-muted: #b9c2db;
+  --nav-faint: #9aa5c4;
   --nav-hover: #22305f;
   --nav-line: #2a3766;
-  --nav-active: #476be0; /* white text 4.7:1 */
+  --nav-active: #476be0;
 
-  /* Agents: identification only, as a 3px edge or a word. */
   --agent-claude: #b0561f;
   --agent-claude-soft: #f7ebe2;
   --agent-codex: #1f7259;
   --agent-codex-soft: #e1f0ea;
-  --agent-other: #5b6170;
-  --agent-other-soft: #f0f1f4;
+  --agent-other: #4f5873;
+  --agent-other-soft: #eef0f5;
 
   /* Severity: state only, never decoration. */
   --info: #3f6390;
   --info-soft: #e7edf5;
-  --warning: #9a6200;
-  --warning-soft: #faf0da;
-  --high: #c13b22;
-  --high-soft: #fae8e3;
+  --warning: #8a5600;
+  --warning-soft: #fbf1dc;
+  --high: #c2341d;
+  --high-soft: #fdebe7;
   --critical: #9c1030;
   --critical-soft: #f7dee4;
-  --ok: #1f7a50;
-  --ok-soft: #e0f1e8;
+  --ok: #17704a;
+  --ok-soft: #e1f2ea;
 
-  /* The logo keeps its own blue in both themes. */
+  /* One colour per person: their threads on the work map, their avatar ring, their lines in a diff. */
+  --c-amber: #a05c02;
+  --c-violet: #6f52e8;
+  --c-teal: #097a85;
+  --c-green: #217c4a;
+  --c-pink: #bd2f85;
+  --c-sky: #2468b8;
+
   --brand: #476be0;
+  --shadow: 0 1px 2px rgb(19 26 48 / 0.05), 0 8px 24px rgb(19 26 48 / 0.06);
+  --shadow-pop: 0 12px 32px rgb(19 26 48 / 0.14);
+  --backdrop: rgb(8 11 22 / 0.5);
 
-  --shadow: none;
-  --shadow-pop: 0 12px 32px rgb(22 24 29 / 0.12);
-
+  color-scheme: light;
   --font: "Be Vietnam Pro", ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
 
@@ -86,8 +94,99 @@
   accent-color: var(--accent);
   --sidebar: 232px;
   --content: 1200px;
+}
 
-  color-scheme: light;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1322;
+    --surface: #161c2f;
+    --raised: #1d2440;
+    --sunken: #0a0e1a;
+    --fg: #edf0f8;
+    --muted: #a6aec6;
+    --faint: #8791ae;
+    --line: #262e4a;
+    --line-strong: #3d4770;
+    --hover: #1d2440;
+    --accent: #7f9cff;
+    --accent-hover: #98afff;
+    --accent-ink: #0e1322;
+    --accent-soft: #1f2a52;
+    --nav-bg: #0a0e1a;
+    --nav-hover: #1d2440;
+    --nav-line: #1d2440;
+    --agent-claude: #f0a26e;
+    --agent-claude-soft: #3a2618;
+    --agent-codex: #5fd0aa;
+    --agent-codex-soft: #12302a;
+    --agent-other: #a6aec6;
+    --agent-other-soft: #1d2440;
+    --info: #8fb3e6;
+    --info-soft: #1a2a44;
+    --warning: #f2b750;
+    --warning-soft: #33290f;
+    --high: #ff7d6e;
+    --high-soft: #3a1f26;
+    --critical: #ff8fa8;
+    --critical-soft: #40182a;
+    --ok: #52d3a2;
+    --ok-soft: #12302a;
+    --c-amber: #f3ad4a;
+    --c-violet: #a897ff;
+    --c-teal: #43cfd6;
+    --c-green: #62d490;
+    --c-pink: #f582c4;
+    --c-sky: #73b6ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+    --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
+    --backdrop: rgb(3 5 12 / 0.65);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1322;
+  --surface: #161c2f;
+  --raised: #1d2440;
+  --sunken: #0a0e1a;
+  --fg: #edf0f8;
+  --muted: #a6aec6;
+  --faint: #8791ae;
+  --line: #262e4a;
+  --line-strong: #3d4770;
+  --hover: #1d2440;
+  --accent: #7f9cff;
+  --accent-hover: #98afff;
+  --accent-ink: #0e1322;
+  --accent-soft: #1f2a52;
+  --nav-bg: #0a0e1a;
+  --nav-hover: #1d2440;
+  --nav-line: #1d2440;
+  --agent-claude: #f0a26e;
+  --agent-claude-soft: #3a2618;
+  --agent-codex: #5fd0aa;
+  --agent-codex-soft: #12302a;
+  --agent-other: #a6aec6;
+  --agent-other-soft: #1d2440;
+  --info: #8fb3e6;
+  --info-soft: #1a2a44;
+  --warning: #f2b750;
+  --warning-soft: #33290f;
+  --high: #ff7d6e;
+  --high-soft: #3a1f26;
+  --critical: #ff8fa8;
+  --critical-soft: #40182a;
+  --ok: #52d3a2;
+  --ok-soft: #12302a;
+  --c-amber: #f3ad4a;
+  --c-violet: #a897ff;
+  --c-teal: #43cfd6;
+  --c-green: #62d490;
+  --c-pink: #f582c4;
+  --c-sky: #73b6ff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.5);
+  --backdrop: rgb(3 5 12 / 0.65);
 }
 
 /* Windows High Contrast: let system colours carry boundaries and state. */

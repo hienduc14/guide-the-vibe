@@ -1,30 +1,25 @@
-import { createContext, useContext } from "react";
-import { Outlet, useParams } from "react-router-dom";
+import { createContext, useContext, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BookOpen, ChevronDown, GitBranch, Inbox, MessagesSquare, Moon, SlidersHorizontal, Activity, SquareKanban, Sun } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { ProjectDetail } from "../../api/types";
+import { isLoaded } from "../../api/types";
 import { usePoll, type Poll } from "../../hooks/usePoll";
-import { PageHead } from "../../components/Layout";
-import { Tabs } from "../../components/Tabs";
-import {
-  BookOpen,
-  ChartColumn,
-  Layers,
-  LayoutDashboard,
-  MessageCircleQuestion,
-  MessagesSquare,
-  Network,
-  Settings,
-  SquareKanban,
-  Users,
-  Zap,
-} from "lucide-react";
+import { useOverview } from "../../hooks/useOverview";
+import { useAuth } from "../../hooks/useAuth";
+import { PeopleProvider } from "../../hooks/usePeople";
 import { ErrorNotice, Loading } from "../../components/Empty";
-import { shortSha, ago, repoName } from "../../lib/format";
+import { ago, shortSha } from "../../lib/format";
+import { isDark, toggleTheme } from "../../lib/theme";
+import { daysUntil } from "./CharterCard";
+import { FileSheet } from "./FileSheet";
 
 interface ProjectCtx {
   id: string;
   detail: ProjectDetail;
   reload: Poll<ProjectDetail>["reload"];
+  /** Open the file sheet over the current page (?file=…). */
+  openFile: (path: string) => void;
 }
 
 const Ctx = createContext<ProjectCtx | null>(null);
@@ -35,69 +30,163 @@ export function useProject(): ProjectCtx {
   return c;
 }
 
+function ProjectSwitch({ name, id }: { name: string; id: string }) {
+  const { data } = useOverview();
+  const others = data?.projects.filter((p) => p.id !== id) ?? [];
+  return (
+    <details className="pswitch">
+      <summary className="pname" title={others.length ? "Đổi project" : undefined}>
+        <span className="p-tile">{name.slice(0, 1).toUpperCase()}</span>
+        <b>{name}</b>
+        {others.length > 0 && <ChevronDown />}
+      </summary>
+      {others.length > 0 && (
+        <div className="pswitch-menu">
+          {others.map((p) => (
+            <Link key={p.id} to={`/p/${p.id}`} onClick={(e) => (e.currentTarget.closest("details")!.open = false)}>
+              <span className="p-tile">{p.name.slice(0, 1).toUpperCase()}</span>
+              {p.name}
+              {isLoaded(p) && p.attention > 0 && <span className="n">{p.attention}</span>}
+            </Link>
+          ))}
+        </div>
+      )}
+    </details>
+  );
+}
+
+function BrainPill() {
+  const { data } = useOverview();
+  const { can } = useAuth();
+  if (!data) return null;
+  const b = data.brain;
+  const failing = b.failing?.count ?? 0;
+  const off = b.backend === "null";
+  const label = off ? "AI đang tắt" : failing ? "AI trả lời đang lỗi" : b.ok ? "AI trả lời" : "AI chưa chạy được";
+  const title = failing ? `${failing} lần lỗi trong 10 phút qua: ${b.failing?.error ?? ""}` : (b.detail ?? "");
+  const body = <span className={`state ${off ? "" : failing || !b.ok ? "idle" : "running"}`}>{label}</span>;
+  return can("admin") ? (
+    <Link to="/brain" className={`pill${failing || (!off && !b.ok) ? " warn" : ""}`} title={title}>
+      {body}
+    </Link>
+  ) : (
+    <span className={`pill${failing ? " warn" : ""}`} title={title}>
+      {body}
+    </span>
+  );
+}
+
+function ThemeButton() {
+  const [dark, setDark] = useState(isDark);
+  return (
+    <button
+      type="button"
+      className="iconbtn"
+      onClick={() => setDark(toggleTheme())}
+      title={dark ? "Chuyển sang nền sáng" : "Chuyển sang nền tối"}
+      aria-label="Đổi nền sáng tối"
+    >
+      {dark ? <Sun /> : <Moon />}
+    </button>
+  );
+}
+
 export function ProjectLayout() {
   const { id = "" } = useParams();
+  const { can } = useAuth();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { data, error, reload } = usePoll(() => api.projects.detail(id), [id], 5000);
   if (error && !data) return <ErrorNotice error={error} />;
   if (!data) return <Loading />;
-  const c = data.counts;
+  const b = data.board;
+  const deadline = data.charter.deadline;
+  const left = deadline ? daysUntil(deadline) : undefined;
+  const need = data.attention;
+  const file = params.get("file");
+  const openFile = (path: string) => {
+    const next = new URLSearchParams(params);
+    next.set("file", path);
+    setParams(next);
+  };
+  const closeFile = () => {
+    const next = new URLSearchParams(params);
+    next.delete("file");
+    setParams(next, { replace: true });
+  };
+  const tab = (to: string, label: string, Icon: typeof Activity, end = false, count?: number) => (
+    <NavLink to={to} end={end} className={({ isActive }) => `tab${isActive ? " on" : ""}`}>
+      <Icon />
+      {label}
+      {count ? <span className="n">{count}</span> : null}
+    </NavLink>
+  );
   return (
-    <Ctx.Provider value={{ id, detail: data, reload }}>
-      <PageHead
-        title={data.name}
-        subtitle={
-          <span className="meta">
-            <span className="mono" title={data.repo_url}>
-              {repoName(data.repo_url)}
-            </span>
-            <span className="mono">
-              {data.main_branch}@{shortSha(data.main_sha)}
-            </span>
-            {data.last_sync && (
-              <span className={data.last_sync.ok ? "" : "danger-text"}>
-                {data.last_sync.ok ? "đồng bộ" : "đồng bộ lỗi"} {ago(data.last_sync.at)}
-              </span>
+    <Ctx.Provider value={{ id, detail: data, reload, openFile }}>
+      <PeopleProvider members={data.members}>
+        <div className="pj">
+          <header className="p-top">
+            <div className="top-row">
+              <ProjectSwitch name={data.name} id={id} />
+              <div className="repo">
+                <span className="mono" title={data.repo_url}>
+                  <GitBranch />
+                  {data.main_branch} · {shortSha(data.main_sha)}
+                </span>
+                {data.last_sync && (
+                  <span className={data.last_sync.ok ? "" : "bad"} title={data.last_sync.error}>
+                    {data.last_sync.ok ? "đồng bộ" : "đồng bộ lỗi"} {ago(data.last_sync.at)}
+                  </span>
+                )}
+                {b.total > 0 && (
+                  <span>
+                    {b.done}/{b.total} việc xong{left !== undefined ? ` · ${left >= 0 ? `còn ${left} ngày` : `trễ hạn ${-left} ngày`}` : ""}
+                  </span>
+                )}
+              </div>
+              <div className="top-tools">
+                <BrainPill />
+                <ThemeButton />
+              </div>
+            </div>
+            {data.last_sync && !data.last_sync.ok && (
+              <details className="syncbad">
+                <summary>Không lấy được code mới từ repo. Kiểm tra URL repo và quyền đọc trong Thiết lập.</summary>
+                <pre className="mono">{data.last_sync.error}</pre>
+              </details>
             )}
-          </span>
-        }
-      />
-      {data.last_sync && !data.last_sync.ok && (
-        <details className="notice error small sync-error">
-          <summary>Không lấy được code mới từ repo. Kiểm tra URL repo và quyền truy cập trong Cài đặt.</summary>
-          <pre className="mono xs wrap-anywhere">{data.last_sync.error}</pre>
-        </details>
-      )}
-      <Tabs
-        items={[
-          // What a lead checks every day: progress, running work, collisions, questions waiting for them.
-          { to: `/p/${id}`, label: "Tổng quan", icon: LayoutDashboard, end: true },
-          { to: `/p/${id}/board`, label: "Việc", icon: SquareKanban, count: data.board.open, alert: data.board.blocked + data.board.overdue > 0 },
-          {
-            to: `/p/${id}/conversations`,
-            label: "Trao đổi",
-            icon: MessagesSquare,
-            count: c.tickets_waiting,
-            alert: c.tickets_waiting > 0,
-            title: c.tickets_waiting ? `${c.tickets_waiting} câu hỏi chờ người trả lời` : undefined,
-          },
-          {
-            to: `/p/${id}/conflicts`,
-            label: "Xung đột",
-            icon: Zap,
-            count: c.conflicts_open,
-            alert: c.conflicts_by_level.high + c.conflicts_by_level.critical > 0,
-          },
-          { to: `/p/${id}/stats`, label: "Thống kê", icon: ChartColumn },
-          // Everything else lives in "Khác".
-          { to: `/p/${id}/members`, label: "Thành viên", icon: Users, count: data.members.length, more: "Nhóm" },
-          { to: `/p/${id}/knowledge`, label: "Tài liệu", icon: BookOpen, count: c.kb_unverified, more: "Nhóm" },
-          { to: `/p/${id}/qa`, label: "Nhật ký hỏi đáp", icon: MessageCircleQuestion, more: "Kỹ thuật" },
-          { to: `/p/${id}/graph`, label: "Sơ đồ code", icon: Network, more: "Kỹ thuật" },
-          { to: `/p/${id}/layers`, label: "Lớp phát hiện", icon: Layers, more: "Kỹ thuật" },
-          { to: `/p/${id}/settings`, label: "Cài đặt", icon: Settings, className: "manage-only", more: "Quản trị" },
-        ]}
-      />
-      <Outlet />
+            <nav className="p-tabs" aria-label="Project">
+              {tab(`/p/${id}`, "Hiện trường", Activity, true)}
+              {tab(`/p/${id}/inbox`, "Cần xử lý", Inbox, false, need)}
+              {tab(`/p/${id}/work`, "Việc", SquareKanban)}
+              {tab(`/p/${id}/talk`, "Trao đổi", MessagesSquare)}
+              {tab(`/p/${id}/knowledge`, "Tri thức", BookOpen)}
+              <span className="gap" />
+              {can("manager") && tab(`/p/${id}/settings`, "Thiết lập", SlidersHorizontal)}
+            </nav>
+          </header>
+          <main className="screen">
+            <Outlet />
+          </main>
+          {file && <FileSheet path={file} onClose={closeFile} onOpenIncident={(iid) => navigate(`/p/${id}/inbox?i=${iid}`)} />}
+        </div>
+      </PeopleProvider>
     </Ctx.Provider>
   );
+}
+
+/** Settings need a manager: others are sent back to the project's first page. */
+export function ManagerOnly({ children }: { children: JSX.Element }) {
+  const { can, me } = useAuth();
+  const { id } = useProject();
+  if (!me) return <Loading />;
+  if (!can("manager")) {
+    return (
+      <div className="p-empty">
+        <b>Cần quyền quản lý</b>
+        <Link to={`/p/${id}`}>Về Hiện trường</Link>
+      </div>
+    );
+  }
+  return children;
 }

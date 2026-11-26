@@ -97,19 +97,22 @@ Không có `GTV_ADMIN_TOKEN`: dashboard mở cho tới khi có tài khoản đ�
 
 ### Conflict, knowledge, feature, graph
 
-| Method | Path                                  | Mô tả                                                                                  |
-| ------ | ------------------------------------- | -------------------------------------------------------------------------------------- |
-| GET    | `/conflicts?all=1`                    | mặc định chỉ `open` + `acked`                                                          |
-| POST   | `/conflicts/:id/ack\|dismiss\|reopen` | đổi trạng thái (`:id` nhận cả `key`)                                                   |
-| GET    | `/kb?q=&limit=` · `/kb?type=&status=` | tìm (FTS) hoặc liệt kê                                                                 |
-| POST   | `/kb`                                 | `{ title, body, type?, supersedes? }` → tài liệu `manual_*`, `active`                  |
-| GET    | `/kb/:id`                             | id có `:` (vd `repo:docs/a.md`, `qa:tk_…`) ⇒ encode URL                                |
-| POST   | `/kb/:id/confirm\|reject`             | `unverified → active` / `→ superseded`                                                 |
-| GET    | `/features`                           | `{ modes, defs, tripped }`                                                             |
-| PUT    | `/features`                           | `{ feature, mode: "off"\|"shadow"\|"on"\|null }` (`null` = về mặc định, reset cầu dao) |
-| GET    | `/graph/symbols?q=&view=`             | `view` = `base` hoặc workspace id                                                      |
-| GET    | `/graph/callers?q=&view=`             | `[{ symbol, callers: [{path, line, kind, from_symbol, confidence}] }]`                 |
-| GET    | `/graph/stats`                        | `{ base: {files, symbols, refs}, main }`                                               |
+| Method | Path                                  | Mô tả                                                                                                    |
+| ------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| GET    | `/conflicts?all=1`                    | mặc định chỉ `open` + `acked`                                                                            |
+| POST   | `/conflicts/:id/ack\|dismiss\|reopen` | đổi trạng thái (`:id` nhận cả `key`)                                                                     |
+| GET    | `/incidents?all=1`                    | vụ đụng nhau: mọi conflict của một cặp workspace gom thành một `Incident` (mặc định chỉ vụ còn hiệu lực) |
+| POST   | `/incidents/:id/ack\|dismiss\|reopen` | áp cho mọi conflict của vụ                                                                               |
+| POST   | `/incidents/:id/guide`                | `{ body, to: [dev] }`: gửi hướng xử lý vào agent của người nhận, rồi đánh dấu vụ đã biết                 |
+| GET    | `/kb?q=&limit=` · `/kb?type=&status=` | tìm (FTS) hoặc liệt kê                                                                                   |
+| POST   | `/kb`                                 | `{ title, body, type?, supersedes? }` → tài liệu `manual_*`, `active`                                    |
+| GET    | `/kb/:id`                             | id có `:` (vd `repo:docs/a.md`, `qa:tk_…`) ⇒ encode URL                                                  |
+| POST   | `/kb/:id/confirm\|reject`             | `unverified → active` / `→ superseded`                                                                   |
+| GET    | `/features`                           | `{ modes, defs, tripped }`                                                                               |
+| PUT    | `/features`                           | `{ feature, mode: "off"\|"shadow"\|"on"\|null }` (`null` = về mặc định, reset cầu dao)                   |
+| GET    | `/graph/symbols?q=&view=`             | `view` = `base` hoặc workspace id                                                                        |
+| GET    | `/graph/callers?q=&view=`             | `[{ symbol, callers: [{path, line, kind, from_symbol, confidence}] }]`                                   |
+| GET    | `/graph/stats`                        | `{ base: {files, symbols, refs}, main }`                                                                 |
 
 ### Bảng task, thành viên (v0.8)
 
@@ -137,15 +140,21 @@ Trạng thái việc đi theo đăng ký: đăng ký → `in_progress`; `gtv_fin
 
 ## Admin API — `/api` (dashboard)
 
-| Method           | Path                                 | Mô tả                                                                                                                                   |
-| ---------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| POST             | `/login`                             | **Không cần token**: `{ name, password }` → `{ token: gtvs_…, name, role, expires_at }` (14 ngày)                                       |
-| POST / GET       | `/logout`, `/me`                     | huỷ phiên / `{ name, role, kind: admin_token\|user\|share\|open, project, open_mode, has_users }`                                       |
-| GET / PUT / DEL  | `/users`, `/users/:name`             | admin: liệt kê / tạo hoặc sửa `{ role?, password? }` (đổi mật khẩu hoặc role ⇒ đăng xuất mọi nơi) / xoá                                 |
-| GET / POST / DEL | `/projects/:id/share-links[/:link]`  | link xem chỉ đọc: liệt kê / tạo `{ label?, days? }` → `{ …, code }` (hiện 1 lần) / thu hồi                                              |
-| GET / PUT / DEL  | `/projects/:id/members[/:dev]`       | thành viên: `{ role?, level?, note? }`                                                                                                  |
-| GET              | `/projects/:id/conversations?limit=` | `[Thread]`: luồng trao đổi (question \| conflict \| task \| note) với `entries: [{ from, to, at, kind, body }]`                         |
-| GET              | `/projects/:id/attention`            | `[{ kind, level, title, detail, ref, at }]`: conflict high/critical chưa ack, câu hỏi chờ người, việc quá hạn / bị chặn / gấp chưa giao |
+| Method           | Path                                   | Mô tả                                                                                                                                                                                                                               |
+| ---------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST             | `/login`                               | **Không cần token**: `{ name, password }` → `{ token: gtvs_…, name, role, expires_at }` (14 ngày)                                                                                                                                   |
+| POST / GET       | `/logout`, `/me`                       | huỷ phiên / `{ name, role, kind: admin_token\|user\|share\|open, project, open_mode, has_users }`                                                                                                                                   |
+| GET / PUT / DEL  | `/users`, `/users/:name`               | admin: liệt kê / tạo hoặc sửa `{ role?, password? }` (đổi mật khẩu hoặc role ⇒ đăng xuất mọi nơi) / xoá                                                                                                                             |
+| GET / POST / DEL | `/projects/:id/share-links[/:link]`    | link xem chỉ đọc: liệt kê / tạo `{ label?, days? }` → `{ …, code }` (hiện 1 lần) / thu hồi                                                                                                                                          |
+| GET / PUT / DEL  | `/projects/:id/members[/:dev]`         | thành viên: `{ role?, level?, note? }`                                                                                                                                                                                              |
+| GET              | `/projects/:id/conversations?limit=`   | `[Thread]`: luồng trao đổi (question \| conflict \| task \| note) với `entries: [{ from, to, at, kind, body }]`                                                                                                                     |
+| GET              | `/projects/:id/attention`              | `[{ kind, level, title, detail, ref, at, ticket?, board? }]`: vụ đụng nhau high/critical chưa xử lý (`ref` = id vụ), câu hỏi chờ người, việc quá hạn / bị chặn / gấp chưa giao / im lặng (`stale`, không agent nào chạy quá 24 giờ) |
+| GET              | `/projects/:id/incidents/:iid/plans`   | `{ plans: [{ title, text }] }`: 2–3 hướng xử lý AI soạn (lưu đệm); `[]` khi AI tắt hoặc chưa soạn xong (hỏi lại sau vài giây)                                                                                                       |
+| POST             | `/projects/:id/incidents/:iid/rewrite` | `{ text }` → `{ text }`: AI viết lại cùng ý; `""` khi AI tắt                                                                                                                                                                        |
+| GET              | `/projects/:id/file?path=&context=`    | một file qua mắt cả nhóm: `{ conflicts, workspaces: [{ dev, diff, base, … }], outline, used_by }`; `context` = số dòng ngữ cảnh của diff                                                                                            |
+
+`Incident = { id, workspace_a, workspace_b, dev_a, dev_b, level, status: open|guided|acked|closed, closed_reason?, headline: { layer, kind, subject }, evidence: [conflict], files, board_ids, guide?: { at, by, body, to: [{ dev, delivered_at }] } }`.
+`/conversations` nhận `kinds=task,question,note`; luồng câu hỏi có `board_id`, tin nhắn có `delivered_at`. `/overview` và `/health` có `brain.failing = { count, error }` (job AI lỗi trong 10 phút qua).
 
 `PATCH /projects/:id` nhận thêm `charter: { goal?, users?, deadline?, milestones?, stack?: string[], constraints?, non_goals?, quality?: prototype\|mvp\|production, notes? }`.
 `POST /projects/:id/messages` nhận thêm `ref_id?` (gắn tin vào một luồng trao đổi).

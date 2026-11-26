@@ -7,6 +7,7 @@ import "./styles/components.css";
 import "./styles/manager.css";
 import "./styles/theme.css";
 import "./styles/visual.css";
+import "./styles/project.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

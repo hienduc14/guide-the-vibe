@@ -15,7 +15,7 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
    Cầu dao đã tự tắt `brain.summary` sau nhiều lần lỗi (reset khi container khởi động lại).
    Sửa: dashboard › **AI trả lời** đăng nhập lại, hoặc chọn provider / model khác. Sau đó mở tab Trao đổi và Tổng quan để
    tóm tắt được viết (thẻ "Hôm nay · AI tóm tắt" chỉ hiện khi đã có bản tóm tắt).
-2. **`/health` báo brain `ok` dù model không gọi được.** `health()` của backend Pi chỉ kiểm tra cấu hình, không gọi model, nên chấm xanh
+2. ~~**`/health` báo brain `ok` dù model không gọi được.**~~ Đã có `brain.failing` (27/11). `health()` của backend Pi chỉ kiểm tra cấu hình, không gọi model, nên chấm xanh
    ở menu "AI trả lời" đánh lừa. Nên đưa lỗi gần nhất của `brain_jobs` (bảng trong hub db, `src/server/brain/metered.ts`) vào `/health` và
    trang AI trả lời, ví dụ "3 job lỗi trong 10 phút qua: …".
 3. **Gói npm 0.1.3 chưa phát hành.** `dist/npm` đã build từ `main` (có bản sửa hook nhân bản và các tool MCP có cấu trúc), nhưng npm vẫn là
@@ -25,12 +25,12 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
 
 ### Lỗi đã biết
 
-- **Danh sách Trao đổi bị luồng xung đột chiếm chỗ.** Mỗi cặp file/hàm là một luồng, một lần đụng nhau sinh 5–8 luồng. Nên gom theo cặp
+- ~~**Danh sách Trao đổi bị luồng xung đột chiếm chỗ.**~~ Trang mới gom theo vụ và theo việc (27/11). Mỗi cặp file/hàm là một luồng, một lần đụng nhau sinh 5–8 luồng. Nên gom theo cặp
   người (hoặc theo cặp Việc): "hien ↔ hien-test · 6 xung đột ▸". Chỗ: vòng `engine.store.conflicts("all")` trong `conversations()` (`src/server/project/conversations.ts`).
 - **Đăng ký việc mới bị gắn vào Việc cũ của cùng người.** Test 26/11: việc "Kiểm tra image là URL" của hien nằm dưới Việc
   "X1: module validation dùng chung". Nguyên nhân: `Board.resolveFor` làm tiếp Việc còn dở của dev trong cùng checkout. Nên so tiêu đề
   hoặc chỉ làm tiếp khi phiên mới không mang tiêu đề khác hẳn.
-- **Sơ đồ "Ai đang sửa file nào" hiện agent "Chưa đăng ký việc"** sau khi agent đã `gtv_finish_task` (đăng ký đóng, footprint còn).
+- ~~**Sơ đồ "Ai đang sửa file nào" hiện agent "Chưa đăng ký việc"**~~ Sơ đồ mới chỉ có thẻ cho workspace còn phiên hoặc còn việc mở (27/11). sau khi agent đã `gtv_finish_task` (đăng ký đóng, footprint còn).
   Nên hiện tiêu đề Việc vừa xong (mờ), hoặc ẩn agent không còn phiên và không còn đăng ký mở. Chỗ: `buildMap` trong
   `web/src/pages/project/WorkMap.tsx`.
 - **Chạy agent không tương tác (`claude -p`, `codex exec`) thì không bao giờ thấy "Đang chạy"**: phiên kết thúc ngay khi xong. Đúng hành vi,
@@ -117,3 +117,13 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
 - Trang "Lớp phát hiện" vẫn dùng thuật ngữ kỹ thuật (`detect.l0_path`, off / shadow / on); nên viết mỗi lớp một câu bắt được gì và đổi "shadow" thành "Chạy thử (chỉ ghi lại)".
 - Trên điện thoại, sơ đồ file để khoảng trống dưới danh sách (chiều cao tính theo cột agent đã bị ẩn).
 - Khung Trao đổi tính chiều cao theo `100dvh - 250px`. Khi có thông báo lỗi đồng bộ ở đầu trang, trang vẫn cuộn thêm khoảng 100px.
+
+## Giao diện project mới (27/11/2026): phần còn lại
+
+Kế hoạch: `docs/prototype/PLAN.md`.
+
+- "Gộp thử" trong khung xem file chưa có bản gộp do AI viết: chỗ đụng hiện bản của từng người xếp chồng.
+- Mức giám sát "Chặt" (chặn agent sửa file đang đụng cho tới khi có người cho phép): cần cờ mới ở daemon và gói npm mới.
+- Tài khoản dashboard chưa gắn với tên dev; bộ lọc "Liên quan tới" ở Cần xử lý chọn sẵn người khi tên trùng nhau.
+- Khung xem file gộp theo tên dev: một người có hai workspace cùng sửa một file thì chỉ thấy một bản.
+- Các khối cũ dùng lại trong trang mới (Tài liệu, Thành viên, Repo, Link chia sẻ, Tiến độ, Nhật ký) vẫn mang kiểu cũ; nên viết lại theo `project.css`.

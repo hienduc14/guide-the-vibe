@@ -11,9 +11,97 @@ import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Blank } from "../../components/pj";
 import { Loading } from "../../components/Empty";
-import { CharterEditor, QUALITY, daysUntil } from "./CharterCard";
-import { KnowledgeTab } from "./KnowledgeTab";
+import { QUALITY, daysUntil } from "../../lib/charter";
+import type { Charter } from "../../api/types";
+import { DocsSection } from "./Docs";
 import { ago } from "../../lib/format";
+
+type TextKey = "goal" | "users" | "milestones" | "constraints" | "non_goals" | "notes";
+
+function CharterEditor({ charter, onDone }: { charter: Charter; onDone: () => void }) {
+  const { id, reload } = useProject();
+  const run = useAction();
+  const [f, setF] = useState({ ...charter, stack: (charter.stack ?? []).join(", ") });
+  const text = (k: TextKey, label: string, placeholder: string, area = false) => (
+    <label className={area ? "wide" : ""}>
+      {label}
+      {area ? (
+        <textarea className="p-textarea" rows={2} value={f[k] ?? ""} placeholder={placeholder} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      ) : (
+        <input className="p-input" value={f[k] ?? ""} placeholder={placeholder} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      )}
+    </label>
+  );
+  return (
+    <>
+      <h2>Sửa tiêu chí project</h2>
+      <p className="lede">Agent thấy bản mới ở phiên kế tiếp.</p>
+      <form
+        className="formgrid"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const stack = f.stack
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (await run(() => api.projects.update(id, { charter: { ...f, stack } }), "Đã lưu tiêu chí")) {
+            void reload();
+            onDone();
+          }
+        }}
+      >
+        <label className="wide">
+          Mục tiêu
+          <textarea
+            className="p-textarea"
+            rows={2}
+            value={f.goal ?? ""}
+            placeholder="Ra MVP đặt món cho 3 quán ăn thử nghiệm"
+            onChange={(e) => setF({ ...f, goal: e.target.value })}
+          />
+        </label>
+        {text("users", "Người dùng", "100 người dùng thử, chủ yếu trên điện thoại")}
+        <label>
+          Hạn
+          <input className="p-input" type="date" value={f.deadline ?? ""} onChange={(e) => setF({ ...f, deadline: e.target.value })} />
+        </label>
+        <label>
+          Mức hoàn thiện
+          <select className="p-input" value={f.quality ?? ""} onChange={(e) => setF({ ...f, quality: (e.target.value || undefined) as Charter["quality"] })}>
+            <option value="">Chưa chọn</option>
+            <option value="prototype">Prototype: nhanh, bỏ đi được</option>
+            <option value="mvp">MVP: chạy ổn, đơn giản</option>
+            <option value="production">Production: có test, bảo mật, dễ bảo trì</option>
+          </select>
+        </label>
+        <label>
+          Ngôn ngữ agent viết
+          <select className="p-input" value={f.language ?? "vi"} onChange={(e) => setF({ ...f, language: e.target.value as Charter["language"] })}>
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">Tiếng Anh</option>
+          </select>
+        </label>
+        <label className="wide">
+          Công nghệ
+          <input className="p-input" value={f.stack} placeholder="Next.js, Node 24, PostgreSQL" onChange={(e) => setF({ ...f, stack: e.target.value })} />
+          <small>Cách nhau bằng dấu phẩy. Agent hỏi trước khi thêm công nghệ mới.</small>
+        </label>
+        {text("milestones", "Mốc", "Tuần 4: đặt món chạy; tuần 8: thanh toán", true)}
+        {text("constraints", "Ràng buộc", "Chỉ dùng dịch vụ miễn phí; dữ liệu ở Việt Nam", true)}
+        {text("non_goals", "Không làm", "Ứng dụng di động native, đa ngôn ngữ", true)}
+        {text("notes", "Ghi chú khác", "", true)}
+        <div className="acts wide">
+          <button type="submit" className="p-btn primary">
+            Lưu tiêu chí
+          </button>
+          <button type="button" className="p-btn quiet" onClick={onDone}>
+            Huỷ
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
 
 function CharterView() {
   const { detail } = useProject();
@@ -162,17 +250,7 @@ export function KnowledgePage() {
             </NavLink>
           ))}
         </nav>
-        <section className="panel doc">
-          {section === "docs" ? (
-            <div className="legacy">
-              <KnowledgeTab />
-            </div>
-          ) : section === "review" ? (
-            <Review />
-          ) : (
-            <CharterView />
-          )}
-        </section>
+        <section className="panel doc">{section === "docs" ? <DocsSection /> : section === "review" ? <Review /> : <CharterView />}</section>
       </div>
     </>
   );

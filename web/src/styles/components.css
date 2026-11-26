@@ -210,10 +210,6 @@ a.card {
 a.card:hover {
   border-color: var(--accent);
 }
-.card-foot {
-  padding: var(--s2) var(--s4);
-  border-top: 1px solid var(--line);
-}
 
 /* ---- summary line: compact numbers that replace big stat tiles ---- */
 .summary {
@@ -258,23 +254,6 @@ a.card:hover {
 }
 
 /* ---- stat (kept for detail pages) ---- */
-.stat {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  padding: var(--s3) var(--s4);
-}
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.stat-value.alert {
-  color: var(--high);
-}
 
 /* ---- badge ---- */
 .badge {
@@ -486,17 +465,6 @@ table.table {
 }
 
 /* Sync failure under the project header: one line, raw git output on demand. */
-.sync-error {
-  margin-bottom: var(--s4);
-}
-.sync-error summary {
-  cursor: pointer;
-}
-.sync-error pre {
-  margin: var(--s2) 0 0;
-  white-space: pre-wrap;
-  color: var(--fg);
-}
 
 /* ---- segmented ---- */
 .seg {
@@ -647,69 +615,7 @@ details > summary {
 }
 
 /* ---- activity feed ---- */
-.feed {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.feed-item {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: var(--s3);
-  padding: 10px var(--s4) 10px calc(var(--s4) - 3px);
-  border-bottom: 1px solid var(--line);
-  border-left: 3px solid transparent;
-  font-size: var(--text-sm);
-}
-.feed-item:last-child {
-  border-bottom: 0;
-}
-.feed-item time {
-  font-variant-numeric: tabular-nums;
-  padding-top: 1px;
-  white-space: nowrap;
-  color: var(--faint);
-  font-size: var(--text-xs);
-}
-.feed-item.lvl-critical {
-  border-left-color: var(--critical);
-}
-.feed-item.lvl-high {
-  border-left-color: var(--high);
-}
-.feed-item.lvl-warning {
-  border-left-color: var(--warning);
-}
-.feed-text {
-  all: unset;
-  min-width: 0;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.feed-text.open {
-  -webkit-line-clamp: unset;
-}
-.feed-text:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.feed-text .badge {
-  height: 19px;
-  vertical-align: 1px;
-}
-.task-item {
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--line);
-}
-.task-item:last-child {
-  border-bottom: 0;
-}
+
 .meta {
   display: inline-flex;
   flex-wrap: wrap;
@@ -754,28 +660,7 @@ details > summary {
   background: var(--high);
   color: #fff;
 }
-.layer-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--s3) var(--s4);
-  padding: var(--s4);
-  border-bottom: 1px solid var(--line);
-}
-.layer-row:last-child {
-  border-bottom: 0;
-}
-.kv {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1) var(--s4);
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-.kv b {
-  color: var(--fg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
+
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
@@ -786,18 +671,6 @@ details > summary {
   .split {
     grid-template-columns: 1fr;
   }
-  .layer-row {
-    grid-template-columns: 1fr;
-  }
-}
-.doc-body {
-  white-space: pre-wrap;
-  font-size: var(--text-sm);
-  line-height: 1.65;
-}
-.cell-wide {
-  display: block;
-  min-width: 200px;
 }
 
 /* ---- resource chips (files, symbols, contracts) ---- */
@@ -818,20 +691,13 @@ details > summary {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.res-v {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .res em {
   flex-shrink: 0;
   font-style: normal;
   color: var(--muted);
 }
-.res.breaking {
-  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
-  background: var(--warning-soft);
-}
+
 .res.clash {
   border-color: color-mix(in srgb, var(--high) 55%, transparent);
   background: var(--high-soft);
@@ -999,9 +865,7 @@ details > summary {
 }
 
 /* ---- rendered markdown (project documents) ---- */
-.doc-body:has(> .md) {
-  white-space: normal;
-}
+
 .md > :first-child {
   margin-top: 0;
 }

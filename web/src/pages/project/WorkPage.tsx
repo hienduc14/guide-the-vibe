@@ -15,8 +15,8 @@ import { PRIORITIES, PRIORITY_INFO, STATUS_INFO } from "../../components/Task";
 import { NOTE_TAG } from "../../components/Message";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { ago } from "../../lib/format";
-import { daysUntil } from "./CharterCard";
-import { ProgressView } from "./StatsTab";
+import { daysUntil } from "../../lib/charter";
+import { ProgressView } from "./Progress";
 
 const COLS: { key: BoardStatus; label: string; icon: JSX.Element }[] = [
   { key: "todo", label: "Cần làm", icon: <Circle /> },
@@ -455,9 +455,7 @@ export function WorkPage() {
       </div>
       {adding && <AddTask onDone={() => (setAdding(false), void board.reload())} />}
       {view === "progress" ? (
-        <div className="legacy">
-          <ProgressView />
-        </div>
+        <ProgressView />
       ) : !board.data ? (
         <Loading />
       ) : (

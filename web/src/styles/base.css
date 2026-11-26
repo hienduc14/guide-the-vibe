@@ -195,9 +195,7 @@ textarea {
 .stack.tight {
   gap: var(--s2);
 }
-.stack.loose {
-  gap: var(--s5);
-}
+
 .grid {
   display: grid;
   gap: var(--s4);
@@ -241,11 +239,7 @@ textarea {
 .spacer {
   flex: 1;
 }
-hr.sep {
-  border: 0;
-  border-top: 1px solid var(--line);
-  margin: var(--s4) 0;
-}
+
 /* Small muted label (sentence case: Vietnamese diacritics read badly in tracked caps). */
 .label-caps {
   font-size: var(--text-xs);

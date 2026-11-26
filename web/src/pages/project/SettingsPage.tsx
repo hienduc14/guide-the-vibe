@@ -7,58 +7,12 @@ import { api } from "../../api/endpoints";
 import type { FeatureMode, Layer } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
-import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Seg } from "../../components/pj";
 import { Loading } from "../../components/Empty";
-import { CopyCommand } from "../../components/CopyCommand";
 import { FEATURE_GROUPS, FEATURE_TEXT, PRESETS } from "../../lib/featureText";
-import { MembersTab } from "./MembersTab";
-import { RepoSettings } from "./SettingsTab";
-import { ShareLinksCard } from "./ShareLinksCard";
-import { ActivityFeed } from "./ActivityFeed";
-import { TechStats } from "./StatsTab";
-
-function Invite() {
-  const run = useAction();
-  const [name, setName] = useState("");
-  const [cmd, setCmd] = useState<string>();
-  return (
-    <div className="block">
-      <span className="sect">Mời thêm người</span>
-      <form
-        className="acts"
-        style={{ marginTop: 0 }}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const r = await run(() => api.devs.invite(name.trim()), "Đã tạo lệnh mời, có hiệu lực 24 giờ");
-          if (r) setCmd(`npx guide-the-vibe join ${location.origin}/j/${r.code}`);
-        }}
-      >
-        <input
-          className="p-input"
-          style={{ maxWidth: 240 }}
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Tên developer"
-          aria-label="Tên developer"
-        />
-        <button type="submit" className="p-btn primary">
-          Tạo lệnh mời
-        </button>
-      </form>
-      {cmd && (
-        <div style={{ marginTop: 10 }}>
-          <CopyCommand text={cmd} />
-          <p className="faint" style={{ marginTop: 6 }}>
-            Người đó chạy lệnh này một lần trong bản clone của repo.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
+import { TechStats } from "./Progress";
+import { LogList, MembersSection, RepoSection, ShareSection } from "./SettingsSections";
 
 const MODES: [FeatureMode, string][] = [
   ["off", "Tắt"],
@@ -174,7 +128,7 @@ function Log() {
     <>
       <h2>Nhật ký hệ thống</h2>
       <p className="lede">Mọi sự kiện gtv ghi lại, và số liệu kỹ thuật của AI, phát hiện đụng nhau, hỏi đáp.</p>
-      <div className="legacy">{events.data ? <ActivityFeed events={events.data} /> : <Loading />}</div>
+      {events.data ? <LogList events={events.data} /> : <Loading />}
       <div className="block">
         <div className="acts" style={{ marginTop: 0, alignItems: "center" }}>
           <span className="sect">Số liệu kỹ thuật</span>
@@ -189,9 +143,7 @@ function Log() {
             ]}
           />
         </div>
-        <div className="legacy">
-          <TechStats days={days} />
-        </div>
+        <TechStats days={days} />
       </div>
     </>
   );
@@ -199,7 +151,6 @@ function Log() {
 
 export function SettingsPage() {
   const { id } = useProject();
-  const { can } = useAuth();
   const { section = "members" } = useParams();
   const nav: [string, string, JSX.Element][] = [
     ["members", "Thành viên", <Users key="u" />],
@@ -229,32 +180,13 @@ export function SettingsPage() {
           {section === "watch" ? (
             <Watch />
           ) : section === "repo" ? (
-            <>
-              <h2>Repo và đồng bộ</h2>
-              <p className="lede">gtv kéo repo về định kỳ để so với phần đang làm dở của từng người.</p>
-              <div className="legacy">
-                <RepoSettings />
-              </div>
-            </>
+            <RepoSection />
           ) : section === "share" ? (
-            <>
-              <h2>Link chia sẻ</h2>
-              <p className="lede">Link chỉ xem, không cần tài khoản. Dùng để gửi giảng viên hoặc người ngoài nhóm.</p>
-              <div className="legacy">
-                <ShareLinksCard id={id} />
-              </div>
-            </>
+            <ShareSection />
           ) : section === "log" ? (
             <Log />
           ) : (
-            <>
-              <h2>Thành viên</h2>
-              <p className="lede">Mỗi thành viên cài gtv một lần trong bản clone của mình. Vai trò và trình độ giúp AI chọn cách trả lời và người để hỏi.</p>
-              <div className="legacy">
-                <MembersTab />
-              </div>
-              {can("admin") && <Invite />}
-            </>
+            <MembersSection />
           )}
         </section>
       </div>

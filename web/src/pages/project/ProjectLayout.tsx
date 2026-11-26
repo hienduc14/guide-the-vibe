@@ -11,7 +11,7 @@ import { PeopleProvider } from "../../hooks/usePeople";
 import { ErrorNotice, Loading } from "../../components/Empty";
 import { ago, shortSha } from "../../lib/format";
 import { isDark, toggleTheme } from "../../lib/theme";
-import { daysUntil } from "./CharterCard";
+import { daysUntil } from "../../lib/charter";
 import { FileSheet } from "./FileSheet";
 
 interface ProjectCtx {

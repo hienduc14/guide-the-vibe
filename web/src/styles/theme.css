@@ -315,17 +315,6 @@ p {
 .charter {
   border-left: 1px solid var(--line);
 }
-.tcard {
-  box-shadow: none;
-}
-.tcard:hover {
-  box-shadow: none;
-  background: var(--hover);
-}
-.tcard.blocked {
-  background: var(--surface);
-  border-color: color-mix(in oklab, var(--high) 40%, var(--line));
-}
 
 /* ---- mobile top bar ---- */
 @media (max-width: 860px) {

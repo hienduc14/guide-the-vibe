@@ -126,4 +126,3 @@ Kế hoạch: `docs/prototype/PLAN.md`.
 - Mức giám sát "Chặt" (chặn agent sửa file đang đụng cho tới khi có người cho phép): cần cờ mới ở daemon và gói npm mới.
 - Tài khoản dashboard chưa gắn với tên dev; bộ lọc "Liên quan tới" ở Cần xử lý chọn sẵn người khi tên trùng nhau.
 - Khung xem file gộp theo tên dev: một người có hai workspace cùng sửa một file thì chỉ thấy một bản.
-- Các khối cũ dùng lại trong trang mới (Tài liệu, Thành viên, Repo, Link chia sẻ, Tiến độ, Nhật ký) vẫn mang kiểu cũ; nên viết lại theo `project.css`.

@@ -25,8 +25,6 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
   }
   const active = p.people.filter((x) => x.working ?? x.status === "active");
   const syncFailed = p.last_sync && !p.last_sync.ok;
-  const lv = p.counts.conflicts_by_level;
-  const conflictTone = lv.critical + lv.high > 0 ? "high" : lv.warning > 0 ? "warning" : "neutral";
   const deadline = p.charter?.deadline;
   return (
     <Link to={`/p/${p.id}`} className="pcard" title={`${repoName(p.repo_url)} · ${p.main_branch}@${shortSha(p.main_sha)}`}>
@@ -52,9 +50,9 @@ function ProjectCard({ p }: { p: ProjectEntry }) {
       </div>
       <div className="pcard-foot">
         <span className="metrics">
-          <span className={`metric t-${conflictTone}`} title="Xung đột đang mở">
+          <span className={`metric${p.attention ? " t-high" : ""}`} title="Vụ đụng nhau, câu hỏi và việc đang chờ một người quyết">
             <Zap />
-            {p.counts.conflicts_open} xung đột
+            {p.attention} cần xử lý
           </span>
           <span className={`metric${p.counts.tickets_waiting ? " t-warning" : ""}`} title="Câu hỏi chờ người">
             <MessageCircleQuestion />
@@ -90,8 +88,7 @@ export function OverviewPage() {
   const loaded = data.projects.filter(isLoaded);
   const sum = (f: (p: (typeof loaded)[number]) => number) => loaded.reduce((n, p) => n + f(p), 0);
   const people = new Set(loaded.flatMap((p) => p.people.filter((x) => x.working ?? x.status === "active").map((x) => x.dev)));
-  const conflicts = sum((p) => p.counts.conflicts_open);
-  const serious = sum((p) => p.counts.conflicts_by_level.high + p.counts.conflicts_by_level.critical);
+  const need = sum((p) => p.attention);
   const waiting = sum((p) => p.counts.tickets_waiting);
   const bs = data.brain_stats;
   const done = sum((p) => p.board.done);
@@ -126,13 +123,7 @@ export function OverviewPage() {
           label="Người đang làm"
           aside={people.size ? <AvatarStack people={[...people].map((name) => ({ name }))} max={3} size={24} /> : undefined}
         />
-        <Kpi
-          icon={Zap}
-          tone={serious ? "high" : conflicts ? "warning" : "neutral"}
-          value={conflicts}
-          label="Xung đột"
-          title="Hai người đang sửa trùng file, hàm hoặc API"
-        />
+        <Kpi icon={Zap} tone={need ? "high" : "neutral"} value={need} label="Cần xử lý" title="Vụ đụng nhau, câu hỏi và việc đang chờ một người quyết" />
         <Kpi
           icon={MessageCircleQuestion}
           tone={waiting ? "warning" : "neutral"}

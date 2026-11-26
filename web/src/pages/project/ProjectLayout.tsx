@@ -82,7 +82,7 @@ export function ProjectLayout() {
           },
           {
             to: `/p/${id}/conflicts`,
-            label: "Conflict",
+            label: "Xung đột",
             icon: Zap,
             count: c.conflicts_open,
             alert: c.conflicts_by_level.high + c.conflicts_by_level.critical > 0,

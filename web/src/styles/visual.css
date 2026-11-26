@@ -917,3 +917,211 @@ a.kpi:hover {
     grid-row: 2;
   }
 }
+
+/* ---- work map: agents ↔ files ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.wm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  margin-bottom: var(--s3);
+}
+.wm-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.wm-line {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+.wm-line.edited {
+  border-top-color: var(--line-strong);
+}
+.wm-line.declared {
+  border-top: 2px dashed var(--line-strong);
+}
+.wm-line.clash {
+  border-top: 3px solid var(--high);
+}
+.wm {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(48px, 1fr) minmax(200px, 320px);
+}
+.wm-col {
+  position: relative;
+}
+.wm-agent,
+.wm-file {
+  position: absolute;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  transition: opacity 0.15s;
+}
+.wm-agent-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.wm-agent-text b {
+  font-size: var(--text-sm);
+}
+.wm-file {
+  padding: 0 var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.wm-file:hover,
+.wm-file:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.wm-file.s-conflict {
+  border-color: var(--high);
+  background: var(--high-soft);
+}
+.wm-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+.wm-name b {
+  font-weight: 500;
+}
+.wm-dir {
+  color: var(--faint);
+}
+.wm-file-devs {
+  flex-shrink: 0;
+}
+.wm-lines {
+  display: block;
+  overflow: visible;
+}
+.wm-edge {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  transition: opacity 0.15s;
+}
+.wm-edge.edited {
+  stroke: var(--line-strong);
+}
+.wm-edge.declared {
+  stroke: var(--line-strong);
+  stroke-dasharray: 5 4;
+}
+.wm-edge.clash {
+  stroke: var(--high);
+  stroke-width: 3;
+}
+.wm-edge.dim,
+.wm-agent.dim,
+.wm-file.dim {
+  opacity: 0.25;
+}
+@media (max-width: 640px) {
+  /* No room for lines: each file keeps its avatars, so who-is-where still reads. */
+  .wm {
+    grid-template-columns: 1fr;
+  }
+  .wm-agents,
+  .wm-lines {
+    display: none;
+  }
+}
+
+/* ---- file detail: diff ---- */
+.fd .dialog-body {
+  gap: var(--s5);
+}
+.fd-ws {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.fd-ws + .fd-ws {
+  border-top: 1px solid var(--line);
+  padding-top: var(--s4);
+}
+.diff {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.diff-hunk {
+  padding: 2px var(--s2);
+  background: var(--sunken);
+  color: var(--faint);
+}
+.diff-line {
+  display: grid;
+  grid-template-columns: 36px 36px 16px 1fr auto;
+  align-items: baseline;
+  min-width: max-content;
+}
+.diff-no {
+  padding-inline-end: 6px;
+  text-align: end;
+  color: var(--faint);
+  user-select: none;
+}
+.diff-sign {
+  color: var(--faint);
+  user-select: none;
+}
+.diff-text {
+  white-space: pre;
+  font-size: inherit;
+  background: none;
+  padding: 0;
+}
+.diff-line.add {
+  background: var(--ok-soft);
+}
+.diff-line.del {
+  background: var(--sunken);
+  color: var(--muted);
+}
+.diff-line.overlap {
+  background: var(--high-soft);
+  box-shadow: inset 3px 0 0 var(--high);
+}
+.diff-tag {
+  margin-inline: var(--s2);
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--high);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.lane-who .status-dot {
+  margin-top: 2px;
+}

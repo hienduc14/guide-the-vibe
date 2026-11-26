@@ -124,11 +124,17 @@ export class Store extends EventEmitter {
     return this.db.all<Workspace>(`SELECT * FROM workspaces ORDER BY updated_at DESC`);
   }
 
-  /** Workspaces with at least one non-ended session, or a task still in flight. */
+  /**
+   * Workspaces with at least one non-ended session, a task still in flight, or a snapshot from the last
+   * two days: closing the agent leaves the uncommitted work on disk, and it can still clash.
+   */
   activeWorkspaces(): Workspace[] {
+    const recent = new Date(Date.now() - 2 * 86_400_000).toISOString();
     return this.db.all<Workspace>(
       `SELECT * FROM workspaces w WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.workspace_id = w.id AND s.status != 'ended')
-       OR EXISTS (SELECT 1 FROM tasks t WHERE t.workspace_id = w.id AND t.status IN ('registered','active','pr_open'))`,
+       OR EXISTS (SELECT 1 FROM tasks t WHERE t.workspace_id = w.id AND t.status IN ('registered','active','pr_open'))
+       OR (w.snapshot_sha IS NOT NULL AND w.updated_at > ?)`,
+      recent,
     );
   }
 

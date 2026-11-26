@@ -5,8 +5,12 @@ Làm xong mục nào thì xoá khỏi đây và ghi vào commit.
 
 ## Tài khoản và CLI (27/11/2026): phần còn lại
 
-- Người chưa kích hoạt (dev cũ `hien`, `khanh`…) cần admin gửi **Link kích hoạt mới** ở trang Người; máy cũ của họ vẫn
-  chạy, nhưng họ chưa đăng nhập dashboard được.
+- Hiện trường chỉ biết file một người sửa qua hook sửa file (Edit/Write, apply_patch). Agent sửa bằng lệnh shell (`sed -i`)
+  thì không có footprint: người đó không hiện ở cột trái và file của họ không hiện, dù vụ đụng vẫn được bắt (từ snapshot).
+  Hướng sửa: lấy danh sách file từ diff của snapshot (`repo.diffNames(base, snapshot_sha)`) khi không có footprint.
+- Thử thật 27/11 (Claude Code + Codex, 2 tài khoản, server local): đăng nhập máy, `gtv on`, cảnh báo đụng nhau, hỏi đáp
+  hai chiều đều chạy. Hai lỗi tìm ra đã sửa: workspace bị bỏ khỏi so sánh khi phiên agent kết thúc dù code dở vẫn còn;
+  server không tắt khi còn luồng sự kiện của daemon nên daemon bám vào tiến trình cũ.
 - `gtv login` chưa có cách đăng nhập không cần trình duyệt trên máy khác (chép mã sang máy có trình duyệt thì vẫn được:
   trang `/connect` nhận mã gõ tay).
 - Giới hạn tần suất nằm trong bộ nhớ của tiến trình (reset khi khởi động lại), theo `cf-connecting-ip` / `x-forwarded-for`.

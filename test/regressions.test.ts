@@ -136,3 +136,19 @@ test("reinstalling Claude hooks replaces gtv's http hooks instead of adding anot
   assert.deepEqual(hooks.SessionStart[0], theirs);
   assert.match(JSON.stringify(hooks.SessionStart[1]), /7392/);
 });
+
+test("closing the agent keeps a workspace's uncommitted work in clash detection for two days", async () => {
+  const { Store } = await import("../src/server/project/store.ts");
+  const store = new Store(new Db(":memory:", PROJECT_SCHEMA));
+  const s = store.upsertSession({ dev: "alice", agent: "claude", workspace_id: "ws_a", workspace_label: "shop" });
+  store.endSession(s.id);
+  assert.deepEqual(store.activeWorkspaces(), [], "no snapshot: nothing to compare");
+  store.setSnapshot("ws_a", "abc123", undefined);
+  assert.deepEqual(
+    store.activeWorkspaces().map((w) => w.id),
+    ["ws_a"],
+  );
+  const old = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  (store as unknown as { db: Db }).db.run(`UPDATE workspaces SET updated_at = ? WHERE id = 'ws_a'`, old);
+  assert.deepEqual(store.activeWorkspaces(), [], "a snapshot older than two days drops out");
+});

@@ -37,9 +37,11 @@ export interface BoardInput {
 
 /** A board item with what gtv knows about it right now. */
 export interface BoardView extends BoardTask {
-  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null }[];
+  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null; last_seen: string | null }[];
   conflicts: { id: string; level: Level; status: string; with: string; message: string }[];
-  /** An open high/critical conflict touches this work: someone must decide before it can go on. */
+  /** Questions this work's agents asked that wait for a person. */
+  waiting: { id: string; to_dev: string | null }[];
+  /** An open high/critical conflict touches this work, or its agent waits for a person's answer: someone must act before it can go on. */
   blocked: boolean;
   overdue: boolean;
   notes_count: number;
@@ -86,14 +88,22 @@ export class Board {
       .map((c) => ({ id: c.id, level: c.level, status: c.status, with: workspaces.has(c.workspace_a) ? c.dev_b : c.dev_a, message: c.message }))
       .sort((a, b) => LEVEL_RANK[b.level] - LEVEL_RANK[a.level]);
     const open = OPEN.includes(t.status);
+    const sessions = new Set(active.map((r) => r.session_id));
+    const waiting = sessions.size
+      ? this.store
+          .tickets({ status: ["waiting_human"] })
+          .filter((k) => sessions.has(k.from_session))
+          .map((k) => ({ id: k.id, to_dev: k.to_dev ?? null }))
+      : [];
     return {
       ...t,
       work: active.map((r) => {
         const s = this.store.session(r.session_id);
-        return { task_id: r.id, dev: r.dev, title: r.title, session_status: s?.status ?? null, agent: s?.agent ?? null };
+        return { task_id: r.id, dev: r.dev, title: r.title, session_status: s?.status ?? null, agent: s?.agent ?? null, last_seen: s?.last_seen ?? null };
       }),
       conflicts,
-      blocked: open && (t.status === "blocked" || conflicts.some((c) => c.status !== "acked" && LEVEL_RANK[c.level] >= LEVEL_RANK.high)),
+      waiting,
+      blocked: open && (t.status === "blocked" || waiting.length > 0 || conflicts.some((c) => c.status !== "acked" && LEVEL_RANK[c.level] >= LEVEL_RANK.high)),
       overdue: open && !!t.due_date && t.due_date < today(),
       notes_count: this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM board_notes WHERE board_id = ?`, t.id)!.n,
     };

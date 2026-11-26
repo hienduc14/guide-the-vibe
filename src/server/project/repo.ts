@@ -163,9 +163,9 @@ export class Repo {
     });
   }
 
-  /** Unified diff of one file between two commits (3 lines of context), "" when it did not change. */
-  async diffFile(from: string, to: string, path: string): Promise<string> {
-    const r = await git(this.dir, ["diff", "--no-renames", "--no-color", from, to, "--", path], { allowFail: true });
+  /** Unified diff of one file between two commits (`context` lines around changes), "" when it did not change. */
+  async diffFile(from: string, to: string, path: string, context = 3): Promise<string> {
+    const r = await git(this.dir, ["diff", "--no-renames", "--no-color", `-U${context}`, from, to, "--", path], { allowFail: true });
     return r.code === 0 ? r.stdout : "";
   }
 

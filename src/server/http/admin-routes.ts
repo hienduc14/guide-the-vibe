@@ -7,11 +7,12 @@ import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
 import { bearer, openMode } from "./auth.ts";
 import type { Role } from "../hub/accounts.ts";
-import { FEATURES, FEATURE_KEYS } from "../../shared/features.ts";
+import { FEATURES, FEATURE_KEYS, isActive } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
 import { attention, conversations } from "../project/conversations.ts";
+import { incident, suggester } from "../project/incidents.ts";
 import { summarizer } from "../project/summaries.ts";
 import { loadSymbolChanges } from "../detect/l2.ts";
 import { globMatch, normPath } from "../../shared/util.ts";
@@ -249,7 +250,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({
       open_mode: openMode(hub),
       commit: process.env.GTV_COMMIT || null, // the deployed git commit (docker/auto-deploy.sh)
-      brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...brainHealth },
+      brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...brainHealth, failing: hub.brainFailing() },
       brain_stats: hub.brainStats({ days: 7 }),
       projects,
       devs: hub.devs(),
@@ -319,13 +320,28 @@ export function adminRoutes(hub: Hub): Hono<Env> {
 
   app.get("/projects/:id/conversations", async (c) => {
     const { engine } = await rt(c.req.param("id"));
-    const threads = conversations(engine, Math.min(200, Number(c.req.query("limit") ?? 40)));
+    const kinds = c.req.query("kinds")?.split(",").filter(Boolean);
+    const threads = conversations(engine, Math.min(200, Number(c.req.query("limit") ?? 40)), kinds);
     summarizer(engine).threads(threads);
     return c.json(threads);
   });
   /** Today's brain digest (cached; null until the first one is written or when the brain is off). */
   app.get("/projects/:id/digest", async (c) => c.json({ digest: summarizer((await rt(c.req.param("id"))).engine).day() ?? null }));
   app.get("/projects/:id/attention", async (c) => c.json(attention((await rt(c.req.param("id"))).engine)));
+  /** The brain's drafts for settling an incident; [] until they are written (the page asks again) or when the brain is off. */
+  app.get("/projects/:id/incidents/:iid/plans", async (c) => {
+    const { engine } = await rt(c.req.param("id"));
+    const inc = incident(engine, c.req.param("iid"));
+    if (!inc) throw new Error("unknown incident");
+    return c.json({ plans: suggester(engine).plans(inc) });
+  });
+  app.post("/projects/:id/incidents/:iid/rewrite", async (c) => {
+    const { engine } = await rt(c.req.param("id"));
+    const inc = incident(engine, c.req.param("iid"));
+    if (!inc) throw new Error("unknown incident");
+    const { text } = (await c.req.json()) as { text?: string };
+    return c.json({ text: await suggester(engine).rewrite(inc, String(text ?? "")) });
+  });
 
   app.get("/projects/:id/state", async (c) => c.json((await rt(c.req.param("id"))).engine.store.teamState()));
   /**
@@ -338,15 +354,16 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     if (!path) throw new Error("path is required");
     const state = p.engine.store.teamState();
     const sessionAgent = new Map(state.sessions.map((s) => [s.id, s.agent]));
-    const conflicts = state.conflicts.filter(
-      (x) => (x.status === "open" || x.status === "acked") && (x.subject === path || x.subject.startsWith(`${path}#`) || x.message.includes(path)),
-    );
+    // Whole-file context lets the dashboard show each person's version side by side (capped for huge files).
+    const context = Math.max(3, Math.min(100_000, Number(c.req.query("context") ?? 3)));
+    const aboutFile = (subject: string) => subject === path || subject.startsWith(`${path}#`) || subject.split(" ~ ").includes(path);
+    const conflicts = state.conflicts.filter((x) => (x.status === "open" || x.status === "acked") && aboutFile(x.subject));
     const workspaces = [];
     for (const ws of state.workspaces) {
       const footprint = state.footprints.find((f) => f.workspace_id === ws.id && f.path === path);
       const tasks = state.tasks.filter((t) => t.workspace_id === ws.id && t.resources.some((r) => r.kind === "path" && globMatch(r.value, path)));
       let diff = "";
-      if (p.engine.repo && ws.snapshot_sha && ws.snapshot_base) diff = await p.engine.repo.diffFile(ws.snapshot_base, ws.snapshot_sha, path);
+      if (p.engine.repo && ws.snapshot_sha && ws.snapshot_base) diff = await p.engine.repo.diffFile(ws.snapshot_base, ws.snapshot_sha, path, context);
       if (!footprint && !tasks.length && !diff) continue;
       const symbols = loadSymbolChanges(p.db, ws.id).filter((s) => s.symbol_id.startsWith(`${path}#`));
       workspaces.push({
@@ -361,11 +378,28 @@ export function adminRoutes(hub: Hub): Hono<Env> {
           ops: t.resources.filter((r) => r.kind === "path" && globMatch(r.value, path)).map((r) => r.op ?? ""),
         })),
         snapshot_at: ws.snapshot_sha ? ws.updated_at : null,
-        diff: diff.length > 60_000 ? diff.slice(0, 60_000) + "\n… (cắt bớt)" : diff,
+        base: ws.snapshot_base ?? null,
+        diff: diff.length > 400_000 ? diff.slice(0, 400_000) + "\n… (cắt bớt)" : diff,
         symbols,
       });
     }
-    return c.json({ path, conflicts, workspaces });
+    // The file's functions and classes (main), and who calls a symbol someone is changing in a breaking way.
+    const outline = isActive(p.engine.mode("knowledge.code_graph"))
+      ? p.engine.graph.fileSymbols(path, BASE).map((s) => ({ name: s.qualname || s.name, kind: s.kind, start_line: s.start_line, end_line: s.end_line }))
+      : [];
+    const used_by = state.conflicts
+      .filter((x) => x.kind === "breaking_change_used" && x.subject.startsWith(`${path}#`))
+      .flatMap((x) => {
+        const ev = x.evidence as { used_by?: string; changed_by?: string; callers?: { path: string; line: number; from_symbol?: string | null }[] };
+        return (ev.callers ?? []).map((h) => ({
+          dev: ev.used_by ?? "",
+          symbol: x.subject.split("#")[1] ?? "",
+          path: h.path,
+          line: h.line,
+          from_symbol: h.from_symbol ?? null,
+        }));
+      });
+    return c.json({ path, conflicts, workspaces, outline, used_by });
   });
   app.get("/projects/:id/stats", async (c) => c.json(stats(hub, await rt(c.req.param("id")), Number(c.req.query("days") ?? 7))));
   app.get("/projects/:id/layers", async (c) => c.json(layers(await rt(c.req.param("id")))));

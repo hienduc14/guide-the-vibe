@@ -33,6 +33,11 @@ export const FEATURES = {
     requires: ["brain"],
     description: "One-line brain summary of each settled conversation and a digest of the day on the dashboard (cached, capped per day)",
   },
+  "brain.suggest": {
+    default: "on",
+    requires: ["brain"],
+    description: "Brain drafts 2-3 ways to settle a clash, and rewrites a lead's message to the agents on request",
+  },
   brain: { default: "on", description: "LLM brain (Pi / null)" },
 } satisfies Record<string, FeatureDef>;
 

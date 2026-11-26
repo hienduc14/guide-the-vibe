@@ -25,7 +25,8 @@ export function buildApp(hub: Hub): Hono {
     if (token) hub.devForToken(token);
     return c.json({
       ok: true,
-      brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()) },
+      // health() checks the configuration only; `failing` says whether jobs actually work.
+      brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()), failing: hub.brainFailing() },
       projects: hub.records().map((p) => p.id),
       commit: process.env.GTV_COMMIT || null,
     });

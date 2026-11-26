@@ -10,6 +10,7 @@ import { BASE } from "../../codeintel/graph.ts";
 import { callMap, structureMap } from "../../codeintel/map.ts";
 import { FEATURES } from "../../shared/features.ts";
 import { globMatch, newId, normPath } from "../../shared/util.ts";
+import { actOnIncident, guideIncident, incidents } from "../project/incidents.ts";
 
 export type ProjectEnv = { Variables: AuthVars & { rt: ProjectRuntime } };
 type Ctx = Context<ProjectEnv>;
@@ -240,6 +241,15 @@ export function agentRoutes(): Hono<ProjectEnv> {
     store.logEvent(`conflict_${c.req.param("action")}`, c.get("dev"), { id: res.id });
     return c.json(res);
   });
+
+  // Incidents: every conflict row about one pair of workspaces, acted on together.
+  app.get("/incidents", (c) => c.json(incidents(c.get("rt").engine, c.req.query("all") ? "all" : "active")));
+  app.post("/incidents/:id/:action{ack|dismiss|reopen}", (c) =>
+    c.json(actOnIncident(c.get("rt").engine, c.req.param("id"), c.req.param("action") as "ack" | "dismiss" | "reopen", c.get("dev"))),
+  );
+  app.post("/incidents/:id/guide", async (c) =>
+    c.json(guideIncident(c.get("rt").engine, c.req.param("id"), (await c.req.json()) as { body?: string; to?: string[] }, c.get("dev"))),
+  );
 
   // ---- knowledge ------------------------------------------------------------------------
 

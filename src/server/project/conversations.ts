@@ -10,6 +10,7 @@ import type { BoardNote, Conflict, Level, Message, Ticket } from "../../shared/t
 import { oneLine } from "../../shared/types.ts";
 import { parseJson } from "../../shared/db.ts";
 import { cachedSummaries } from "./summaries.ts";
+import { incidents } from "./incidents.ts";
 
 export interface ChatEntry {
   id: string;
@@ -22,6 +23,8 @@ export interface ChatEntry {
   summary?: string;
   /** What a work note is about (progress, decision, blocker, question, done). */
   tag?: string | null;
+  /** Messages delivered into an agent: when the agent received it (null = not yet). */
+  delivered_at?: string | null;
 }
 
 /** A brain summary of a thread or a day, cached in the summaries table. */
@@ -45,12 +48,14 @@ export interface Thread {
   conflict?: { layer: string; kind: string; dev_a: string; dev_b: string; subject: string };
   /** Questions: the choices the asker offered, shown as buttons while a person has to decide. */
   options?: string[];
+  /** Questions: the board task the asking session was working on. */
+  board_id?: string;
   ai_summary?: AiSummary;
 }
 
 const strip = (body: string) => body.replace(/^\[gtv[^\]]*\]\s*/, "").replace(/\n\(conflict [^)]*\)$/, "");
 
-function questionThread(t: Ticket, msgs: Message[]): Thread {
+function questionThread(t: Ticket, msgs: Message[], boardId?: string): Thread {
   const entries: ChatEntry[] = [
     {
       id: `${t.id}:q`,
@@ -73,7 +78,16 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
       .replace(/^Q: [\s\S]*?\nA: /, ""); // answers repeat the question: the thread already shows it
     // A question asked straight to a teammate is delivered word for word: the asker's bubble already says it.
     if (kind === "forward" && body.trim() === t.question.trim()) continue;
-    entries.push({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind, body, summary: oneLine(body, 160) });
+    entries.push({
+      id: m.id,
+      from: m.from_dev ?? "gtv",
+      to: m.to_dev,
+      at: m.created_at,
+      kind,
+      body,
+      summary: oneLine(body, 160),
+      delivered_at: m.delivered_at ?? null,
+    });
   }
   // A synchronous answer (gtv_ask returned it directly) has no message: take it from the ticket.
   if (t.answer && (t.status === "answered" || t.status === "closed" || t.status === "expired") && !entries.some((e) => e.kind === "answer"))
@@ -96,12 +110,22 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
     updated_at: t.updated_at,
     entries,
     options: t.options?.length ? t.options : undefined,
+    board_id: boardId,
   });
 }
 
 function conflictThread(c: Conflict, msgs: Message[], acks: { ts: string; actor: string | null; type: string }[]): Thread {
   const entries: ChatEntry[] = [{ id: `${c.id}:d`, from: "gtv", to: null, at: c.created_at, kind: "conflict", body: c.message }];
-  for (const m of msgs) entries.push({ id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind: "conflict", body: strip(m.body) });
+  for (const m of msgs)
+    entries.push({
+      id: m.id,
+      from: m.from_dev ?? "gtv",
+      to: m.to_dev,
+      at: m.created_at,
+      kind: "conflict",
+      body: strip(m.body),
+      delivered_at: m.delivered_at ?? null,
+    });
   for (const a of acks)
     entries.push({
       id: `${c.id}:${a.ts}`,
@@ -134,8 +158,18 @@ function finish(t: Thread): Thread {
   return t;
 }
 
-/** The most recently active threads. */
-export function conversations(engine: Engine, limit = 40): Thread[] {
+/** The board task each session was working on when it asked (its latest registration with a board item). */
+function boardOfSession(engine: Engine): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of engine.db.all<{ session_id: string; board_id: string }>(
+    `SELECT session_id, board_id FROM tasks WHERE board_id IS NOT NULL ORDER BY created_at`,
+  ))
+    out.set(r.session_id, r.board_id);
+  return out;
+}
+
+/** The most recently active threads; `kinds` keeps only those thread kinds (before the limit is applied). */
+export function conversations(engine: Engine, limit = 40, kinds?: string[]): Thread[] {
   const db = engine.db;
   const byRef = new Map<string, Message[]>();
   const loose: Message[] = [];
@@ -144,8 +178,9 @@ export function conversations(engine: Engine, limit = 40): Thread[] {
     else loose.push(m);
   }
   const threads: Thread[] = [];
+  const boardOf = boardOfSession(engine);
   for (const t of engine.store.tickets()) {
-    threads.push(questionThread(t, byRef.get(t.id) ?? []));
+    threads.push(questionThread(t, byRef.get(t.id) ?? [], boardOf.get(t.from_session)));
     byRef.delete(t.id);
   }
   const acks = new Map<string, { ts: string; actor: string | null; type: string }[]>();
@@ -174,7 +209,16 @@ export function conversations(engine: Engine, limit = 40): Thread[] {
     const entries: ChatEntry[] = [
       ...msgs.map((m) => {
         const body = strip(m.body);
-        return { id: m.id, from: m.from_dev ?? "gtv", to: m.to_dev, at: m.created_at, kind: item ? "task" : "note", body, summary: oneLine(body, 160) };
+        return {
+          id: m.id,
+          from: m.from_dev ?? "gtv",
+          to: m.to_dev,
+          at: m.created_at,
+          kind: item ? "task" : "note",
+          body,
+          summary: oneLine(body, 160),
+          delivered_at: m.delivered_at ?? null,
+        };
       }),
       ...notes.map((n) => ({
         id: n.id,
@@ -214,10 +258,21 @@ export function conversations(engine: Engine, limit = 40): Thread[] {
         participants: [],
         started_at: msgs[0].created_at,
         updated_at: msgs.at(-1)!.created_at,
-        entries: msgs.map((m) => ({ id: m.id, from: m.from_dev!, to: m.to_dev, at: m.created_at, kind: "note", body: strip(m.body) })),
+        entries: msgs.map((m) => ({
+          id: m.id,
+          from: m.from_dev!,
+          to: m.to_dev,
+          at: m.created_at,
+          kind: "note",
+          body: strip(m.body),
+          delivered_at: m.delivered_at ?? null,
+        })),
       }),
     );
-  const out = threads.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, limit);
+  const out = threads
+    .filter((t) => !kinds?.length || kinds.includes(t.kind))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, limit);
   const cached = cachedSummaries(
     db,
     out.map((t) => t.id),
@@ -238,22 +293,38 @@ export interface AttentionItem {
   at: string;
   /** Conflicts: the facts, so the dashboard writes a short headline instead of gtv's sentence. */
   conflict?: { kind: string; subject: string; dev_a: string; dev_b: string };
+  /** Questions: who asked whom, and the board task the asker was on. */
+  ticket?: { from_dev: string; to_dev: string | null; tier: number };
+  board?: { id: string; title: string };
 }
+
+/** No session of in-progress work has been seen for this long: someone should check on it. */
+const STALE_MS = 24 * 3600_000;
 
 /** What a lead should look at now, most serious first. */
 export function attention(engine: Engine): AttentionItem[] {
   const out: AttentionItem[] = [];
-  for (const c of engine.store.conflicts("open"))
-    if (c.status === "open" && (c.level === "high" || c.level === "critical"))
+  // One item per incident (pair of people), not per conflict row.
+  const listedConflicts = new Set<string>();
+  for (const i of incidents(engine, "active"))
+    if (i.status === "open" && (i.level === "high" || i.level === "critical")) {
+      for (const e of i.evidence) listedConflicts.add(e.id);
       out.push({
         kind: "conflict",
-        level: c.level,
-        title: `${c.dev_a} ↔ ${c.dev_b}: ${c.subject}`,
-        detail: c.message,
-        ref: c.id,
-        at: c.updated_at,
-        conflict: { kind: c.kind, subject: c.subject, dev_a: c.dev_a, dev_b: c.dev_b },
+        level: i.level,
+        title: `${i.dev_a} ↔ ${i.dev_b}: ${i.headline.subject}`,
+        detail: i.evidence[0]?.message ?? "",
+        ref: i.id,
+        at: i.updated_at,
+        conflict: { kind: i.headline.kind, subject: i.headline.subject, dev_a: i.dev_a, dev_b: i.dev_b },
       });
+    }
+  const boardOf = boardOfSession(engine);
+  const boardRef = (session: string) => {
+    const b = boardOf.get(session);
+    const item = b ? engine.board.get(b) : undefined;
+    return item ? { id: item.id, title: item.title } : undefined;
+  };
   for (const t of engine.store.tickets({ status: ["waiting_human"] }))
     out.push({
       kind: "question",
@@ -262,6 +333,8 @@ export function attention(engine: Engine): AttentionItem[] {
       detail: t.forwarded_question ?? t.question,
       ref: t.id,
       at: t.updated_at,
+      ticket: { from_dev: t.from_dev, to_dev: t.to_dev ?? null, tier: t.tier },
+      board: boardRef(t.from_session),
     });
   const stale = Date.now() - 15 * 60_000;
   for (const t of engine.store.tickets({ status: ["forwarded"] }))
@@ -273,16 +346,19 @@ export function attention(engine: Engine): AttentionItem[] {
         detail: t.forwarded_question ?? t.question,
         ref: t.id,
         at: t.updated_at,
+        ticket: { from_dev: t.from_dev, to_dev: t.to_dev ?? null, tier: t.tier },
+        board: boardRef(t.from_session),
       });
-  const listed = new Set(out.filter((a) => a.kind === "conflict").map((a) => a.ref));
+  const askedAbout = new Set(out.filter((a) => a.kind === "question" && a.board).map((a) => a.board!.id));
   for (const b of engine.board.list({ open: true })) {
-    // Work blocked only by a conflict already listed above would repeat it: list the task when nothing else does.
-    if (b.blocked && (b.status === "blocked" || !b.conflicts.some((c) => listed.has(c.id))))
+    // Work blocked only by an incident or a question already listed above would repeat it: list the task when nothing else does.
+    const explained = b.conflicts.some((c) => listedConflicts.has(c.id)) || (b.waiting.length > 0 && askedAbout.has(b.id));
+    if (b.blocked && (b.status === "blocked" || !explained))
       out.push({
         kind: "blocked",
         level: "high",
         title: `Việc bị chặn: ${b.title}`,
-        detail: b.conflicts[0]?.message ?? "Đánh dấu bị chặn",
+        detail: b.conflicts[0]?.message ?? (b.waiting.length ? `Chờ ${b.waiting[0].to_dev ?? "một người"} trả lời` : "Đánh dấu bị chặn"),
         ref: b.id,
         at: b.updated_at,
       });
@@ -296,7 +372,26 @@ export function attention(engine: Engine): AttentionItem[] {
         at: b.updated_at,
       });
     if (!b.assignee && b.status === "todo" && (b.priority === "urgent" || b.priority === "high"))
-      out.push({ kind: "unassigned", level: "warning", title: `Chưa ai nhận: ${b.title}`, detail: `Ưu tiên ${b.priority}`, ref: b.id, at: b.updated_at });
+      out.push({
+        kind: "unassigned",
+        level: "warning",
+        title: `Chưa ai nhận: ${b.title}`,
+        detail: `Ưu tiên ${b.priority === "urgent" ? "khẩn" : "cao"}`,
+        ref: b.id,
+        at: b.updated_at,
+      });
+    if (b.status === "in_progress" && b.work.every((w) => w.session_status !== "active")) {
+      const seen = [b.updated_at, ...b.work.map((w) => w.last_seen ?? "")].reduce((m, x) => (x > m ? x : m), "");
+      if (Date.now() - Date.parse(seen) > STALE_MS)
+        out.push({
+          kind: "stale",
+          level: "warning",
+          title: `Im lặng: ${b.title}`,
+          detail: `${b.assignee ?? "Chưa giao"} · không agent nào chạy từ ${seen.slice(0, 10)}`,
+          ref: b.id,
+          at: seen,
+        });
+    }
   }
   const rank: Record<Level, number> = { critical: 3, high: 2, warning: 1, info: 0 };
   return out.sort((a, b) => rank[b.level] - rank[a.level] || b.at.localeCompare(a.at));

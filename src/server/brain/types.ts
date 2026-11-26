@@ -3,7 +3,7 @@
 
 import type { Engine } from "../project/engine.ts";
 
-export type JobKind = "answer_question" | "judge_registration" | "extract_intent_from_plan" | "summarize_thread" | "summarize_day";
+export type JobKind = "answer_question" | "judge_registration" | "extract_intent_from_plan" | "summarize_thread" | "summarize_day" | "suggest_resolution";
 
 export interface BrainJob {
   kind: JobKind;

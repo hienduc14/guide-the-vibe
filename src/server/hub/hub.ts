@@ -230,6 +230,14 @@ export class Hub {
     else this.db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, key, value);
   }
 
+  /** Brain jobs that failed in the last 10 minutes, and the latest error: a provider can be configured yet refuse every job. */
+  brainFailing(): { count: number; error: string | null } {
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const n = this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM brain_jobs WHERE ts >= ? AND ok = 0`, since)!.n;
+    const last = n ? this.db.get<{ error: string | null }>(`SELECT error FROM brain_jobs WHERE ts >= ? AND ok = 0 ORDER BY id DESC LIMIT 1`, since) : undefined;
+    return { count: n, error: last?.error ?? null };
+  }
+
   brainStats(opts: { project?: string; days?: number } = {}) {
     const since = new Date(Date.now() - (opts.days ?? 7) * 86_400_000).toISOString();
     const where = `ts >= ?${opts.project ? " AND project = ?" : ""}`;

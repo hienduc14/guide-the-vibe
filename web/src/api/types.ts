@@ -84,7 +84,7 @@ export interface Dev {
 export interface Overview {
   open_mode: boolean;
   commit: string | null;
-  brain: { backend: string; model: string | null; ok: boolean; detail?: string };
+  brain: { backend: string; model: string | null; ok: boolean; detail?: string; failing?: { count: number; error: string | null } };
   brain_stats: BrainStats;
   projects: ProjectEntry[];
   devs: Dev[];
@@ -131,6 +131,8 @@ export interface Task {
   goal?: string;
   resources: TaskResource[];
   status: string;
+  board_id?: string | null;
+  summary?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -194,9 +196,48 @@ export interface FileDetail {
     footprint: Footprint | null;
     tasks: { id: string; title: string; ops: string[] }[];
     snapshot_at: string | null;
+    base: string | null;
     diff: string;
     symbols: { symbol_id: string; name: string; kind: string; change: string; old_sig?: string; new_sig?: string }[];
   }[];
+  outline: { name: string; kind: string; start_line: number; end_line: number }[];
+  used_by: { dev: string; symbol: string; path: string; line: number; from_symbol: string | null }[];
+}
+
+export type IncidentStatus = "open" | "guided" | "acked" | "closed";
+
+/** One clash between two people's workspaces: every conflict row about that pair (GET /v1/p/:id/incidents). */
+export interface Incident {
+  id: string;
+  workspace_a: string;
+  workspace_b: string;
+  dev_a: string;
+  dev_b: string;
+  level: Level;
+  status: IncidentStatus;
+  closed_reason?: "dismissed" | "resolved";
+  headline: { layer: string; kind: string; subject: string };
+  evidence: {
+    id: string;
+    layer: string;
+    kind: string;
+    level: Level;
+    status: Conflict["status"];
+    subject: string;
+    message: string;
+    evidence: Record<string, unknown>;
+    updated_at: string;
+  }[];
+  files: string[];
+  board_ids: string[];
+  guide?: { at: string; by: string; body: string; to: { dev: string; delivered_at: string | null }[] };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Plan {
+  title: string;
+  text: string;
 }
 
 export interface TeamState {
@@ -230,6 +271,7 @@ export interface Ticket {
   confidence?: string | null;
   to_dev?: string | null;
   forwarded_question?: string | null;
+  options?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -450,8 +492,9 @@ export interface BoardTask {
 }
 
 export interface BoardView extends BoardTask {
-  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null }[];
+  work: { task_id: string; dev: string; title: string; session_status: string | null; agent: string | null; last_seen?: string | null }[];
   conflicts: { id: string; level: Level; status: string; with: string; message: string }[];
+  waiting: { id: string; to_dev: string | null }[];
   blocked: boolean;
   overdue: boolean;
   notes_count: number;
@@ -497,6 +540,7 @@ export interface ChatEntry {
   body: string;
   summary?: string;
   tag?: NoteTag | null;
+  delivered_at?: string | null;
 }
 
 /** A brain summary of a thread or of the day (cached on the server). */
@@ -518,6 +562,7 @@ export interface Thread {
   entries: ChatEntry[];
   conflict?: { layer: string; kind: string; dev_a: string; dev_b: string; subject: string };
   options?: string[];
+  board_id?: string;
   ai_summary?: AiSummary;
 }
 
@@ -529,6 +574,8 @@ export interface AttentionItem {
   ref: string;
   at: string;
   conflict?: { kind: string; subject: string; dev_a: string; dev_b: string };
+  ticket?: { from_dev: string; to_dev: string | null; tier: number };
+  board?: { id: string; title: string };
 }
 
 // ---- code map -------------------------------------------------------------------------------

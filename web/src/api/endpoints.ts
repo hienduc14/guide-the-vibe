@@ -13,6 +13,8 @@ import type {
   CallerHit,
   Conflict,
   FileDetail,
+  Incident,
+  Plan,
   Dev,
   FeatureMode,
   KbDoc,
@@ -101,15 +103,24 @@ export const api = {
     archive: (id: string) => del<{ ok: boolean }>(a(id)),
     sync: (id: string) => post<{ last_sync: ProjectDetail["last_sync"]; main: string | null }>(`${a(id)}/sync`),
     state: (id: string) => get<TeamState>(`${a(id)}/state`),
-    file: (id: string, path: string) => get<FileDetail>(`${a(id)}/file?path=${encodeURIComponent(path)}`),
+    file: (id: string, path: string, context = 3) => get<FileDetail>(`${a(id)}/file?path=${encodeURIComponent(path)}&context=${context}`),
     stats: (id: string, days: number) => get<ProjectStats>(`${a(id)}/stats?days=${days}`),
     layers: (id: string) => get<Layer[]>(`${a(id)}/layers`),
     activity: (id: string, limit = 60, type?: string) =>
       get<ActivityEvent[]>(`${a(id)}/activity?limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),
     message: (id: string, to_dev: string, body: string, ref_id?: string) => post(`${a(id)}/messages`, { to_dev, body, ref_id }),
-    conversations: (id: string, limit = 40) => get<Thread[]>(`${a(id)}/conversations?limit=${limit}`),
+    conversations: (id: string, limit = 40, kinds?: string[]) =>
+      get<Thread[]>(`${a(id)}/conversations?limit=${limit}${kinds?.length ? `&kinds=${kinds.join(",")}` : ""}`),
     attention: (id: string) => get<AttentionItem[]>(`${a(id)}/attention`),
     digest: (id: string) => get<{ digest: AiSummary | null }>(`${a(id)}/digest`),
+  },
+
+  incidents: {
+    list: (id: string, all = false) => get<Incident[]>(`${p(id)}/incidents${all ? "?all=1" : ""}`),
+    act: (id: string, iid: string, action: "ack" | "dismiss" | "reopen") => post<Incident>(`${p(id)}/incidents/${encodeURIComponent(iid)}/${action}`),
+    guide: (id: string, iid: string, body: string, to: string[]) => post<Incident>(`${p(id)}/incidents/${encodeURIComponent(iid)}/guide`, { body, to }),
+    plans: (id: string, iid: string) => get<{ plans: Plan[] }>(`${a(id)}/incidents/${encodeURIComponent(iid)}/plans`),
+    rewrite: (id: string, iid: string, text: string) => post<{ text: string }>(`${a(id)}/incidents/${encodeURIComponent(iid)}/rewrite`, { text }),
   },
 
   conflicts: {

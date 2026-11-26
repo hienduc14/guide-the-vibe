@@ -132,6 +132,15 @@ export function ChatView({ thread, projectId, members, onSent }: { thread: Threa
                   </span>
                 </div>
                 <EntryText e={e} />
+                {e.kind === "question" && thread.options && (
+                  <div className="option-chips" aria-label="Các lựa chọn">
+                    {thread.options.map((o, i) => (
+                      <span key={o} className="option-chip">
+                        {i + 1}. {o}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

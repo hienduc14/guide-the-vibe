@@ -1218,3 +1218,16 @@ a.kpi:hover {
   color: var(--accent);
   font-weight: 500;
 }
+.option-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.option-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: var(--text-xs);
+}

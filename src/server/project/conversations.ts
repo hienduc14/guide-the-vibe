@@ -69,6 +69,7 @@ function questionThread(t: Ticket, msgs: Message[]): Thread {
     const body = strip(m.body)
       .replace(/\nAnswer with the gtv_reply tool[\s\S]*$/, "")
       .replace(/\nReply in a terminal:[\s\S]*$/, "")
+      .replace(/\nOptions: .*$/m, "") // the choices are shown under the question
       .replace(/^Q: [\s\S]*?\nA: /, ""); // answers repeat the question: the thread already shows it
     // A question asked straight to a teammate is delivered word for word: the asker's bubble already says it.
     if (kind === "forward" && body.trim() === t.question.trim()) continue;

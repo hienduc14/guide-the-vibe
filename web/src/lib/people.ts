@@ -21,5 +21,5 @@ export function personColor(dev: string, members: Pick<Member, "dev" | "created_
 export function initials(name: string): string {
   const parts = name.split(/[-_.\s]+/).filter(Boolean);
   if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 1).toUpperCase() + name.slice(1, 2);
+  return name.slice(0, 1).toUpperCase();
 }

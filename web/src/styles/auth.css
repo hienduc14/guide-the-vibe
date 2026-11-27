@@ -332,6 +332,9 @@
 .pj .page.narrow {
   max-width: 780px;
 }
+.pj .stack > * {
+  min-width: 0; /* a wide table scrolls inside its card instead of widening the page on phones */
+}
 .pj .stack {
   display: grid;
   gap: 16px;
@@ -686,6 +689,20 @@
 .pj .tbl .num {
   text-align: right;
 }
+/* accounts: the person column takes the free width, the others sit together on the right with even gaps */
+.pj .tbl.users :is(th, td) {
+  padding-right: 28px;
+}
+.pj .tbl.users :is(th, td):first-child {
+  width: 100%;
+}
+.pj .tbl.users td:not(:first-child) {
+  white-space: nowrap;
+}
+.pj .tbl.users :is(th, td):last-child {
+  padding-right: 0;
+  text-align: right;
+}
 .pj .logos {
   display: inline-flex;
   gap: 4px;
@@ -708,7 +725,8 @@
 /* Thành viên */
 .pj .mrow {
   display: grid;
-  grid-template-columns: auto minmax(160px, 1.3fr) minmax(130px, auto) minmax(0, 1fr) auto;
+  /* avatar · name · computers (right-aligned) · access, the same width on every row · remove */
+  grid-template-columns: auto minmax(0, 1fr) auto 150px 32px;
   gap: 14px;
   align-items: center;
   padding: 12px 0;
@@ -732,6 +750,10 @@
 .pj .mrow .seen {
   color: var(--muted);
   font-size: 13px;
+  text-align: right;
+}
+.pj .mrow select.p-input {
+  width: 100%;
 }
 .pj .mrow .you {
   color: var(--faint);
@@ -1151,7 +1173,7 @@
   .pj .mrow .seen {
     display: none;
   }
-  .pj .mrow > div:nth-child(3) {
+  .pj .mrow > div:nth-child(4) {
     grid-column: 2 / -1;
   }
   .pj .iopt {

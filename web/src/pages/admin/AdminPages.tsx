@@ -82,7 +82,7 @@ export function AdminUsersPage() {
         </div>
         <div className="panel pad">
           <div className="tbl-wrap">
-            <table className="tbl">
+            <table className="tbl users">
               <thead>
                 <tr>
                   <th>Người</th>

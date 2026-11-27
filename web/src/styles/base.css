@@ -13,10 +13,6 @@ body {
   line-height: 1.55;
 }
 /* The root keeps the browser's (and the OS's) text size so rem tokens scale with it. */
-html {
-  /* Reserve the scrollbar's width on every page so content does not shift sideways between tabs. */
-  scrollbar-gutter: stable;
-}
 body {
   font-size: var(--text-md);
   line-height: 1.55;

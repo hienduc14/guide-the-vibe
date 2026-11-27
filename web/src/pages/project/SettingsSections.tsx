@@ -342,7 +342,9 @@ export function MembersSection() {
                   {m.display_name} {mine && <span className="you">(bạn)</span>}
                 </b>
                 <small>
-                  <span className="mono">{m.dev}</span> · {m.role} · {LEVEL_LABEL[m.level]}
+                  <span className="mono">{m.dev}</span>
+                  {/* developer · mid are the defaults every new member gets: show them only once someone set them */}
+                  {(m.role !== "developer" || m.level !== "mid") && ` · ${m.role} · ${LEVEL_LABEL[m.level]}`}
                   {manage && (
                     <button
                       type="button"
@@ -354,6 +356,18 @@ export function MembersSection() {
                     </button>
                   )}
                 </small>
+              </div>
+              <div className="seen">
+                {m.devices.length ? `${m.devices.length} máy · ` : "chưa kết nối máy · "}
+                {working.has(m.dev) ? (
+                  <span className="state running">đang làm</span>
+                ) : m.devices.some((d) => d.online) ? (
+                  "đang kết nối"
+                ) : seen ? (
+                  `thấy ${ago(seen)}`
+                ) : (
+                  "chưa thấy"
+                )}
               </div>
               <div>
                 {manage ? (
@@ -376,23 +390,6 @@ export function MembersSection() {
                   </select>
                 ) : (
                   <AccessChip access={m.access} />
-                )}
-                {lastMgr && manage && (
-                  <small className="faint" style={{ marginTop: 3 }}>
-                    Quản lý duy nhất
-                  </small>
-                )}
-              </div>
-              <div className="seen">
-                {m.devices.length ? `${m.devices.length} máy · ` : "chưa kết nối máy · "}
-                {working.has(m.dev) ? (
-                  <span className="state running">đang làm</span>
-                ) : m.devices.some((d) => d.online) ? (
-                  "đang kết nối"
-                ) : seen ? (
-                  `thấy ${ago(seen)}`
-                ) : (
-                  "chưa thấy"
                 )}
               </div>
               <div className="rm">
@@ -476,7 +473,7 @@ export function MembersSection() {
       <div className="sec">
         <span className="sect">Rời project</span>
         <div className="hrow">
-          <p className="muted grow" style={{ maxWidth: "60ch" }}>
+          <p className="muted grow">
             {iAmLastManager
               ? "Bạn là Quản lý duy nhất. Nâng một người khác lên Quản lý trước khi rời."
               : "Rời project thì bạn thôi thấy project này, và máy của bạn thôi làm việc ở đây. Việc đã làm vẫn giữ tên bạn."}

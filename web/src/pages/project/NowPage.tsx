@@ -29,6 +29,8 @@ interface AgentCard {
   last_seen: string | null;
   branch: string | null;
   task?: TeamState["tasks"][number];
+  /** the task it finished last, when it has none open */
+  done?: TeamState["tasks"][number];
 }
 interface FileRow {
   path: string;
@@ -71,6 +73,10 @@ export function buildMap(s: TeamState, incidents: Incident[], now = Date.now()) 
     if (!cur.task || t.updated_at > cur.task.updated_at) cur.task = t;
     agents.set(t.workspace_id, cur);
   }
+  for (const t of s.recent_done ?? []) {
+    const a = agents.get(t.workspace_id);
+    if (a && !a.task) a.done = t; // the list is oldest first: the last one wins
+  }
   const files = new Map<string, FileRow>();
   const touch = (path: string, ws: string, dev: string, agent: string | null, state: Touch, n: number, last: string | null) => {
     const f = files.get(path) ?? { path, touches: [] };
@@ -90,7 +96,8 @@ export function buildMap(s: TeamState, incidents: Incident[], now = Date.now()) 
       fp.workspace_id,
       fp.dev,
       sessionOf.get(fp.session_id)?.agent ?? null,
-      now - Date.parse(fp.last_at) < RECENT_MS ? "editing" : "edited",
+      // "editing" only while the agent is at work: once it stops (Stop hook) or goes quiet the edits are history
+      now - Date.parse(fp.last_at) < RECENT_MS && sessionOf.get(fp.session_id)?.status === "active" ? "editing" : "edited",
       fp.count,
       fp.last_at,
     );
@@ -242,7 +249,13 @@ function AgentModal({ a, onClose }: { a: AgentCard; onClose: () => void }) {
     >
       <dl className="p-kv">
         <dt>Việc</dt>
-        <dd>{boardId ? <Link to={`/p/${id}/work?task=${boardId}`}>{t?.title}</Link> : (t?.title ?? <span className="faint">Chưa nói đang làm gì</span>)}</dd>
+        <dd>
+          {boardId ? (
+            <Link to={`/p/${id}/work?task=${boardId}`}>{t?.title}</Link>
+          ) : (
+            (t?.title ?? (a.done ? `Đã xong: ${a.done.title}` : <span className="faint">Chưa nói đang làm gì</span>))
+          )}
+        </dd>
         {a.branch && (
           <>
             <dt>Nhánh</dt>
@@ -440,7 +453,9 @@ export function NowPage() {
                         <span className="p-who">
                           <b>{a.dev}</b>
                         </span>
-                        <span className={`task${a.task ? "" : " none"}`}>{a.task?.title ?? "Chưa nói đang làm gì"}</span>
+                        <span className={`task${a.task ? "" : " none"}`}>
+                          {a.task?.title ?? (a.done ? `Đã xong: ${a.done.title}` : "Chưa nói đang làm gì")}
+                        </span>
                         <span className="p-meta">
                           <State status={a.status} />
                           {bumps.length > 0 && <span className="bump">đụng {bumps.join(", ")}</span>}

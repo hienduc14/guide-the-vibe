@@ -239,6 +239,8 @@ export interface TeamState {
   workspaces: Workspace[];
   sessions: Session[];
   tasks: Task[];
+  /** tasks finished in the last two hours (what an agent just did) */
+  recent_done?: Task[];
   footprints: Footprint[];
   conflicts: Conflict[];
   features: Record<string, FeatureMode>;

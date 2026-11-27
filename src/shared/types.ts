@@ -157,6 +157,8 @@ export interface Message {
 export type GtvEvent =
   | { type: "session_start"; session: SessionHello }
   | { type: "session_end"; session_id: string }
+  /** The agent finished its turn (Stop hook): the session goes idle until the next prompt or edit. */
+  | { type: "stop"; session_id: string }
   | { type: "prompt"; session_id: string; prompt: string }
   | { type: "plan"; session_id: string; plan: string }
   | { type: "edit"; session_id: string; paths: string[]; phase: "pre" | "post" }
@@ -180,6 +182,8 @@ export interface TeamState {
   workspaces: Workspace[];
   sessions: Session[];
   tasks: Task[];
+  /** Tasks finished in the last two hours, so a card can say what an agent just did (not used for detection). */
+  recent_done?: Task[];
   footprints: Footprint[];
   conflicts: Conflict[];
   features: Record<string, FeatureMode>;

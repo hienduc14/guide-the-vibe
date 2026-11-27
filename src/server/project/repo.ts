@@ -22,6 +22,10 @@ export interface DiffEntry {
 }
 
 export const SNAPSHOT_PREFIX = "refs/gtv/";
+/** Snapshots a daemon uploads (a git bundle over HTTP). Not under refs/gtv/, which `fetch --prune` mirrors from origin. */
+export const UPLOAD_PREFIX = "refs/gtv-wip/";
+/** The ref a daemon's bundle carries its snapshot under. */
+export const BUNDLE_REF = "refs/gtv-local/snapshot";
 
 export class Repo {
   readonly dir: string;
@@ -51,6 +55,17 @@ export class Repo {
 
   async fetch(): Promise<void> {
     await git(this.dir, ["fetch", "--prune", "--quiet", "origin"]);
+  }
+
+  /**
+   * Take a snapshot from a bundle file into `ref`. "missing" when the bundle builds on commits this mirror does not
+   * have (the developer's origin is ahead of ours, or local unpushed commits): fetch, then ask for a full bundle.
+   */
+  async importBundle(file: string, ref: string): Promise<"ok" | "missing"> {
+    const r = await git(this.dir, ["fetch", "--quiet", "--no-tags", file, `+${BUNDLE_REF}:${ref}`], { allowFail: true });
+    if (r.code === 0) return "ok";
+    if (/prerequisite|lacks|missing|did not send all necessary objects/i.test(r.stderr)) return "missing";
+    throw new Error(`could not read the snapshot bundle: ${r.stderr.trim().slice(0, 300)}`);
   }
 
   async revParse(ref: string): Promise<string | undefined> {

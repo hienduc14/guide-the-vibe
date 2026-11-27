@@ -4,7 +4,7 @@ import type { Db } from "../../shared/db.ts";
 import { Store, type Team } from "./store.ts";
 import { Board, type BoardView } from "./board.ts";
 import { conflictAdvice, standingOf } from "./coord.ts";
-import type { Repo } from "./repo.ts";
+import { UPLOAD_PREFIX, type Repo } from "./repo.ts";
 import { KnowledgeBase, type KbHit } from "../knowledge/kb.ts";
 import { CodeGraph, BASE } from "../../codeintel/graph.ts";
 import { syncBase, syncOverlay, workspaceChanges } from "../../codeintel/indexer.ts";
@@ -170,6 +170,9 @@ export class Engine {
       }
       case "session_end":
         this.store.endSession(ev.session_id);
+        return {};
+      case "stop":
+        this.store.idleSession(ev.session_id);
         return {};
       case "prompt":
         this.store.touchSession(ev.session_id);
@@ -435,6 +438,46 @@ export class Engine {
 
   // ---- snapshots & repo ----------------------------------------------------------
 
+  /**
+   * A snapshot the daemon uploaded as a git bundle (no push rights to the team's remote needed). Returns "missing"
+   * when the bundle builds on commits the mirror lacks even after a fetch: the daemon then sends a full bundle.
+   */
+  async receiveSnapshot(dev: string, workspaceId: string, sha: string, bundleFile: string, branch?: string): Promise<"ok" | "missing"> {
+    if (!this.repo) throw new Error("this project has no repository");
+    const ws = this.store.workspace(workspaceId);
+    if (!ws || ws.dev !== dev) throw new Error(`unknown workspace ${workspaceId}`);
+    const ref = `${UPLOAD_PREFIX}${dev}/${workspaceId}`;
+    const got = await this.gitLock.use(async () => {
+      let r = await this.repo!.importBundle(bundleFile, ref);
+      if (r === "missing") {
+        await this.repo!.fetch();
+        r = await this.repo!.importBundle(bundleFile, ref);
+      }
+      return r;
+    });
+    if (got === "missing") return got;
+    if ((await this.repo.revParse(ref)) !== sha) throw new Error("the bundle does not hold the snapshot it names");
+    await this.onSnapshot(workspaceId, sha, branch);
+    return "ok";
+  }
+
+  /**
+   * Files the snapshot changes that no edit hook reported (Codex without hooks, edits made by shell commands): they
+   * count as edited by the workspace's latest session, so the map and the path checks see them.
+   */
+  private async footprintsFromSnapshot(workspaceId: string, sha: string, base: string): Promise<void> {
+    const session = this.store.sessions(true).find((s) => s.workspace_id === workspaceId);
+    if (!session) return;
+    const known = new Set(
+      this.store
+        .footprints()
+        .filter((f) => f.workspace_id === workspaceId)
+        .map((f) => f.path),
+    );
+    const changed = (await this.repo!.diffNames(base, sha)).map((d) => d.path).filter((p) => !known.has(p));
+    if (changed.length) this.store.addFootprints(session, changed);
+  }
+
   async onSnapshot(workspaceId: string, sha: string, branch?: string): Promise<void> {
     if (!this.repo) return;
     await this.gitLock.use(async () => {
@@ -449,6 +492,7 @@ export class Engine {
       const base = main ? await this.repo!.mergeBase(sha, main) : undefined;
       this.store.setSnapshot(workspaceId, sha, base, branch);
       this.store.logEvent("snapshot", ws.dev, { workspace: workspaceId, sha, base });
+      if (base) await this.footprintsFromSnapshot(workspaceId, sha, base);
       if (main && isActive(this.mode("knowledge.code_graph"))) {
         await this.guarded("knowledge.code_graph", async () => {
           await syncBase(this.graph, this.repo!, main);

@@ -1,6 +1,9 @@
 // Project-scoped API used by daemons, agents (through the daemon) and the CLI: mounted at /v1/p/:project.
 
 import { Hono, type Context } from "hono";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { streamSSE } from "hono/streaming";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
@@ -13,6 +16,7 @@ import { globMatch, newId, normPath } from "../../shared/util.ts";
 import { actOnIncident, guideIncident, incidents } from "../project/incidents.ts";
 
 export type ProjectEnv = { Variables: AuthVars & { rt: ProjectRuntime } };
+const MAX_BUNDLE = 100 << 20;
 type Ctx = Context<ProjectEnv>;
 
 const sessionOf = (c: Ctx, id: string | undefined): Session => {
@@ -42,6 +46,29 @@ export function agentRoutes(): Hono<ProjectEnv> {
       results.push(await engine.handle(c.get("dev"), ev));
     }
     return c.json({ results });
+  });
+
+  /**
+   * A WIP snapshot as a git bundle (body), so a developer needs no push rights to the team's remote:
+   * ?workspace_id=&sha=&branch=. 409 { need: "full" } asks the daemon for a bundle with the whole history.
+   */
+  app.post("/snapshot", async (c) => {
+    const { engine } = c.get("rt");
+    const ws = c.req.query("workspace_id") ?? "";
+    const sha = c.req.query("sha") ?? "";
+    if (!/^[0-9a-f]{40}$/.test(sha)) return c.json({ error: "sha must be a full commit id" }, 400);
+    const body = Buffer.from(await c.req.arrayBuffer());
+    if (!body.length) return c.json({ error: "empty bundle" }, 400);
+    if (body.length > MAX_BUNDLE) return c.json({ error: `snapshot too large (over ${MAX_BUNDLE >> 20} MB)` }, 413);
+    const dir = mkdtempSync(join(tmpdir(), "gtv-bundle-"));
+    try {
+      const file = join(dir, "snapshot.bundle");
+      writeFileSync(file, body);
+      const r = await engine.receiveSnapshot(c.get("dev"), ws, sha, file, c.req.query("branch") || undefined);
+      return r === "ok" ? c.json({ accepted: true }) : c.json({ error: "the bundle builds on commits the server does not have", need: "full" }, 409);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   app.get("/state", (c) => c.json(c.get("rt").engine.store.teamState()));

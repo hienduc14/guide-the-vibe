@@ -17,15 +17,19 @@ export class ServerClient {
   }
 
   async call<T = any>(method: string, path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
+    return this.send<T>(method, path, body === undefined ? undefined : JSON.stringify(body), this.headers(), timeoutMs);
+  }
+
+  /** POST raw bytes (a snapshot bundle). */
+  upload<T = any>(path: string, bytes: Uint8Array, timeoutMs = 120_000): Promise<T> {
+    return this.send<T>("POST", path, bytes, { ...this.headers(), "content-type": "application/octet-stream" }, timeoutMs);
+  }
+
+  private async send<T>(method: string, path: string, body: string | Uint8Array | undefined, headers: Record<string, string>, timeoutMs: number): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(this.cfg.server + path, {
-        method,
-        headers: this.headers(),
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: ctrl.signal,
-      });
+      const res = await fetch(this.cfg.server + path, { method, headers, body: body as BodyInit | undefined, signal: ctrl.signal });
       const text = await res.text();
       const json = text ? JSON.parse(text) : undefined;
       if (!res.ok) throw Object.assign(new Error(json?.error ?? `${res.status} ${res.statusText}`), { status: res.status });

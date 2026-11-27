@@ -9,7 +9,7 @@ import { GTV_VERSION, agentVersions, setupState } from "./install.ts";
 import { ServerClient } from "./client.ts";
 import { normalize, toRepoPaths, formatOutput, type NormalizedHook } from "./hooks.ts";
 import { decidePreEdit, messagesFor, statusline, type LocalSession } from "./decide.ts";
-import { snapshotWorktree } from "./snapshot.ts";
+import { bundleSnapshot, forgetSnapshot, snapshotWorktree } from "./snapshot.ts";
 import { desktopNotify } from "./notify.ts";
 import { Workspaces, type WorkspaceInfo } from "./workspace.ts";
 import { runTool, describeStatus } from "./tools.ts";
@@ -34,6 +34,9 @@ export class Daemon {
   private sessions = new Map<string, LocalSession & { project: string }>();
   private lastActive = new Map<string, string>(); // `${agent}|${ws}` -> session key
   private snapshotTimers = new Map<string, NodeJS.Timeout>();
+  /** workspace id → last time an agent used it (hook or tool call) */
+  private usedAt = new Map<string, number>();
+  private snapTickTimer?: NodeJS.Timeout;
   private waiters = new Set<{ key: string; resolve: () => void }>();
   private waitTokens = new Map<string, symbol>();
   private sendChain: Promise<unknown> = Promise.resolve();
@@ -77,6 +80,8 @@ export class Daemon {
     void this.reportDevice();
     this.reportTimer = setInterval(() => void this.reportDevice(), 6 * 3600_000);
     this.reportTimer.unref();
+    this.snapTickTimer = setInterval(() => this.snapshotTick(), 60_000);
+    this.snapTickTimer.unref();
   }
 
   /** Tells the server what this computer has (My computers): gtv version, agents, and the repos where gtv is on. */
@@ -94,6 +99,7 @@ export class Daemon {
     clearInterval(this.reportTimer);
     for (const p of this.projects.values()) p.stop();
     for (const t of this.snapshotTimers.values()) clearTimeout(t);
+    clearInterval(this.snapTickTimer);
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
   }
 
@@ -182,6 +188,7 @@ export class Daemon {
     if (!ws) throw new Error(`${cwd} is not a git repository linked to a gtv project (run: gtv link <project>)`);
     const key = this.lastActive.get(`${agent}|${ws.id}`) ?? [...this.lastActive.entries()].find(([k]) => k.endsWith(`|${ws.id}`))?.[1];
     const s = key ? this.sessions.get(key) : undefined;
+    this.usedAt.set(ws.id, Date.now());
     if (s) return { session: s, ws };
     return { session: (await this.ensureSession(agent, `mcp-${agent}-${ws.id}`, ws, cwd)).session, ws };
   }
@@ -208,17 +215,38 @@ export class Daemon {
     this.snapshotTimers.set(
       ws.id,
       setTimeout(async () => {
+        const ref = `refs/gtv/${this.cfg.dev}/${ws.id}`;
         try {
-          const snap = await snapshotWorktree(ws.top, `refs/gtv/${this.cfg.dev}/${ws.id}`, { remote: this.cfg.remote });
-          if (snap?.pushed) {
-            log("daemon", `snapshot ${snap.sha.slice(0, 8)} pushed for ${ws.project}/${ws.label}`);
-            this.send(ws.project, { type: "snapshot", workspace_id: ws.id, sha: snap.sha, branch: snap.branch });
-          }
+          // Sent to the gtv server as a bundle: no push rights to the team's remote are needed.
+          const snap = await snapshotWorktree(ws.top, ref, { remote: this.cfg.remote, push: false });
+          if (!snap?.changed) return;
+          await this.uploadSnapshot(ws, snap.sha, snap.branch);
+          log("daemon", `snapshot ${snap.sha.slice(0, 8)} sent for ${ws.project}/${ws.label}`);
         } catch (e) {
+          forgetSnapshot(ws.top, ref); // try again next time even if nothing changes meanwhile
           log("daemon", `snapshot failed for ${ws.label}: ${(e as Error).message}`);
         }
       }, delayMs),
     );
+  }
+
+  private async uploadSnapshot(ws: WorkspaceInfo, sha: string, branch: string | undefined): Promise<void> {
+    const q = new URLSearchParams({ workspace_id: ws.id, sha, ...(branch ? { branch } : {}) });
+    const path = `/v1/p/${encodeURIComponent(ws.project)}/snapshot?${q}`;
+    try {
+      await this.client.upload(path, await bundleSnapshot(ws.top, sha, { remote: this.cfg.remote }));
+    } catch (e) {
+      // The server lacks commits the bundle builds on: send the whole history once.
+      if ((e as { status?: number }).status !== 409) throw e;
+      await this.client.upload(path, await bundleSnapshot(ws.top, sha, { remote: this.cfg.remote, full: true }));
+    }
+  }
+
+  /** Workspaces an agent used in the last two hours get a snapshot every minute: agents without edit hooks (Codex on
+   * some setups, edits made with shell commands) still show what they changed. Unchanged trees are not sent. */
+  private snapshotTick(): void {
+    const recent = Date.now() - 2 * 3600_000;
+    for (const ws of this.workspaces.all()) if ((this.usedAt.get(ws.id) ?? 0) > recent) this.scheduleSnapshot(ws, 0);
   }
 
   // ---- hooks ------------------------------------------------------------------------------
@@ -247,6 +275,7 @@ export class Daemon {
       return undefined; // fail open
     }
     this.lastActive.set(`${agent}|${ws.id}`, `${agent}:${h.agentSessionId}`);
+    this.usedAt.set(ws.id, Date.now());
     return formatOutput(h, this.decide(h, ctx.session, ws, ctx.briefing));
   }
 
@@ -278,6 +307,7 @@ export class Daemon {
       }
       case "stop":
         this.scheduleSnapshot(ws, 2000);
+        this.send(ws.project, { type: "stop", session_id: s.id });
         return { decision: "allow" };
       case "session_end":
         this.scheduleSnapshot(ws, 1000);

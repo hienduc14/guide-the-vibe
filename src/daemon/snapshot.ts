@@ -1,6 +1,9 @@
-// WIP snapshot: commit the working tree into a throwaway commit using a temporary index, then
-// force-push it to refs/gtv/<dev>/<workspace>. The dev's branch, index and stash are never touched.
+// WIP snapshot: commit the working tree into a throwaway commit using a temporary index. The daemon sends it to the
+// gtv server as a git bundle (bundleSnapshot); tests and old setups can still force-push it to refs/gtv/<dev>/<workspace>.
+// The dev's branch, index and stash are never touched.
 
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "../shared/util.ts";
 
@@ -18,6 +21,34 @@ export interface SnapshotResult {
   tree: string;
   branch?: string;
   pushed: boolean;
+  /** The working tree differs from the last snapshot taken for this ref. */
+  changed: boolean;
+}
+
+/** The ref a bundle carries the snapshot under (the server reads this name). */
+const BUNDLE_REF = "refs/gtv-local/snapshot";
+
+/**
+ * A git bundle with the snapshot commit. By default it leaves out what the remote-tracking branches already have
+ * (the server mirrors the same remote); `full` sends the whole history, for when the server lacks those commits.
+ */
+export async function bundleSnapshot(top: string, sha: string, opts: { remote?: string; full?: boolean } = {}): Promise<Uint8Array> {
+  await git(top, ["update-ref", BUNDLE_REF, sha]);
+  const dir = mkdtempSync(join(tmpdir(), "gtv-snap-"));
+  try {
+    const file = join(dir, "snapshot.bundle");
+    const remote = opts.remote ?? "origin";
+    const hasRemote = !opts.full && (await git(top, ["for-each-ref", "--count=1", `refs/remotes/${remote}/`])).stdout.trim() !== "";
+    const args = ["bundle", "create", "--quiet", file, BUNDLE_REF];
+    if (hasRemote) args.push("--not", `--remotes=${remote}`);
+    const r = await git(top, args, { allowFail: true });
+    // Nothing new beyond the remote (the snapshot is a commit the remote already has): send it whole.
+    if (r.code !== 0 && hasRemote) await git(top, ["bundle", "create", "--quiet", file, BUNDLE_REF]);
+    else if (r.code !== 0) throw new Error(`git bundle failed: ${r.stderr.trim()}`);
+    return readFileSync(file);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 export async function repoTop(dir: string): Promise<string | undefined> {
@@ -50,10 +81,15 @@ export async function snapshotWorktree(dir: string, ref: string, opts: { remote?
   if (headSha) commitArgs.splice(2, 0, "-p", headSha);
   const sha = (await git(top, commitArgs, { env })).stdout.trim();
 
-  if (lastTree.get(key) === `${tree}|${headSha}`) return { sha, tree, branch, pushed: false };
+  if (lastTree.get(key) === `${tree}|${headSha}`) return { sha, tree, branch, pushed: false, changed: false };
   if (opts.push !== false) {
     await git(top, ["push", "--quiet", "--force", opts.remote ?? "origin", `${sha}:${ref}`]);
   }
   lastTree.set(key, `${tree}|${headSha}`);
-  return { sha, tree, branch, pushed: opts.push !== false };
+  return { sha, tree, branch, pushed: opts.push !== false, changed: true };
+}
+
+/** Forget the last snapshot of a ref, so the next one is sent even if nothing changed (after a failed upload). */
+export function forgetSnapshot(top: string, ref: string): void {
+  lastTree.delete(`${top}|${ref}`);
 }

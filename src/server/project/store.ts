@@ -91,17 +91,27 @@ export class Store extends EventEmitter {
     this.db.run(`UPDATE sessions SET last_seen = ?, status = 'active' WHERE id = ?`, nowIso(), id);
   }
 
+  /** The agent finished its turn: idle until it does something again (touchSession). */
+  idleSession(id: string): void {
+    this.db.run(`UPDATE sessions SET status = 'idle' WHERE id = ? AND status = 'active'`, id);
+    this.changed();
+  }
+
   endSession(id: string): void {
     this.db.run(`UPDATE sessions SET status = 'ended' WHERE id = ?`, id);
     this.changed();
   }
 
-  /** Mark sessions idle/ended by heartbeat age. Returns true when something changed. */
+  /**
+   * Mark sessions idle/ended by heartbeat age. Only ever moves a session down (active → idle → ended): activity
+   * (touchSession) is what makes it active again, so an agent that stopped (Stop hook) stays idle. Returns true when
+   * something changed.
+   */
   expireSessions(now = Date.now()): boolean {
     let changed = false;
     for (const s of this.sessions()) {
       const age = now - Date.parse(s.last_seen);
-      const next = age > SESSION_END_MS ? "ended" : age > SESSION_IDLE_MS ? "idle" : "active";
+      const next = age > SESSION_END_MS ? "ended" : age > SESSION_IDLE_MS && s.status === "active" ? "idle" : s.status;
       if (next !== s.status) {
         this.db.run(`UPDATE sessions SET status = ? WHERE id = ?`, next, s.id);
         changed = true;
@@ -404,6 +414,12 @@ export class Store extends EventEmitter {
       workspaces: this.workspaces(),
       sessions: this.sessions(),
       tasks: this.activeTasks(),
+      recent_done: this.db
+        .all<Record<string, unknown>>(
+          `SELECT * FROM tasks WHERE status = 'done' AND updated_at > ? ORDER BY updated_at`,
+          new Date(Date.now() - 2 * 3600_000).toISOString(),
+        )
+        .map(rowToTask),
       footprints: this.footprints(),
       conflicts: this.conflicts("open"),
       features: this.features(),

@@ -122,7 +122,7 @@ export function ThemeButton() {
 /** The top bar of a page outside a project: icon + title, optional tabs. */
 export function SimpleTop({ title, icon: Icon, tabs }: { title: string; icon: LucideIcon; tabs?: [to: string, label: string, icon: LucideIcon][] }) {
   return (
-    <header className="p-top">
+    <header className="p-top simple">
       <div className="top-row" style={{ paddingBottom: tabs ? 0 : 12 }}>
         <div className="top-title">
           <Icon />

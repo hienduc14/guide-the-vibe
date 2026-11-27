@@ -56,7 +56,8 @@ const p = (id: string) => `/v1/p/${encodeURIComponent(id)}`;
 const a = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 
 export interface ProjectInput {
-  id: string;
+  /** left out on create: the server makes one from the name */
+  id?: string;
   name?: string;
   repo_url: string;
   main_branch?: string;

@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Lock, X } from "lucide-react";
+import { Check, Link2, Lock, X } from "lucide-react";
 import { api } from "../../api/endpoints";
 import { useAuth } from "../../hooks/useAuth";
 import { useOverview } from "../../hooks/useOverview";
-import { Modal, slug } from "../../components/ui";
+import { Modal } from "../../components/ui";
 import { CopyLine } from "../project/SettingsSections";
 
 type RepoCheck = { state: "idle" } | { state: "wait" } | { state: "ok"; branch: string | null } | { state: "bad"; error: string };
 
-/** Tạo project: name, id from the name, repo URL that must pass "Kiểm tra" first, main branch, description. */
+/** Tạo project: name, repo URL that must pass "Kiểm tra" first, main branch, description. The server picks the id from the name. */
 export function CreateProjectModal({ repo, onClose }: { repo?: string | null; onClose: () => void }) {
   const navigate = useNavigate();
   const { refresh } = useAuth();
@@ -19,8 +19,6 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
   const fromRepo = repo && /^[\w.-]+\/[\w.-]+$/.test(repo) ? repo : "";
   const [f, setF] = useState({
     name: fromRepo ? fromRepo.split("/")[1] : "",
-    id: fromRepo ? slug(fromRepo.split("/")[1]) : "",
-    idEdited: false,
     url: fromRepo ? `https://github.com/${fromRepo}.git` : "",
     branch: "",
     description: "",
@@ -28,6 +26,7 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
   const [check, setCheck] = useState<RepoCheck>({ state: "idle" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [done, setDone] = useState<{ id: string; name: string }>();
   const runCheck = async () => {
     if (!f.url.trim()) return setCheck({ state: "bad", error: "Dán URL repo trước." });
     setCheck({ state: "wait" });
@@ -41,8 +40,7 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
     setBusy(true);
     setError(undefined);
     try {
-      await api.projects.create({
-        id: f.id.trim(),
+      const p = await api.projects.create({
         name: f.name.trim(),
         repo_url: f.url.trim(),
         main_branch: f.branch.trim() || undefined,
@@ -50,24 +48,67 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
       });
       await refresh();
       void reload();
-      navigate(`/p/${encodeURIComponent(f.id.trim())}/settings/members?created=1`);
+      setDone({ id: p.id, name: p.name ?? f.name.trim() });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
     }
   };
-  const host = window.location.host;
+  if (done) {
+    const to = `/p/${encodeURIComponent(done.id)}`;
+    return (
+      <Modal
+        title="Tạo project"
+        onClose={onClose}
+        foot={
+          <>
+            <button type="button" className="p-btn quiet" onClick={() => navigate(to)}>
+              Mở project
+            </button>
+            <button type="button" className="p-btn primary" onClick={() => navigate(`${to}/settings/members?invite=1`)}>
+              <Link2 size={15} />
+              Mời thành viên
+            </button>
+          </>
+        }
+      >
+        <div className="created">
+          <span className="big-ok">
+            <Check />
+          </span>
+          <div>
+            <b>Đã tạo {done.name}</b>
+            <small>Bạn là Quản lý của project này.</small>
+          </div>
+        </div>
+        <ul className="next-steps">
+          <li>Gửi link mời cho nhóm: bấm Mời thành viên bên dưới.</li>
+          <li>
+            Mỗi người chạy <span className="mono">gtv on</span> trong bản clone của repo.
+          </li>
+          <li>
+            Máy chưa có gtv: chạy <span className="mono">npx guide-the-vibe</span> rồi <span className="mono">gtv login</span> trước.
+          </li>
+        </ul>
+      </Modal>
+    );
+  }
   return (
     <Modal
       title="Tạo project"
-      sub="Một project = một repo và nhóm người cùng làm trên nó. Bạn sẽ là Quản lý."
       onClose={onClose}
       foot={
         <>
           <button type="button" className="p-btn quiet" onClick={onClose}>
             Huỷ
           </button>
-          <button type="submit" form="np-form" className="p-btn primary" disabled={check.state !== "ok" || busy || !f.name.trim() || !f.id.trim()}>
+          <button
+            type="submit"
+            form="np-form"
+            className="p-btn primary"
+            disabled={check.state !== "ok" || busy || !f.name.trim()}
+            title={check.state !== "ok" ? "Bấm Kiểm tra repo trước" : undefined}
+          >
             Tạo project
           </button>
         </>
@@ -87,29 +128,9 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
           </div>
         )}
         <div className="formgrid">
-          <label>
+          <label className="wide">
             Tên project
-            <input
-              className="p-input"
-              value={f.name}
-              placeholder="Realworld API"
-              required
-              autoFocus
-              onChange={(e) => setF({ ...f, name: e.target.value, id: f.idEdited ? f.id : slug(e.target.value) })}
-            />
-          </label>
-          <label>
-            Mã project
-            <input
-              className="p-input mono"
-              value={f.id}
-              placeholder="realworld-api"
-              required
-              onChange={(e) => setF({ ...f, id: e.target.value.toLowerCase(), idEdited: true })}
-            />
-            <small>
-              {host}/p/{f.id || "…"} · không đổi được
-            </small>
+            <input className="p-input" value={f.name} placeholder="Realworld API" required autoFocus onChange={(e) => setF({ ...f, name: e.target.value })} />
           </label>
           <label className="wide">
             <span>URL repo</span>
@@ -143,9 +164,6 @@ export function CreateProjectModal({ repo, onClose }: { repo?: string | null; on
           </label>
         </div>
       </form>
-      <p className="m-note">
-        Sau khi tạo: gửi link mời cho nhóm ở Thiết lập › Thành viên, rồi mỗi người chạy <span className="mono">gtv on</span> trong bản clone của repo.
-      </p>
     </Modal>
   );
 }
@@ -193,7 +211,7 @@ function CheckLine({ check }: { check: RepoCheck }) {
       </div>
     );
   }
-  return <small>Bấm Kiểm tra trước khi tạo. Server cần đọc được repo để so phần việc của mọi người.</small>;
+  return null;
 }
 
 /** Kết nối máy mới: the three commands, run on the computer to connect. */

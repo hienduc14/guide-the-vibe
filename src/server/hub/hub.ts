@@ -83,6 +83,25 @@ export class Hub {
     return r ? rowToRecord(r) : undefined;
   }
 
+  /** An unused project id made from a name: "Realworld API" → realworld-api, then realworld-api-2, … (archived ids count as used). */
+  freeProjectId(name: string): string {
+    const base =
+      name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/gi, "d")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 36)
+        .replace(/-+$/, "") || "project";
+    const padded = base.length < 2 ? `${base}-project` : base;
+    for (let n = 1; ; n++) {
+      const id = n === 1 ? padded : `${padded}-${n}`;
+      if (!this.record(id)) return id;
+    }
+  }
+
   private saveRecord(input: ProjectInput, prev?: ProjectRecord, by?: string): ProjectRecord {
     const now = nowIso();
     const rec: ProjectRecord = {

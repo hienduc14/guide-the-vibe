@@ -240,6 +240,15 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     const body = (await c.req.json()) as ProjectInput;
     const repo_url = String(body.repo_url ?? "").trim();
     if (!repo_url) throw new Error("repo_url is required");
+    if (!body.id)
+      body.id = hub.freeProjectId(
+        body.name ||
+          repo_url
+            .replace(/\.git\/?$/, "")
+            .split(/[/:]/)
+            .pop() ||
+          "",
+      );
     if (hub.record(String(body.id)) && me.role !== "admin") throw new Error(`the project id ${body.id} is taken: pick another one`);
     const { default_branch } = await hub.checkRepo(repo_url, me.role === "admin");
     const p = await hub.createProject({ ...body, repo_url, main_branch: body.main_branch || default_branch || "main" }, me);

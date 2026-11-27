@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, Check, Copy, Link2, Pencil, RefreshCw, Trash2, User as UserIcon, X } from "lucide-react";
+import { AlertTriangle, Copy, Link2, Pencil, RefreshCw, Trash2, User as UserIcon } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { ActivityEvent, Invite, Level, Member, MemberLevel, ProjectAccess } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
@@ -285,44 +285,24 @@ export function MembersSection() {
   const { reload: reloadOverview } = useOverview();
   const navigate = useNavigate();
   const run = useAction();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const [editing, setEditing] = useState<string>();
   const [removing, setRemoving] = useState<string>();
   const [leaving, setLeaving] = useState(false);
-  const [modal, setModal] = useState<"invite" | "add">();
+  // ?invite=1 (from the Tạo project popup) opens Mời bằng link straight away
+  const [modal, setModal] = useState<"invite" | "add" | undefined>(params.get("invite") === "1" ? "invite" : undefined);
   const { data: members, reload } = usePoll(() => api.members.list(id), [id], 15_000);
   const { data: invites, reload: reloadInvites } = usePoll(() => (manage ? api.invites.list(id) : Promise.resolve([])), [id, manage], 30_000);
   if (!members) return <Loading />;
   const working = new Set(detail.people.filter((p) => p.working).map((p) => p.dev));
   const managers = members.filter((m) => m.access === "manager");
   const iAmLastManager = managers.length === 1 && managers[0].dev === me?.name;
-  const created = params.get("created") === "1";
   const after = () => {
     void reload();
     void reloadProject();
   };
   return (
     <>
-      {created && (
-        <div className="banner">
-          <span className="big-ok">
-            <Check />
-          </span>
-          <div className="grow">
-            <b>Đã tạo {detail.name}. Bạn là Quản lý.</b>
-            <small>
-              Bước tiếp: mời nhóm bằng link, rồi mỗi người chạy <span className="mono">gtv on</span> trong bản clone của repo.
-            </small>
-          </div>
-          <button type="button" className="p-btn primary" onClick={() => setModal("invite")}>
-            <Link2 size={15} />
-            Mời bằng link
-          </button>
-          <button type="button" className="iconbtn" aria-label="Ẩn" onClick={() => setParams({}, { replace: true })}>
-            <X />
-          </button>
-        </div>
-      )}
       <div className="hrow" style={{ alignItems: "flex-start" }}>
         <div className="grow">
           <h2>

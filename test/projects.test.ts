@@ -87,6 +87,10 @@ test("a person creates a project and is its manager; others do not see it", asyn
   assert.deepEqual((await call("/api/me", { cookie: bob })).json.projects, []);
   const dup = await call("/api/projects", { method: "POST", cookie: bob, body: { id: "shop", repo_url: origin.bare } });
   assert.match(dup.json.error, /taken/);
+  // no id: the server makes one from the name, and a free one when it is used
+  const auto = async (name: string) => (await call<any>("/api/projects", { method: "POST", cookie: hoc, body: { name, repo_url: origin.bare } })).json.id; // hoc is the server admin, so a local repo path is fine;
+  assert.equal(await auto("Shop"), "shop-2");
+  assert.equal(await auto("Đồ án Môn học"), "do-an-mon-hoc");
 });
 
 test("managers archive their project; an archived id stays taken except for server admins", async () => {

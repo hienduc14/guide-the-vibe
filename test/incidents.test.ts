@@ -98,7 +98,8 @@ test("conflict rows of two pairs become two incidents, with the strongest level 
 
 test("agents acking a merge Git refuses does not take it off a person's list", async () => {
   const ab = (await call<any[]>("/v1/p/shop/incidents")).json.find((i) => i.level === "high")!;
-  for (const e of ab.evidence) assert.equal((await call(`/v1/p/shop/conflicts/${e.id}/ack`, { method: "POST", dev: e.id.length % 2 ? "alice" : "bob" })).status, 200);
+  for (const e of ab.evidence)
+    assert.equal((await call(`/v1/p/shop/conflicts/${e.id}/ack`, { method: "POST", dev: e.id.length % 2 ? "alice" : "bob" })).status, 200);
   const after = (await call<any[]>("/v1/p/shop/incidents")).json.find((i) => i.id === ab.id)!;
   assert.ok(after.evidence.every((e: any) => e.status === "acked"));
   assert.equal(after.status, "open", "the merge still fails: someone has to merge it");

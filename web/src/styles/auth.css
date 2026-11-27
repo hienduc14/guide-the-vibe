@@ -308,22 +308,10 @@
 .pj .page {
   max-width: 1080px;
 }
-/* Pages with the simple top bar: the 1080px column sits in the middle of wide screens, and the bar's title and tabs
-   start on the same left edge as the page. */
-.pj {
-  --side: 28px;
-}
-.pj .p-top.simple .top-row,
-.pj:has(> .p-top.simple) > .screen {
-  padding-inline: max(var(--side), calc((100% - 1080px) / 2));
-}
-.pj .p-top.simple .p-tabs {
-  padding-inline: max(calc(var(--side) - 4px), calc((100% - 1080px) / 2 - 4px));
-}
-@media (max-width: 900px) {
-  .pj {
-    --side: 16px;
-  }
+/* Pages with the simple top bar: the bar spans the full width (title left, tools right), the 1080px page column
+   sits in the middle of wide screens. */
+.pj:has(> .p-top.simple) .page {
+  margin-inline: auto;
 }
 /* the focus ring stays inside rail buttons instead of drawing a bigger box around them */
 .sidebar :focus-visible {

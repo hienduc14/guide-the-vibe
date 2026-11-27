@@ -21,7 +21,7 @@ project, Máy của tôi, dashboard theo prototype `docs/prototype/auth/`. Còn 
 
 ## Tài khoản và CLI (27/11/2026): phần còn lại
 
-- Hiện trường chỉ biết file một người sửa qua hook sửa file (Edit/Write, apply_patch). Agent sửa bằng lệnh shell (`sed -i`)
+- Tab Tổng quan chỉ biết file một người sửa qua hook sửa file (Edit/Write, apply_patch). Agent sửa bằng lệnh shell (`sed -i`)
   thì không có footprint: người đó không hiện ở cột trái và file của họ không hiện, dù vụ đụng vẫn được bắt (từ snapshot).
   Hướng sửa: lấy danh sách file từ diff của snapshot (`repo.diffNames(base, snapshot_sha)`) khi không có footprint.
 - Thử thật 27/11 (Claude Code + Codex, 2 tài khoản, server local): đăng nhập máy, `gtv on`, cảnh báo đụng nhau, hỏi đáp

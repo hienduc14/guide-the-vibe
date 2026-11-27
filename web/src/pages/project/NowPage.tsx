@@ -1,11 +1,11 @@
-// Hiện trường: who is working on what, drawn as threads from each agent to the files it touches,
+// Tổng quan: who is working on what, drawn as threads from each agent to the files it touches,
 // with what needs a person and today's digest beside it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, CircleHelp, Clock, Folder, Send, Sparkles, UserX, X, Zap, OctagonAlert, CalendarClock } from "lucide-react";
+import { Folder, Send, Sparkles, X } from "lucide-react";
 import { api } from "../../api/endpoints";
-import type { AttentionItem, Incident, TeamState } from "../../api/types";
+import type { Incident, TeamState } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction } from "../../hooks/useToast";
 import { useColorOf } from "../../hooks/usePeople";
@@ -13,7 +13,6 @@ import { useProject } from "./ProjectLayout";
 import { Av, Avs, Seg, State, base, dirOf } from "../../components/pj";
 import { Loading } from "../../components/Empty";
 import { fileIncident, incidentTitle, isHot } from "../../lib/incident";
-import { KIND_VI } from "../../components/Message";
 import { NOTE_TAG } from "../../components/Message";
 import { ago, clock } from "../../lib/format";
 
@@ -126,7 +125,8 @@ function Wires({
   const [paths, setPaths] = useState<
     { key: string; d: string; ws: string; file: string; cls: string; color: string; a: [number, number]; b: [number, number] }[]
   >([]);
-  useLayoutEffect(() => {
+  // useEffect, not useLayoutEffect: the parent .map's ref is attached after a child's layout effects run on mount
+  useEffect(() => {
     const el = map.current;
     if (!el) return;
     const draw = () => {
@@ -177,6 +177,8 @@ function Wires({
       {paths.map((p) => (
         <g key={p.key} style={{ ["--p" as string]: p.color }} className={on(p) ? "lit" : ""}>
           <path className={p.cls} d={p.d} />
+          {/* a pulse running toward the file: this agent is editing it right now */}
+          {p.cls.startsWith("editing") && <path className="flow" d={p.d} />}
           <circle cx={p.a[0]} cy={p.a[1]} r={2.5} />
           <circle cx={p.b[0]} cy={p.b[1]} r={2.5} />
         </g>
@@ -185,91 +187,32 @@ function Wires({
   );
 }
 
-function NeedRow({ a, projectId }: { a: AttentionItem; projectId: string }) {
-  const icon =
-    a.kind === "conflict" ? (
-      <Zap />
-    ) : a.kind === "question" ? (
-      <CircleHelp />
-    ) : a.kind === "unassigned" ? (
-      <UserX />
-    ) : a.kind === "overdue" ? (
-      <CalendarClock />
-    ) : a.kind === "blocked" ? (
-      <OctagonAlert />
-    ) : (
-      <Clock />
-    );
-  const title =
-    a.kind === "conflict" && a.conflict
-      ? `${a.conflict.dev_a} và ${a.conflict.dev_b} đụng nhau`
-      : a.kind === "question" && a.ticket
-        ? `${a.ticket.from_dev} hỏi ${a.ticket.to_dev ?? "một người"}`
-        : a.title;
-  const sub = a.kind === "conflict" && a.conflict ? `${KIND_VI[a.conflict.kind] ?? a.conflict.kind}` : a.detail;
-  return (
-    <Link className="need" to={`/p/${projectId}/inbox?i=${encodeURIComponent(a.ref)}`}>
-      <span className={`ic ${a.kind === "conflict" ? "" : a.kind === "question" ? "q" : "t"}`}>{icon}</span>
-      <b>{title}</b>
-      <small>{sub}</small>
-      <span className="go">
-        <ChevronRight />
-      </span>
-    </Link>
-  );
-}
-
-function SideHome({ attention }: { attention: AttentionItem[] | undefined }) {
+/** The AI's summary of the day, under the map; nothing when the AI is off or has not written one yet. */
+function Digest() {
   const { id } = useProject();
   const digest = usePoll(() => api.projects.digest(id), [id], 60_000);
   const d = digest.data?.digest;
-  const shown = attention?.slice(0, 4) ?? [];
+  if (!d) return null;
   return (
-    <>
-      <div className="panel">
-        <h3>
-          Cần người xử lý
-          {attention && attention.length > 0 && (
-            <Link className="all" to={`/p/${id}/inbox`}>
-              Xem cả {attention.length}
-            </Link>
-          )}
-        </h3>
-        {!attention ? (
-          <Loading />
-        ) : shown.length ? (
-          shown.map((a) => <NeedRow key={`${a.kind}:${a.ref}`} a={a} projectId={id} />)
-        ) : (
-          <p className="muted">Không có gì đang chờ.</p>
-        )}
-        {attention && attention.length > shown.length && (
-          <p className="faint" style={{ padding: "8px 10px 0" }}>
-            và {attention.length - shown.length} mục khác
-          </p>
-        )}
-      </div>
-      {d && (
-        <div className="panel">
-          <h3>
-            Hôm nay
-            <span className="byai">
-              <Sparkles />
-              AI tóm tắt lúc {clock(d.at)}
-            </span>
-          </h3>
-          <p className="muted" style={{ marginBottom: 8 }}>
-            {d.text}
-          </p>
-          {d.detail.length > 0 && (
-            <ul className="digest">
-              {d.detail.map((x, i) => (
-                <li key={i}>{x}</li>
-              ))}
-            </ul>
-          )}
-        </div>
+    <div className="panel digest-panel">
+      <h3>
+        Hôm nay
+        <span className="byai">
+          <Sparkles />
+          AI tóm tắt lúc {clock(d.at)}
+        </span>
+      </h3>
+      <p className="muted" style={{ marginBottom: 8 }}>
+        {d.text}
+      </p>
+      {d.detail.length > 0 && (
+        <ul className="digest">
+          {d.detail.map((x, i) => (
+            <li key={i}>{x}</li>
+          ))}
+        </ul>
       )}
-    </>
+    </div>
   );
 }
 
@@ -416,11 +359,23 @@ export function NowPage() {
     <>
       <div className="head">
         <div>
-          <h1>Ai đang làm gì</h1>
+          <h1>Tổng quan</h1>
           <p className="lead">
             <b>{running} agent</b> đang chạy{idle ? `, ${idle} tạm nghỉ` : ""}.{" "}
-            {hot ? <span className="p-hot">{hot} chỗ đang đụng nhau</span> : "Không có chỗ nào đang đụng nhau"}
-            {asking ? `, ${asking} câu hỏi chờ người quyết.` : "."}
+            {hot ? (
+              <Link className="p-hot" to={`/p/${id}/inbox`}>
+                {hot} chỗ đang đụng nhau
+              </Link>
+            ) : (
+              "Không có chỗ nào đang đụng nhau"
+            )}
+            {asking ? (
+              <>
+                , <Link to={`/p/${id}/inbox`}>{asking} câu hỏi chờ người quyết</Link>.
+              </>
+            ) : (
+              "."
+            )}
           </p>
         </div>
         <div className="tools">
@@ -444,7 +399,7 @@ export function NowPage() {
           />
         </div>
       </div>
-      <div className="now">
+      <div className={`now${selected ? "" : " solo"}`}>
         <section className="panel">
           {agents.length === 0 && files.length === 0 ? (
             <div className="p-empty">
@@ -557,7 +512,7 @@ export function NowPage() {
           )}
           <div className="p-legend">
             <span>
-              <i />
+              <i className="live" />
               đang sửa
             </span>
             <span>
@@ -567,6 +522,10 @@ export function NowPage() {
             <span>
               <i className="dots" />
               mới khai báo, chưa sửa
+            </span>
+            <span>
+              <i className="box watch" />
+              cần để ý
             </span>
             <span>
               <i className="box" />
@@ -583,8 +542,13 @@ export function NowPage() {
             </span>
           </div>
         </section>
-        <aside className="side">{selected ? <SideWho a={selected} onClose={() => setSel(null)} /> : <SideHome attention={attention.data} />}</aside>
+        {selected && (
+          <aside className="side">
+            <SideWho a={selected} onClose={() => setSel(null)} />
+          </aside>
+        )}
       </div>
+      <Digest />
     </>
   );
 }

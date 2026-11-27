@@ -160,7 +160,7 @@ export function ProjectLayout() {
               </details>
             )}
             <nav className="p-tabs" aria-label="Project">
-              {tab(`/p/${id}`, "Hiện trường", Activity, true)}
+              {tab(`/p/${id}`, "Tổng quan", Activity, true)}
               {tab(`/p/${id}/inbox`, "Cần xử lý", Inbox, false, need)}
               {tab(`/p/${id}/work`, "Việc", SquareKanban)}
               {tab(`/p/${id}/talk`, "Trao đổi", MessagesSquare)}
@@ -186,7 +186,7 @@ export function ManagerOnly({ children }: { children: JSX.Element }) {
     return (
       <div className="p-empty">
         <b>Cần quyền quản lý</b>
-        <Link to={`/p/${id}`}>Về Hiện trường</Link>
+        <Link to={`/p/${id}`}>Về Tổng quan</Link>
       </div>
     );
   }

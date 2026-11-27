@@ -378,8 +378,13 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pj .state.running::before {
+  .pj .state.running::before,
+  .pj .wires path.flow,
+  .pj .p-legend i.live::after {
     animation: none;
+  }
+  .pj .wires path.flow {
+    display: none;
   }
 }
 
@@ -473,6 +478,14 @@
   gap: 16px;
   align-items: start;
 }
+/* no agent picked: the map takes the whole width */
+.pj .now.solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pj .digest-panel {
+  margin-top: 16px;
+  padding: 16px;
+}
 .pj .mapwrap {
   padding: 18px;
 }
@@ -496,9 +509,23 @@
   stroke-linecap: round;
   transition: opacity 0.15s;
 }
+/* edited earlier: grey, so it never reads as the person's live colour */
 .pj .wires path.edited {
+  stroke: var(--faint);
   stroke-width: 1.25;
-  opacity: 0.5;
+  opacity: 0.55;
+}
+.pj .wires path.flow {
+  stroke: var(--surface);
+  stroke-width: 2.5;
+  stroke-dasharray: 2 48;
+  opacity: 0.9;
+  animation: wire-flow 1.4s linear infinite;
+}
+@keyframes wire-flow {
+  to {
+    stroke-dashoffset: -50;
+  }
 }
 .pj .wires path.declared {
   stroke-dasharray: 2 6;
@@ -682,9 +709,28 @@
   width: 30px;
   border-top: 2px solid var(--muted);
 }
+.pj .p-legend i.live {
+  border-top-color: var(--accent);
+  position: relative;
+}
+.pj .p-legend i.live::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 3px;
+  height: 2px;
+  background: var(--surface);
+  animation: legend-flow 1.4s linear infinite;
+}
+@keyframes legend-flow {
+  to {
+    left: 27px;
+  }
+}
 .pj .p-legend i.thin {
-  border-top-width: 1px;
-  opacity: 0.6;
+  border-top: 1.5px solid var(--faint);
+  opacity: 0.7;
 }
 .pj .p-legend i.dots {
   border-top-style: dotted;
@@ -695,6 +741,10 @@
   border: 1.5px solid var(--high);
   background: var(--high-soft);
   border-radius: 3px;
+}
+.pj .p-legend i.box.watch {
+  border-color: color-mix(in oklab, var(--warning) 55%, var(--line));
+  background: var(--surface);
 }
 .pj .p-legend .p-right {
   margin-left: auto;

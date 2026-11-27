@@ -21,7 +21,8 @@ agent. So kết quả cuối: merge có hỏng không, việc có đạt nghiệ
 **Vai.** Trong cả file: **A** = chủ dự án (hienduc14) dùng Claude Code; **B** = bạn cùng nhóm dùng Codex. Mỗi người
 một máy. Không đổi vai, không đổi agent giữa các vòng.
 
-**Thứ tự.** 9 bước ở mục 12, xếp theo ngày cho tuần báo cáo (30/11–04/12).
+**Thứ tự.** 9 bước ở mục 12, xếp theo ngày cho tuần báo cáo (30/11–04/12). Trước tất cả: một lượt **chạy thử ngắn trên
+hai máy** (mục 16, khoảng 45 phút) để tìm chỗ vấp khi chưa tốn quota cho phần đo.
 
 **Đang ở đâu (27/11).** Bước 1 xong: bản fork [hienduc14/ace-next-gtv-bench](https://github.com/hienduc14/ace-next-gtv-bench)
 đã có commit "bench setup" (`9c8ccbb`), shop chạy được trên máy A. Chạy thử cũng tìm ra một lỗi của gtv phải sửa trước
@@ -671,3 +672,232 @@ lúc đăng ký, câu hỏi, hướng xử lý, tóm tắt).
 - Báo cáo trong tuần 30/11–04/12.
 
 Còn chờ chủ dự án: báo cáo đúng ngày nào trong tuần đó (lịch ở mục 12 đang nhắm thứ Năm 03/12).
+
+## 16. Chạy thử ngắn: hai người, hai máy
+
+**Để làm gì.** Đi hết một lượt đường của demo trên hai máy thật trước khi đo: cài đặt, nhận việc, biết trùng, hỏi
+Operator, chuyển câu hỏi sang agent kia, đụng nhau, quản lý xử lý, merge, việc sang "Xong". **Không đo số**, chỉ ghi chỗ
+vấp. Tốn 2 phiên agent và khoảng 6–10 lượt Brain. Mất khoảng 45 phút: 15 phút chuẩn bị, 30 phút chạy.
+
+Dùng việc của cặp P1 (mã giảm giá và phí ship), prompt rút gọn và được nhắc tới gtv. **A** (Claude Code) kiêm vai quản
+lý trên dashboard; **B** dùng Codex.
+
+Mọi thứ chạy trên nhánh `trial` của bản fork, **không đụng `main`**. Nhờ vậy `main` vẫn là mốc sạch cho các vòng đo.
+
+### 16.1 A chuẩn bị (trước giờ hẹn)
+
+1. **Brain.** Dashboard, trang **AI trả lời**: chọn provider và model. Mở `https://gtv.tenantry.site/health`, phải thấy
+   `"brain":{"backend":"pi",...,"ok":true`. Chưa `ok` thì dừng ở đây: bước 4–6 ở 16.3 cần Brain.
+2. **GitHub.** Thêm B làm collaborator quyền **Write** của `hienduc14/ace-next-gtv-bench`. Tạo nhánh `trial` từ `main`:
+
+   ```powershell
+   git clone https://github.com/hienduc14/ace-next-gtv-bench.git shop-trial
+   ```
+
+   ```powershell
+   cd shop-trial; git checkout -b trial; git push -u origin trial
+   ```
+
+3. **Project.** Dashboard: **Tạo project**, tên `shop-trial`, repo `https://github.com/hienduc14/ace-next-gtv-bench`,
+   ô nhánh chính ghi **`trial`**. **Mời thành viên**: tạo link quyền Developer, gửi B.
+4. **Tri thức.** Tải lên một tài liệu tên "Chính sách vận chuyển", đánh dấu cốt lõi:
+
+   ```text
+   Chính sách vận chuyển
+   - Đơn có tiền hàng từ 50,00 USD trở lên: miễn phí ship.
+   - Dưới 50,00 USD: phí ship cố định 4,99 USD.
+   - Trong code tiền tính bằng xu: ngưỡng 5000, phí 499.
+   ```
+
+### 16.2 Mỗi người trên máy của mình (làm song song, khoảng 15 phút)
+
+Cần Node 20 trở lên, git, và agent của mình đã đăng nhập (A: Claude Code, B: Codex). B mở link mời trong trình duyệt và
+nhận lời trước.
+
+**Dựng shop.** A dùng luôn thư mục `shop-trial` vừa clone ở 16.1; B clone mới:
+
+```powershell
+git clone https://github.com/hienduc14/ace-next-gtv-bench.git shop-trial
+```
+
+Rồi trong `shop-trial`, cả hai:
+
+```powershell
+git checkout trial
+```
+
+```powershell
+npm ci; Copy-Item .env.example .env; npm run prisma:generate; npm run prisma:push; npm run db:seed
+```
+
+**Cài gtv:**
+
+```powershell
+npx guide-the-vibe
+```
+
+```powershell
+gtv login https://gtv.tenantry.site
+```
+
+Đẩy code dở lên sau 30 giây thay vì 5 phút (ghi thêm một khoá vào `~/.gtv/config.json`, giữ nguyên các khoá khác):
+
+```powershell
+$f = "$HOME\.gtv\config.json"; $c = Get-Content $f -Raw | ConvertFrom-Json; $c | Add-Member snapshotDebounceMs 30000 -Force; [IO.File]::WriteAllText($f, ($c | ConvertTo-Json))
+```
+
+```powershell
+gtv on
+```
+
+- Máy có cả Claude Code lẫn Codex: `gtv on` hỏi "Set up both?". Trả lời **n**, rồi chỉ chọn agent của mình (A: Claude
+  Code, B: Codex).
+- Phải thấy dòng `This repo belongs to shop-trial`. Thấy tên project khác thì chạy `gtv link <id>` (id của
+  `shop-trial` xem trên dashboard), rồi `gtv on` lại.
+
+```powershell
+gtv daemon restart
+```
+
+```powershell
+gtv doctor
+```
+
+`gtv doctor` phải xanh hết. Rồi mỗi người tạo nhánh của mình: A `git checkout -b trial-a`, B `git checkout -b trial-b`.
+
+**Mở agent** (tương tác, không dùng `claude -p` / `codex exec`): A gõ `claude`, B gõ `codex`, trong `shop-trial`.
+
+- Claude Code hỏi duyệt MCP server `gtv`: đồng ý.
+- Codex: trust project, rồi gõ `/hooks` và duyệt các hook của gtv.
+
+### 16.3 Chạy (khoảng 30 phút)
+
+Màn hình chung (hoặc máy A): tab dashboard của `shop-trial`. Mỗi bước xong thì đánh dấu vào bảng ở 16.4.
+
+**Bước 1. Giao việc.** A, trên dashboard, trang **Việc**: tạo hai việc rồi giao.
+
+| Ô        | Việc 1                                                                                                                                                                                                                                | Việc 2                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Tiêu đề  | `Mã giảm giá ở checkout`                                                                                                                                                                                                              | `Phí ship ở checkout`                                                                                                           |
+| Mô tả    | `POST /api/checkout nhận couponCode (không bắt buộc). Mã hợp lệ giảm theo phần trăm. Danh sách mã để trong file mới lib/coupons.ts (SAVE10 = giảm 10%). Trang giỏ hàng có ô nhập mã và hiện số tiền giảm. Không đổi schema database.` | `Cộng phí ship vào tổng đơn theo Chính sách vận chuyển của shop, hiện phí ship trên trang giỏ hàng. Không đổi schema database.` |
+| Ưu tiên  | Cao                                                                                                                                                                                                                                   | Thường                                                                                                                          |
+| Giao cho | A                                                                                                                                                                                                                                     | B                                                                                                                               |
+
+**Bước 2. A nhận việc.** Máy A, Claude Code, gõ `/gtv` rồi dán:
+
+```text
+Nhận việc "Mã giảm giá ở checkout". Lên kế hoạch ngắn, đăng ký việc với gtv, rồi làm luôn. Chưa commit.
+```
+
+Phải thấy: thẻ của A sang "Đang làm"; trang **Tổng quan** có agent của A nối tới `app/api/checkout/route.ts`.
+
+**Bước 3. B nhận việc, biết trùng trước khi code.** Chờ A sửa file đầu tiên. Máy B, Codex, gõ `$gtv` rồi dán:
+
+```text
+Nhận việc "Phí ship ở checkout". Đăng ký việc với gtv trước khi sửa bất kỳ file nào, rồi dừng lại và cho tôi xem nguyên văn gtv trả lời gì.
+```
+
+Phải thấy: phản hồi đăng ký nói trùng với việc của A ở `app/api/checkout/route.ts`. Không thấy thì dán
+`Gọi gtv_status và cho tôi xem ai đang sửa file nào.`
+
+**Bước 4. Hỏi Operator.** Máy B:
+
+```text
+Hỏi Operator bằng gtv_ask: phí ship của shop là bao nhiêu và miễn phí từ mức nào? Cho tôi xem câu trả lời kèm nguồn. Chưa sửa code.
+```
+
+Phải thấy: 4,99 USD, miễn phí từ 50 USD, nguồn "Chính sách vận chuyển". Trang **Trao đổi** có câu hỏi này.
+
+**Bước 5. Chuyển câu hỏi sang agent của A.** Máy B:
+
+```text
+Hỏi bằng gtv_ask: phần mã giảm giá đang làm tính giảm trước hay sau khi cộng phí ship, và ngưỡng miễn phí ship tính trên số nào? Trong lúc chờ, bắt đầu làm phần không phụ thuộc câu trả lời.
+```
+
+Phải thấy: máy A hiện dòng `[gtv question … from …]` giữa lượt của Claude. Nếu Claude hỏi lại A, A dán:
+
+```text
+Trả lời câu hỏi đó qua gtv: giảm trên tiền hàng, không giảm phí ship. Ngưỡng miễn phí ship tính trên tiền hàng trước giảm.
+```
+
+Máy B nhận câu trả lời ở lần Codex gọi tool kế tiếp. Nếu Codex đã dừng thì dán:
+`Đọc gtv_inbox rồi làm tiếp theo câu trả lời vừa nhận.`
+
+**Bước 6. Đụng nhau, quản lý xử lý.** Để hai agent làm tiếp. Mỗi khi agent dừng lượt, code dở được đẩy lên sau vài
+giây. Hơn 1 phút chưa thấy gì thì chạy lệnh này trong `shop-trial` ở **cả hai máy** (lệnh này chưa từng được thử, ghi
+lại nó chạy hay không):
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:7391/snapshot -ContentType 'application/json' -Body (@{ cwd = "$PWD" } | ConvertTo-Json)
+```
+
+Phải thấy: trang **Cần xử lý** có một vụ giữa A và B. A mở vụ, xem các hướng AI soạn, chọn "A merge trước, B làm tiếp
+trên code của A", bấm gửi. Rồi máy A:
+
+```text
+Làm tiếp cho xong. Nếu gtv hỏi trước khi sửa file đang đụng thì cho tôi xem lý do.
+```
+
+Máy B:
+
+```text
+Làm theo hướng xử lý vừa nhận từ gtv.
+```
+
+**Bước 7. Gộp, việc xong.** Máy A:
+
+```text
+Chạy type-check và unit test. Xanh thì commit, push, merge nhánh này vào nhánh trial, push trial, rồi gọi gtv_finish_task kèm tóm tắt.
+```
+
+Khi A báo đã push `trial`, máy B:
+
+```text
+Lấy nhánh trial mới nhất, rebase nhánh của tôi lên đó, sửa cho type-check và unit test xanh, merge vào trial, push trial, rồi gọi gtv_finish_task kèm tóm tắt.
+```
+
+Phải thấy: trang **Việc**, hai thẻ đi qua "Chờ merge" rồi sang "Xong". Chậm thì vào **Thiết lập › Repo và đồng bộ** cho
+server lấy nhánh mới.
+
+**Bước 8. Xem shop.** Máy A:
+
+```powershell
+git checkout trial; git pull; npm run dev
+```
+
+Mở `http://localhost:3000`, đăng nhập bằng tài khoản admin trong `.env`, thêm hàng vào giỏ, nhập `SAVE10`: phải thấy
+tiền giảm và phí ship cùng lúc.
+
+### 16.4 Ghi lại
+
+Một người ghi, ngay trong lúc chạy:
+
+| Bước | Đạt? | Mất bao lâu | Vấp gì, đã làm gì |
+| ---- | ---- | ----------- | ----------------- |
+| Cài  |      |             |                   |
+| 1    |      |             |                   |
+| 2    |      |             |                   |
+| 3    |      |             |                   |
+| 4    |      |             |                   |
+| 5    |      |             |                   |
+| 6    |      |             |                   |
+| 7    |      |             |                   |
+| 8    |      |             |                   |
+
+Riêng mấy điều chưa ai kiểm:
+
+- Codex sửa file thì B có hiện trên **Tổng quan** không. Codex ghi file bằng lệnh PowerShell thì không có dấu chân
+  (mục 11, việc 9).
+- Lệnh đẩy code dở ở bước 6 chạy được không.
+- Tóm tắt và hướng xử lý tiếng Việt của Brain đọc có hiểu không.
+- Có việc nào bị gắn nhầm vào việc khác trên trang **Việc** không (mục 11, việc 8).
+- Tổng thời gian bước 1–8, so với 20 phút của buổi demo.
+
+Chạy xong, mỗi vấp thành một việc phải sửa ở mục 11, hoặc thêm một dòng vào bảng trục trặc ở mục 10.5.
+
+### 16.5 Dọn sau khi thử
+
+- Bảo mỗi agent `finish your gtv task` nếu chưa gọi, rồi thoát agent.
+- Giữ project `shop-trial` để xem lại. Các vòng đo dùng project mới (mục 5.1, điều 6). Khi tạo project mới cùng repo,
+  trong clone đo chạy `gtv link <id project mới>` để clone không bám nhầm vào `shop-trial`.
+- Nhánh `trial`, `trial-a`, `trial-b` để nguyên trên GitHub. `main` không bị đổi.

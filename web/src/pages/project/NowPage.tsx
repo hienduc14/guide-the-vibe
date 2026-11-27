@@ -409,7 +409,7 @@ export function NowPage() {
             </div>
           ) : (
             <div className="mapwrap">
-              <div className={`map${detailMode === "long" ? " detail" : ""}${lit ? " focus" : ""}`} ref={mapRef} onMouseLeave={() => setHover(null)}>
+              <div className={`map${detailMode === "long" ? " long" : ""}${lit ? " focus" : ""}`} ref={mapRef} onMouseLeave={() => setHover(null)}>
                 <Wires map={mapRef} lit={lit} files={files} agents={agents} />
                 <div className="agents">
                   {agents.map((a) => {

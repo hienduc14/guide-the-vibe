@@ -655,7 +655,7 @@
   font-size: 12.5px;
   color: var(--muted);
 }
-.pj .map.detail .agent .p-more {
+.pj .map.long .agent .p-more {
   display: block;
 }
 .pj .agent .inline-files {
@@ -712,7 +712,7 @@
 .pj .file .sy {
   display: none;
 }
-.pj .map.detail .file .sy {
+.pj .map.long .file .sy {
   display: block;
 }
 .pj .file .avs {

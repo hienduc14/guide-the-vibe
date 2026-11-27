@@ -45,7 +45,7 @@ api POST /api/projects '{"id":"realworld","name":"RealWorld API (Node/Express)",
 [ -d sandbox/origin.git ] && api POST /api/projects '{"id":"mini-shop","name":"mini-shop sample","repo_url":"/repos/origin.git","main_branch":"main"}' > /dev/null
 for d in alice bob; do
   port=$([ $d = alice ] && echo 7391 || echo 7392)
-  for p in realworld mini-shop; do api PUT /api/projects/$p/members/$d '{"access":"developer"}' > /dev/null || true; done
+  for p in realworld mini-shop; do api POST /api/projects/$p/members "{\"user\":\"$d\",\"access\":\"developer\"}" > /dev/null || true; done
   mkdir -p "sandbox/.home-$d"
   printf '{ "dev": "%s", "server": "http://127.0.0.1:7390", "port": %s, "token": "%s" }\n' $d $port "${KEY[$d]}" > "sandbox/.home-$d/config.json"
 done

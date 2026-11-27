@@ -1,7 +1,7 @@
 // Engine: turns daemon events into registry updates, runs detectors per feature mode, and notifies.
 
 import type { Db } from "../../shared/db.ts";
-import { Store } from "./store.ts";
+import { Store, type Team } from "./store.ts";
 import { Board, type BoardView } from "./board.ts";
 import { conflictAdvice, standingOf } from "./coord.ts";
 import type { Repo } from "./repo.ts";
@@ -50,7 +50,7 @@ export class Engine {
   mainSha?: string;
   private polledMain?: string;
 
-  constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig }) {
+  constructor(opts: { db: Db; repo?: Repo; brain: Brain; cfg: EngineConfig; team?: Team }) {
     this.db = opts.db;
     opts.db.ensureColumn("tasks", "board_id", "TEXT");
     opts.db.ensureColumn("messages", "from_dev", "TEXT");
@@ -58,8 +58,8 @@ export class Engine {
     opts.db.ensureColumn("board_notes", "summary", "TEXT");
     opts.db.ensureColumn("tickets", "options", "TEXT");
     opts.db.ensureColumn("tasks", "summary", "TEXT");
-    opts.db.ensureColumn("members", "access", "TEXT NOT NULL DEFAULT 'developer'");
     this.store = new Store(opts.db);
+    this.store.team = opts.team;
     this.board = new Board(opts.db, this.store);
     this.graph = new CodeGraph(opts.db);
     this.kb = new KnowledgeBase(opts.db);

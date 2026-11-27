@@ -74,7 +74,7 @@ await call(
 // One account per person, made directly here (people sign up on the dashboard).
 const person = async (name: string, password: string | null, access: "manager" | "developer" | "viewer") => {
   srv.hub.accounts.createUser(name, { role: name === "hoc" ? "admin" : "member", password });
-  srv.hub.live("mini-shop")!.engine.store.saveMember(name, { access });
+  srv.hub.members.add("mini-shop", name, access, null);
 };
 await person("hoc", "hoc-demo-123", "manager");
 await person("minh", "minh-demo-123", "manager");
@@ -87,7 +87,7 @@ for (const [dev, role, level, note] of [
   ["bob", "backend", "mid", "Phụ trách đăng nhập"],
   ["carol", "frontend", "junior", ""],
 ] as const)
-  await call(`/api/projects/mini-shop/members/${dev}`, { role, level, note }, { method: "PUT" });
+  await call(`/api/projects/mini-shop/members/${dev}`, { role, level, note }, { method: "PATCH" });
 
 // ---- project documents: the refund policy from the repo and a requirements page, both core ---------
 

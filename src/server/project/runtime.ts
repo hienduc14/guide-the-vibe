@@ -9,6 +9,7 @@ import { TicketService } from "../qa/tickets.ts";
 import type { Brain } from "../brain/types.ts";
 import type { ServerConfig } from "../config.ts";
 import type { Charter, Policy } from "../../shared/types.ts";
+import type { Team } from "./store.ts";
 import { log } from "../../shared/util.ts";
 
 export interface ProjectRecord {
@@ -21,6 +22,7 @@ export interface ProjectRecord {
   description?: string;
   charter: Charter;
   archived: boolean;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,7 +36,7 @@ export class ProjectRuntime {
   lastSync?: { at: string; ok: boolean; error?: string };
   private timers: NodeJS.Timeout[] = [];
 
-  private constructor(record: ProjectRecord, cfg: ServerConfig, brain: Brain) {
+  private constructor(record: ProjectRecord, cfg: ServerConfig, brain: Brain, team?: Team) {
     this.record = record;
     const dir = cfg.dataDir === ":memory:" ? undefined : join(cfg.dataDir, "projects", record.id);
     this.db = new Db(dir ? join(dir, "gtv.db") : ":memory:", PROJECT_SCHEMA);
@@ -43,6 +45,7 @@ export class ProjectRuntime {
       db: this.db,
       repo: this.repo,
       brain,
+      team,
       cfg: { featureDefaults: cfg.features, registrationWaitMs: cfg.registrationWaitMs, l3DailyBudget: cfg.l3DailyBudget },
     });
     if (cfg.docGlobs) this.engine.kb.globs = cfg.docGlobs;
@@ -50,8 +53,9 @@ export class ProjectRuntime {
     this.applyRecord(record, cfg.policy);
   }
 
-  static async open(record: ProjectRecord, cfg: ServerConfig, brain: Brain): Promise<ProjectRuntime> {
-    const rt = new ProjectRuntime(record, cfg, brain);
+  /** `team`: who is in the project and their access (the hub's project_members). */
+  static async open(record: ProjectRecord, cfg: ServerConfig, brain: Brain, team?: Team): Promise<ProjectRuntime> {
+    const rt = new ProjectRuntime(record, cfg, brain, team);
     await rt.repo.ensure();
     await rt.sync();
     rt.timers = [

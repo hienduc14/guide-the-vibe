@@ -50,10 +50,14 @@ export function accountRoutes(hub: Hub): Hono<Env> {
     const b = await body<{ name?: string; display_name?: string; password?: string; invite?: string }>(c);
     const mode = registration();
     if (mode === "closed") return c.json({ error: "sign-up is closed on this server: ask an admin" }, 403);
-    if (mode === "invite") return c.json({ error: "sign-up needs an invite link on this server" }, 403);
+    if (b.invite && !hub.inviteInfo(b.invite).valid) return c.json({ error: "this invite link no longer works: ask for a new one" }, 400);
+    if (mode === "invite" && !b.invite) return c.json({ error: "sign-up needs an invite link on this server" }, 403);
     const name = String(b.name ?? "").trim();
     hub.accounts.createUser(name, { display_name: b.display_name, password: String(b.password ?? "") });
-    return loggedIn(c, hub.accounts.newSession(name, sessionMeta(c)));
+    const joined = b.invite ? hub.acceptInvite(b.invite, name) : undefined;
+    const s = hub.accounts.newSession(name, sessionMeta(c));
+    setSessionCookie(c, s.token);
+    return c.json({ name, display_name: s.user.display_name, role: s.user.role, project: joined ? { id: joined.project, access: joined.access } : null });
   });
 
   app.post("/auth/login", async (c) => {
@@ -78,6 +82,24 @@ export function accountRoutes(hub: Hub): Hono<Env> {
     if (rateLimited(c, "reset", 30)) return tooMany(c);
     const { password } = await body<{ password?: string }>(c);
     return loggedIn(c, hub.accounts.resetPassword(c.req.param("code"), String(password ?? ""), sessionMeta(c)));
+  });
+
+  // ---- invite links ----------------------------------------------------------------------------
+
+  /** Anyone may look at an invite: the project's name, the access and who invited, and whether they are in already. */
+  app.get("/invites/:code", (c) => {
+    if (rateLimited(c, "invite", 30)) return tooMany(c);
+    const info = hub.inviteInfo(c.req.param("code"));
+    const p = c.get("principal");
+    const member = info.valid && p?.kind === "user" ? !!hub.members.access(info.project_id, p.name) : false;
+    if (!info.valid) return c.json(info);
+    const { project_id, ...card } = info;
+    return c.json(member ? { ...info, member } : { ...card, member });
+  });
+  app.post("/invites/:code/accept", (c) => {
+    if (rateLimited(c, "invite", 30)) return tooMany(c);
+    const r = hub.acceptInvite(c.req.param("code"), myName(c));
+    return c.json({ project: { id: r.project, name: hub.record(r.project)?.name ?? r.project }, access: r.access, already_member: r.already_member });
   });
 
   // ---- my account -----------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 //   /health                    liveness + brain status
 //   /v1/connect/*              connecting a computer to an account (gtv login), no token needed
 //   /v1/me                     the computer's account and projects
-//   /v1/projects, /v1/resolve  project discovery for daemons
+//   /v1/projects, /v1/resolve  project discovery for daemons (one's own projects; others only "exists")
 //   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard callers by role)
 //   /api/*                     dashboard API
 //   /*                         dashboard (web/dist)
@@ -29,7 +29,6 @@ export function buildApp(hub: Hub): Hono {
       ok: true,
       // health() checks the configuration only; `failing` says whether jobs actually work.
       brain: { backend: hub.brain.name, model: hub.brain.model ?? null, ...(await hub.brain.health()), failing: hub.brainFailing() },
-      projects: hub.records().map((p) => p.id),
       commit: process.env.GTV_COMMIT || null,
     });
   });
@@ -70,12 +69,19 @@ export function buildApp(hub: Hub): Hono {
     hub.accounts.removeDevice(p.device!);
     return c.json({ ok: true });
   });
+  /** Projects are private: the caller's own only. */
   dev.get("/projects", (c) =>
-    c.json(hub.records().map((p) => ({ id: p.id, name: p.name, repo_url: p.repo_url.replace(/\/\/[^@/]+@/, "//***@"), main_branch: p.main_branch }))),
+    c.json(
+      hub
+        .myProjects(c.get("principal")!)
+        .map(({ record: p }) => ({ id: p.id, name: p.name, repo_url: p.repo_url.replace(/\/\/[^@/]+@/, "//***@"), main_branch: p.main_branch })),
+    ),
   );
+  /** Which project a remote belongs to; someone outside it only learns that there is one. */
   dev.get("/resolve", (c) => {
     const p = hub.resolve(c.req.query("remote") ?? "");
-    return p ? c.json({ id: p.id, name: p.name }) : c.json({ error: "no project matches this remote" }, 404);
+    if (!p) return c.json({ error: "no project matches this remote" }, 404);
+    return hub.projectAccess(c.get("principal")!, p.id) === "none" ? c.json({ exists: true }) : c.json({ id: p.id, name: p.name });
   });
   const project = new Hono<ProjectEnv>();
   project.use("*", async (c, next) => {

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { Db, parseJson } from "../../shared/db.ts";
 import { HUB_SCHEMA } from "./hub-db.ts";
 import { Accounts, hashToken, type Principal } from "./accounts.ts";
+import { Members } from "./members.ts";
+import { checkRepoAddress, lsRemote } from "./repo-check.ts";
 import { ProjectRuntime, type ProjectRecord } from "../project/runtime.ts";
 import { MeteredBrain, type ProjectScopedBackend } from "../brain/metered.ts";
 import { PiBrain } from "../brain/pi.ts";
@@ -14,7 +16,7 @@ import { log, nowIso, repoKey } from "../../shared/util.ts";
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
 
-/** A caller's access in one project: members.access, or none. */
+/** A caller's access in one project: their project_members row, or none. */
 export type ProjectAccess = "manager" | "developer" | "viewer" | "none";
 export const ACCESS_RANK: Record<ProjectAccess, number> = { none: 0, viewer: 1, developer: 2, manager: 3 };
 
@@ -36,6 +38,7 @@ export class Hub {
   readonly cfg: ServerConfig;
   readonly brain: ProjectScopedBackend;
   readonly accounts: Accounts;
+  readonly members: Members;
   private runtimes = new Map<string, ProjectRuntime>();
   private opening = new Map<string, Promise<ProjectRuntime>>();
 
@@ -44,7 +47,9 @@ export class Hub {
     this.brain = brain;
     this.db = new Db(cfg.dataDir === ":memory:" ? ":memory:" : join(cfg.dataDir, "hub.db"), HUB_SCHEMA);
     this.db.ensureColumn("projects", "charter", "TEXT NOT NULL DEFAULT '{}'");
+    this.db.ensureColumn("projects", "created_by", "TEXT");
     this.accounts = new Accounts(this.db);
+    this.members = new Members(this.db);
   }
 
   async init(): Promise<void> {
@@ -78,7 +83,7 @@ export class Hub {
     return r ? rowToRecord(r) : undefined;
   }
 
-  private saveRecord(input: ProjectInput, prev?: ProjectRecord): ProjectRecord {
+  private saveRecord(input: ProjectInput, prev?: ProjectRecord, by?: string): ProjectRecord {
     const now = nowIso();
     const rec: ProjectRecord = {
       id: input.id,
@@ -93,6 +98,7 @@ export class Hub {
       description: input.description ?? prev?.description,
       charter: input.charter ? cleanCharter(input.charter) : (prev?.charter ?? {}),
       archived: prev?.archived ?? false,
+      created_by: prev?.created_by ?? by ?? null,
       created_at: prev?.created_at ?? now,
       updated_at: now,
     };
@@ -100,14 +106,25 @@ export class Hub {
     return rec;
   }
 
-  async createProject(input: ProjectInput): Promise<ProjectRuntime> {
+  /**
+   * A new project; a person who creates one is its manager. Only a server admin may bring back an archived project
+   * under its old id (with its data and members).
+   */
+  async createProject(input: ProjectInput, by?: Principal): Promise<ProjectRuntime> {
     if (!PROJECT_ID.test(input.id)) throw new Error("project id: lowercase letters, digits and dashes (2-41 chars)");
     if (!input.repo_url) throw new Error("repo_url is required");
     const prev = this.record(input.id);
-    if (prev && !prev.archived) throw new Error(`project ${input.id} already exists`);
+    if (prev && (!prev.archived || (by && by.role !== "admin"))) throw new Error(`the project id ${input.id} is taken: pick another one`);
     if (prev) this.db.run(`UPDATE projects SET archived = 0 WHERE id = ?`, input.id);
-    this.saveRecord(input, prev ? { ...prev, archived: false } : undefined);
+    this.saveRecord(input, prev ? { ...prev, archived: false } : undefined, by?.name);
+    if (by?.kind === "user" && !this.members.access(input.id, by.name)) this.members.add(input.id, by.name, "manager", null);
     return this.runtime(input.id);
+  }
+
+  /** Can the server read this repo, and what is its default branch? Only server admins may use local paths. */
+  async checkRepo(url: string, admin: boolean): Promise<{ default_branch: string | null }> {
+    if (!admin) await checkRepoAddress(url);
+    return lsRemote(url, { local: admin });
   }
 
   async updateProject(id: string, patch: Partial<ProjectInput>): Promise<ProjectRecord> {
@@ -139,7 +156,8 @@ export class Hub {
     if (pending) return pending;
     const rec = this.record(id);
     if (!rec || rec.archived) return Promise.reject(new Error(`unknown project ${id}`));
-    const p = ProjectRuntime.open(rec, this.cfg, new MeteredBrain(this.brain, id, this.db, () => this.runtimes.get(id)?.engine))
+    const brain = new MeteredBrain(this.brain, id, this.db, () => this.runtimes.get(id)?.engine);
+    const p = ProjectRuntime.open(rec, this.cfg, brain, () => this.members.list(id))
       .then((rt) => {
         this.runtimes.set(id, rt);
         log("hub", `project ${id} ready (${rec.repo_url})`);
@@ -169,7 +187,7 @@ export class Hub {
   projectAccess(p: Principal, projectId: string): ProjectAccess {
     if (p.kind === "share") return p.project === projectId ? "viewer" : "none";
     if (p.role === "admin" || p.kind === "admin_token" || p.kind === "open") return "manager";
-    return this.live(projectId)?.engine.store.member(p.name)?.access ?? "none";
+    return this.members.access(projectId, p.name) ?? "none";
   }
 
   /** Projects a caller can see, with their access in each. */
@@ -184,8 +202,35 @@ export class Hub {
 
   /** Deletes an account everywhere: sessions, computers and memberships go; project records keep the name. */
   deleteAccount(name: string): void {
+    const sole = this.members.soleManagerOf(name).filter((id) => this.record(id) && !this.record(id)!.archived);
+    if (sole.length) throw new Error(`${name} is the last manager of ${sole.join(", ")}: make someone else a manager first`);
     this.accounts.deleteUser(name);
-    for (const r of this.records()) if (this.live(r.id)?.engine.store.member(name)) this.live(r.id)!.engine.store.removeMember(name);
+    this.members.removeUser(name);
+  }
+
+  // ---- invites ------------------------------------------------------------------------
+
+  /** What an invite link shows anyone: the project's name, the access it gives and who made it, nothing else. */
+  inviteInfo(
+    code: string,
+  ): { valid: false } | { valid: true; project_id: string; project_name: string; access: string; invited_by: string; invited_by_name: string } {
+    const inv = this.members.invite(code);
+    const rec = inv && this.record(inv.project);
+    if (!inv || !rec || rec.archived) return { valid: false };
+    const by = this.accounts.user(inv.created_by);
+    return {
+      valid: true,
+      project_id: rec.id,
+      project_name: rec.name,
+      access: inv.access,
+      invited_by: inv.created_by,
+      invited_by_name: by?.display_name ?? inv.created_by,
+    };
+  }
+
+  acceptInvite(code: string, user: string): ReturnType<Members["acceptInvite"]> {
+    if (!this.inviteInfo(code).valid) throw new Error("this invite link no longer works: ask for a new one");
+    return this.members.acceptInvite(code, user);
   }
 
   // ---- settings & brain stats ---------------------------------------------------------

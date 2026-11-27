@@ -64,7 +64,8 @@ test("admin API requires credentials; a computer's key works on /v1 only", async
   const list = await call<any[]>("/v1/projects", { token: alice.device });
   assert.deepEqual(
     list.json.map((p) => p.id),
-    ["shop", "billing"],
+    ["shop"],
+    "one's own projects only",
   );
   assert.equal((await call("/api/overview", { token: alice.device })).status, 401, "a computer's key is not a dashboard login");
   srv.hub.db.run(`UPDATE devices SET last_seen = NULL WHERE user = 'alice'`);

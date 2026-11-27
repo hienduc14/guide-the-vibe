@@ -2,14 +2,14 @@
 // Mutations on a project's tasks/conflicts/tickets/knowledge reuse the project API (/v1/p/:id) with the admin token.
 
 import { Hono } from "hono";
-import type { Hub } from "../hub/hub.ts";
+import type { Hub, ProjectInput } from "../hub/hub.ts";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
-import { openMode } from "./auth.ts";
+import { openMode, publicOrigin, rateLimited } from "./auth.ts";
 import { accountRoutes } from "./account-routes.ts";
 import { FEATURES, FEATURE_KEYS, isActive } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
-import type { Level } from "../../shared/types.ts";
+import type { Level, MemberAccess, MemberLevel } from "../../shared/types.ts";
 import { PiBrain } from "../brain/pi.ts";
 import { attention, conversations } from "../project/conversations.ts";
 import { incident, suggester } from "../project/incidents.ts";
@@ -233,10 +233,28 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     ),
   );
 
+  /** Anyone logged in creates projects and manages them; the repo is checked first (the server will clone it). */
   app.post("/projects", async (c) => {
-    const body = await c.req.json();
-    const p = await hub.createProject(body);
+    if (rateLimited(c, "check-repo", 10)) return c.json({ error: "too many attempts: wait a minute" }, 429);
+    const me = c.get("principal")!;
+    const body = (await c.req.json()) as ProjectInput;
+    const repo_url = String(body.repo_url ?? "").trim();
+    if (!repo_url) throw new Error("repo_url is required");
+    if (hub.record(String(body.id)) && me.role !== "admin") throw new Error(`the project id ${body.id} is taken: pick another one`);
+    const { default_branch } = await hub.checkRepo(repo_url, me.role === "admin");
+    const p = await hub.createProject({ ...body, repo_url, main_branch: body.main_branch || default_branch || "main" }, me);
     return c.json(summarize(p));
+  });
+
+  /** Can the server read this repo? { ok, default_branch } or { ok: false, error } (shown next to the field). */
+  app.post("/projects/check-repo", async (c) => {
+    if (rateLimited(c, "check-repo", 10)) return c.json({ error: "too many attempts: wait a minute" }, 429);
+    const { repo_url } = (await c.req.json().catch(() => ({}))) as { repo_url?: string };
+    try {
+      return c.json({ ok: true, ...(await hub.checkRepo(String(repo_url ?? "").trim(), c.get("principal")!.role === "admin")) });
+    } catch (e) {
+      return c.json({ ok: false, error: (e as Error).message });
+    }
   });
 
   app.get("/projects/:id", async (c) => {
@@ -249,7 +267,12 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     });
   });
 
-  app.patch("/projects/:id", async (c) => c.json(await hub.updateProject(c.req.param("id"), await c.req.json())));
+  app.patch("/projects/:id", async (c) => {
+    const body = (await c.req.json()) as Partial<ProjectInput>;
+    if (body.repo_url !== undefined && body.repo_url !== hub.record(c.req.param("id"))?.repo_url)
+      await hub.checkRepo(String(body.repo_url).trim(), c.get("principal")!.role === "admin");
+    return c.json(await hub.updateProject(c.req.param("id"), body));
+  });
 
   app.delete("/projects/:id", (c) => {
     hub.archiveProject(c.req.param("id"));
@@ -262,21 +285,65 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json({ last_sync: p.lastSync, main: p.engine.mainSha });
   });
 
-  // Team members: role and level per developer in this project.
-  app.get("/projects/:id/members", async (c) => c.json((await rt(c.req.param("id"))).engine.store.members()));
-  app.put("/projects/:id/members/:dev", async (c) => {
-    const p = await rt(c.req.param("id"));
-    const dev = c.req.param("dev");
-    // New members are people with an account; rows from before accounts keep working.
-    if (!p.engine.store.member(dev) && !hub.accounts.user(dev)) throw new Error(`no account named ${dev}: an admin creates it on the People page`);
-    const m = p.engine.store.saveMember(dev, await c.req.json());
-    p.engine.store.logEvent("member_set", c.get("dev"), m);
-    return c.json(m);
+  // Members: who is in the project with what access (hub), and their profile here (role in the team, level, note).
+  const membersOf = async (id: string) => {
+    const joined = new Map(hub.members.list(id).map((m) => [m.user, m]));
+    return (await rt(id)).engine.store.members().map((m) => ({
+      ...m,
+      display_name: hub.accounts.user(m.dev)?.display_name ?? m.dev,
+      joined_at: joined.get(m.dev)?.joined_at ?? null,
+      invited_by: joined.get(m.dev)?.invited_by ?? null,
+    }));
+  };
+  const memberOf = async (id: string, user: string) => (await membersOf(id)).find((m) => m.dev === user);
+  app.get("/projects/:id/members", async (c) => c.json(await membersOf(c.req.param("id"))));
+  /** Adds someone who has an account, by their user name. */
+  app.post("/projects/:id/members", async (c) => {
+    const id = c.req.param("id");
+    const { user, access } = (await c.req.json()) as { user?: string; access?: MemberAccess };
+    const name = String(user ?? "").trim();
+    const { store } = (await rt(id)).engine;
+    if (!hub.accounts.user(name)) throw new Error(`no account named ${name}: they sign up first, or send them an invite link`);
+    hub.members.add(id, name, access ?? "developer", c.get("dev"));
+    store.logEvent("member_added", c.get("dev"), { dev: name, access: access ?? "developer" });
+    store.changed();
+    return c.json(await memberOf(id, name));
   });
-  app.delete("/projects/:id/members/:dev", async (c) => {
-    const p = await rt(c.req.param("id"));
-    p.engine.store.removeMember(c.req.param("dev"));
-    p.engine.store.logEvent("member_removed", c.get("dev"), { dev: c.req.param("dev") });
+  /** Access (keeping a manager) and the profile: role in the team, level, note for the Operator. */
+  app.patch("/projects/:id/members/:user", async (c) => {
+    const id = c.req.param("id");
+    const user = c.req.param("user");
+    const body = (await c.req.json()) as { access?: MemberAccess; role?: string; level?: MemberLevel; note?: string };
+    if (!hub.members.access(id, user)) throw new Error(`${user} is not a member of this project`);
+    const { store } = (await rt(id)).engine;
+    if (body.role !== undefined || body.level !== undefined || body.note !== undefined)
+      store.saveMember(user, { role: body.role, level: body.level, note: body.note });
+    if (body.access !== undefined) hub.members.setAccess(id, user, body.access);
+    store.logEvent("member_set", c.get("dev"), { dev: user, ...body });
+    store.changed();
+    return c.json(await memberOf(id, user));
+  });
+  /** A manager removes someone, or anyone leaves; the project keeps its last manager. History keeps their name. */
+  app.delete("/projects/:id/members/:user", async (c) => {
+    const id = c.req.param("id");
+    const user = c.req.param("user");
+    hub.members.remove(id, user);
+    const { store } = (await rt(id)).engine;
+    store.logEvent(user === c.get("dev") ? "member_left" : "member_removed", c.get("dev"), { dev: user });
+    store.changed();
+    return c.json({ ok: true });
+  });
+
+  // Invite links: the URL is shown once, when it is made (only the code's hash is kept).
+  app.get("/projects/:id/invites", (c) => c.json(hub.members.invites(c.req.param("id"))));
+  app.post("/projects/:id/invites", async (c) => {
+    const id = c.req.param("id");
+    await rt(id);
+    const inv = hub.members.createInvite(id, (await c.req.json().catch(() => ({}))) as Record<string, unknown>, c.get("dev"));
+    return c.json({ ...inv, url: `${publicOrigin(c)}/join/${inv.code}` });
+  });
+  app.delete("/projects/:id/invites/:invite", (c) => {
+    hub.members.revokeInvite(c.req.param("id"), c.req.param("invite"));
     return c.json({ ok: true });
   });
 
@@ -288,7 +355,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
     return c.json(hub.accounts.createShareLink(c.req.param("id"), { label: body.label, days: body.days, by: c.get("dev") }));
   });
   app.delete("/projects/:id/share-links/:link", (c) => {
-    hub.accounts.revokeShareLink(c.req.param("link"));
+    hub.accounts.revokeShareLink(c.req.param("link"), c.req.param("id"));
     return c.json({ ok: true });
   });
 

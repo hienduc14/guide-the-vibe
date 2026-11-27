@@ -86,7 +86,7 @@ test("nobody becomes a member by working or being assigned: tasks go to members 
   assert.deepEqual([r.status, r.json.error], [400, "frank is not a member of this project"]);
   assert.equal(engine().store.member("frank"), undefined);
   assert.equal(engine().store.member("carol"), undefined, "opening a session does not add anyone");
-  engine().store.saveMember("frank", {});
+  srv.hub.members.add("shop", "frank", "developer", null);
   assert.equal((await call("/v1/p/shop/board", { method: "POST", dev: "lead", body: { title: "Docs", assignee: "frank" } })).status, 200);
 });
 

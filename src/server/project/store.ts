@@ -21,11 +21,14 @@ import type {
   Ticket,
   Workspace,
 } from "../../shared/types.ts";
-import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_ACCESS, MEMBER_LEVELS, type MemberAccess } from "../../shared/types.ts";
+import { AGENT_CAPABILITIES, LEVEL_RANK, MEMBER_LEVELS, type MemberAccess } from "../../shared/types.ts";
 import { newId, nowIso, normPath } from "../../shared/util.ts";
 
 const SESSION_IDLE_MS = 5 * 60_000;
 const SESSION_END_MS = 2 * 60 * 60_000;
+
+/** Who is in a project and their access: the hub's project_members. */
+export type Team = () => { user: string; access: MemberAccess; joined_at: string }[];
 
 export class Store extends EventEmitter {
   readonly db: Db;
@@ -33,6 +36,8 @@ export class Store extends EventEmitter {
   policy: Policy = { critical_paths: [], modules: {} };
   charter: Charter = {};
   features: () => Record<string, FeatureMode> = () => ({});
+  /** Set by the hub; without one (an engine on its own, in tests) everyone with a profile is a developer. */
+  team?: Team;
 
   constructor(db: Db) {
     super();
@@ -307,37 +312,38 @@ export class Store extends EventEmitter {
 
   // ---- members -------------------------------------------------------------------
 
+  /** The team (from the hub, with access) joined with each member's profile here; a member without one gets the defaults. */
   members(): Member[] {
-    return this.db.all<Member>(`SELECT * FROM members ORDER BY dev`);
+    const profiles = new Map(this.db.all<Member>(`SELECT dev, role, level, note, created_at, updated_at FROM members`).map((m) => [m.dev, m]));
+    const team = this.team?.() ?? [...profiles.keys()].map((user) => ({ user, access: "developer" as const, joined_at: "" }));
+    return team.map(({ user, access, joined_at }) => ({
+      ...(profiles.get(user) ?? { dev: user, role: "developer", level: "mid" as MemberLevel, created_at: joined_at, updated_at: joined_at }),
+      note: profiles.get(user)?.note ?? undefined,
+      access,
+    }));
   }
 
   member(dev: string): Member | undefined {
-    return this.db.get<Member>(`SELECT * FROM members WHERE dev = ?`, dev);
+    return this.members().find((m) => m.dev === dev);
   }
 
-  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string; access?: MemberAccess }): Member {
+  /** A member's profile in this project: their role in the team, level and a note for the Operator. */
+  saveMember(dev: string, input: { role?: string; level?: MemberLevel; note?: string }): Member {
     if (!/^[a-zA-Z0-9._-]{1,40}$/.test(dev)) throw new Error("dev name: letters, digits, . _ -");
     if (input.level && !MEMBER_LEVELS.includes(input.level)) throw new Error(`level must be one of ${MEMBER_LEVELS.join(", ")}`);
-    if (input.access && !MEMBER_ACCESS.includes(input.access)) throw new Error(`access must be one of ${MEMBER_ACCESS.join(", ")}`);
-    const prev = this.member(dev);
+    const prev = this.db.get<Member>(`SELECT dev, role, level, note, created_at, updated_at FROM members WHERE dev = ?`, dev);
     const now = nowIso();
-    const m: Member = {
+    const profile = {
       dev,
       role: (input.role ?? prev?.role ?? "developer").trim() || "developer",
       level: input.level ?? prev?.level ?? "mid",
-      access: input.access ?? prev?.access ?? "developer",
-      note: input.note ?? prev?.note,
+      note: input.note ?? prev?.note ?? null,
       created_at: prev?.created_at ?? now,
       updated_at: now,
     };
-    this.db.upsert("members", m as unknown as Record<string, unknown>);
+    this.db.upsert("members", profile);
     this.changed();
-    return m;
-  }
-
-  removeMember(dev: string): void {
-    this.db.run(`DELETE FROM members WHERE dev = ?`, dev);
-    this.changed();
+    return this.member(dev) ?? { ...profile, note: profile.note ?? undefined, access: "developer" };
   }
 
   // ---- messages -----------------------------------------------------------------

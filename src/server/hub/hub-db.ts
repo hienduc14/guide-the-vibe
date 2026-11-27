@@ -5,7 +5,17 @@ PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, repo_url TEXT NOT NULL, main_branch TEXT NOT NULL,
   aliases TEXT NOT NULL DEFAULT '[]', policy TEXT NOT NULL DEFAULT '{}', description TEXT,
-  archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  archived INTEGER NOT NULL DEFAULT 0, created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+-- Who is in which project and with what access (members.ts): the one place access is decided, readable before a
+-- project's runtime opens. Invite links bring people in as developer or viewer, never manager.
+CREATE TABLE IF NOT EXISTS project_members (
+  project TEXT NOT NULL, user TEXT NOT NULL, access TEXT NOT NULL, joined_at TEXT NOT NULL, invited_by TEXT, PRIMARY KEY (project, user)
+);
+CREATE INDEX IF NOT EXISTS project_members_user ON project_members(user);
+CREATE TABLE IF NOT EXISTS project_invites (
+  id TEXT PRIMARY KEY, project TEXT NOT NULL, code_hash TEXT NOT NULL UNIQUE, access TEXT NOT NULL, created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL, expires_at TEXT NOT NULL, max_uses INTEGER, uses INTEGER NOT NULL DEFAULT 0, revoked_at TEXT
 );
 CREATE TABLE IF NOT EXISTS brain_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, project TEXT NOT NULL, kind TEXT NOT NULL,

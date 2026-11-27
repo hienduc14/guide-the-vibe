@@ -1,5 +1,6 @@
-// Who may do what in a project: viewers read, developers answer their questions and update their own tasks,
-// managers do everything in their project; computers work only where their person is a developer or manager.
+// Who may do what in a project: viewers read; developers answer their questions, update their own tasks, create tasks
+// for themselves and edit documents; managers do everything in their project; computers work only where their person
+// is a developer or manager.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -95,22 +96,33 @@ test("a developer updates their own tasks, not others', and cannot hand them ove
   assert.equal((await call(`/v1/p/shop/board/${theirs.id}/notes`, { method: "POST", token: as("dan"), body: { body: "x" } })).status, 403);
   assert.equal((await call(`/v1/p/shop/board/${mine.id}`, { method: "PATCH", token: as("dan"), body: { assignee: "eve" } })).status, 403);
   assert.equal((await call(`/v1/p/shop/board/${mine.id}`, { method: "DELETE", token: as("dan") })).status, 403);
-  assert.equal((await call("/v1/p/shop/board", { method: "POST", token: as("dan"), body: { title: "new" } })).status, 403);
+});
+
+test("a developer creates tasks for themselves or for nobody, and edits documents and knowledge notes", async () => {
+  assert.equal((await call("/v1/p/shop/board", { method: "POST", token: as("dan"), body: { title: "new" } })).status, 200);
+  assert.equal((await call("/v1/p/shop/board", { method: "POST", token: as("dan"), body: { title: "mine", assignee: "dan" } })).status, 200);
+  assert.equal((await call("/v1/p/shop/board", { method: "POST", token: as("dan"), body: { title: "yours", assignee: "eve" } })).status, 403);
+  const doc = await call<any>("/v1/p/shop/kb", { method: "POST", token: as("dan"), body: { title: "Rules", body: "Refunds in 14 days", type: "business" } });
+  assert.equal(doc.status, 200, JSON.stringify(doc.json));
+  assert.equal((await call(`/v1/p/shop/kb/${doc.json.id}`, { method: "PATCH", token: as("dan"), body: { body: "Refunds in 30 days" } })).status, 200);
+  assert.equal((await call(`/v1/p/shop/kb/${doc.json.id}`, { method: "DELETE", token: as("dan") })).status, 403);
+  assert.equal((await call("/v1/p/shop/kb", { method: "POST", token: as("vic"), body: { title: "x", body: "y" } })).status, 403);
+  assert.equal((await call("/v1/p/shop/features", { method: "PUT", token: as("dan"), body: { feature: "brain", mode: "off" } })).status, 403);
 });
 
 test("a manager does everything in their project and nothing as a manager elsewhere", async () => {
   assert.equal((await call("/api/projects/shop", { method: "PATCH", token: as("mia"), body: { description: "d" } })).status, 200);
-  assert.equal((await call("/api/projects/shop/members/out", { method: "PUT", token: as("mia"), body: { access: "viewer" } })).status, 200);
+  assert.equal((await call("/api/projects/shop/members", { method: "POST", token: as("mia"), body: { user: "out", access: "viewer" } })).status, 200);
   assert.equal((await call("/api/projects/shop/members/out", { method: "DELETE", token: as("mia") })).status, 200);
   assert.equal((await call("/api/projects/blog", { method: "PATCH", token: as("mia"), body: { description: "d" } })).status, 403, "developer there");
-  assert.equal((await call("/api/projects/blog/members/out", { method: "PUT", token: as("mia"), body: {} })).status, 403);
+  assert.equal((await call("/api/projects/blog/members", { method: "POST", token: as("mia"), body: { user: "out" } })).status, 403);
 });
 
 test("outsiders: 404 on the dashboard, 403 with a clear message for their computer; viewers' computers are refused too", async () => {
   assert.equal((await call("/api/projects/shop", { token: as("out") })).status, 404);
   assert.equal((await call("/v1/p/shop/state", { token: as("out") })).status, 404);
   const r = await call<any>("/v1/p/shop/state", { token: P.out.device });
-  assert.deepEqual([r.status, r.json.error], [403, "You are not a member of project Shop. Ask a project manager to add you."]);
+  assert.deepEqual([r.status, r.json.error], [403, "You are not a member of project shop. Ask a project manager for an invite link."]);
   const v = await call<any>("/v1/p/shop/events", { method: "POST", token: P.vic.device, body: { events: [] } });
   assert.equal(v.status, 403);
   assert.match(v.json.error, /viewer in project Shop/);

@@ -56,7 +56,7 @@ test("setup", async () => {
   });
   assert.equal((await call("/api/projects", { method: "POST", body: { id: "shop", repo_url: origin.bare } })).status, 200);
   for (const d of ["alice", "bob", "carol"]) {
-    engine().store.saveMember(d, {}); // work goes to members only
+    srv.hub.members.add("shop", d, "developer", null); // work goes to members only
     await start(d);
   }
 });

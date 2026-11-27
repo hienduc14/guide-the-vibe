@@ -418,8 +418,8 @@ export class Accounts {
     return { ...row, code };
   }
 
-  revokeShareLink(id: string): void {
-    this.db.run(`DELETE FROM share_links WHERE id = ?`, id);
+  revokeShareLink(id: string, project: string): void {
+    this.db.run(`DELETE FROM share_links WHERE id = ? AND project = ?`, id, project);
   }
 
   // ---- token → principal ---------------------------------------------------------------

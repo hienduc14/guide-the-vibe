@@ -75,17 +75,17 @@ test("share links read one project and nothing else", async () => {
   assert.equal((await call("/api/me", { token: code })).status, 401, "revoked");
 });
 
-test("members: managers add people with an account and set role, level and access; agents see the team", async () => {
+test("members: managers set role, level and access; agents see the team", async () => {
   const lead = await addPerson(srv, "lead", { password: "lead-pass-1", projects: { shop: "manager" } });
   const watch = await addPerson(srv, "watch", { password: "watch-pass-1", projects: { shop: "viewer" } });
-  await addPerson(srv, "bob");
-  assert.equal((await call("/api/projects/shop/members/bob", { method: "PUT", token: watch.session, body: { role: "frontend" } })).status, 403);
-  assert.match((await call<any>("/api/projects/shop/members/nobody", { method: "PUT", token: lead.session, body: {} })).json.error, /no account named nobody/);
-  const bob = await call<any>("/api/projects/shop/members/bob", { method: "PUT", token: lead.session, body: { role: "frontend", level: "junior" } });
+  await addPerson(srv, "bob", { projects: { shop: "developer" } });
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "PATCH", token: watch.session, body: { role: "frontend" } })).status, 403);
+  assert.match((await call<any>("/api/projects/shop/members/nobody", { method: "PATCH", token: lead.session, body: {} })).json.error, /not a member/);
+  const bob = await call<any>("/api/projects/shop/members/bob", { method: "PATCH", token: lead.session, body: { role: "frontend", level: "junior" } });
   assert.deepEqual([bob.json.level, bob.json.access], ["junior", "developer"]);
-  assert.equal((await call("/api/projects/shop/members/bob", { method: "PUT", token: lead.session, body: { level: "guru" } })).status, 400);
-  assert.equal((await call("/api/projects/shop/members/bob", { method: "PUT", token: lead.session, body: { access: "owner" } })).status, 400);
-  await call("/api/projects/shop/members/lead", { method: "PUT", token: lead.session, body: { role: "tech lead", level: "lead" } });
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "PATCH", token: lead.session, body: { level: "guru" } })).status, 400);
+  assert.equal((await call("/api/projects/shop/members/bob", { method: "PATCH", token: lead.session, body: { access: "owner" } })).status, 400);
+  await call("/api/projects/shop/members/lead", { method: "PATCH", token: lead.session, body: { role: "tech lead", level: "lead" } });
   assert.equal(srv.hub.live("shop")!.engine.store.member("lead")?.access, "manager", "role and level leave access alone");
 
   const s = await call<any>("/v1/p/shop/events", {
@@ -96,6 +96,7 @@ test("members: managers add people with an account and set role, level and acces
   });
   assert.match(s.json.results[0].briefing, /Team: .*bob \(you\) — frontend, junior.*lead — tech lead, lead/);
   assert.equal((await call("/api/projects/shop/members/bob", { method: "DELETE", token: lead.session })).status, 200);
+  assert.equal(srv.hub.live("shop")!.engine.store.member("bob"), undefined);
 });
 
 test("charter: managers set it, agents get it in the briefing and in gtv_status state", async () => {

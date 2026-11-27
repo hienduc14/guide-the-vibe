@@ -112,7 +112,7 @@ const ROUTES: [method: string, path: RegExp, need: Need][] = [
   ["*", /^\/auth\/reset\/[^/]+$/, "public"],
   ["GET", /^\/invites\/[^/]+$/, "public"],
   ["*", /^\/(admin|brain)(\/|$)/, "admin"],
-  ["POST", /^\/projects$/, "admin"],
+  ["POST", /^\/projects\/check-repo$/, "user"],
   ["*", /^\/projects\/[^/]+\/(share-links|invites)(\/|$)/, "manager"],
   ["DELETE", /^\/projects\/[^/]+\/members\/[^/]+$/, "self"],
   ["GET", /^\/projects\/[^/]+(\/|$)/, "viewer"],
@@ -170,22 +170,25 @@ export function v1Auth(hub: Hub) {
 }
 
 /** The 403 an agent's computer gets in a project it may not work in; the CLI and daemon show it as is. */
-export function notMemberMessage(project: string, access: string): string {
+export function notMemberMessage(project: { id: string; name: string }, access: string): string {
   return access === "viewer"
-    ? `You are a viewer in project ${project}; agents need developer access. Ask a project manager to change it.`
-    : `You are not a member of project ${project}. Ask a project manager to add you.`;
+    ? `You are a viewer in project ${project.name}; agents need developer access. Ask a project manager to change it.`
+    : `You are not a member of project ${project.id}. Ask a project manager for an invite link.`; // the id they already know, never the name
 }
+
+const FORBIDDEN_OTHERS_TASK: Denied = { status: 403, error: "forbidden: only a manager gives tasks to someone else" };
 
 /**
  * Project API (/v1/p/:id), once the project is known. Computers work in projects where their person is a developer
  * or manager. Dashboard sessions read as viewers and change things as managers; a developer may also answer
- * questions sent to them (or to everyone) and update the tasks assigned to them.
+ * questions sent to them (or to everyone), update the tasks assigned to them, create tasks for themselves or for
+ * nobody yet, and edit the project's documents and knowledge notes.
  */
 export async function projectDenied(hub: Hub, c: Context<{ Variables: AuthVars & { rt: ProjectRuntime } }>): Promise<Denied | undefined> {
   const p = c.get("principal")!;
   const rt = c.get("rt");
   const access = hub.projectAccess(p, rt.record.id);
-  if (p.kind === "device") return access === "developer" || access === "manager" ? undefined : { status: 403, error: notMemberMessage(rt.record.name, access) };
+  if (p.kind === "device") return access === "developer" || access === "manager" ? undefined : { status: 403, error: notMemberMessage(rt.record, access) };
   if (access === "none") return { status: 404, error: `unknown project ${rt.record.id}` };
   // In open mode a daemon names its developer and acts as that developer only (as before accounts).
   c.set("admin", access === "manager" && !(p.kind === "open" && c.req.header("x-gtv-dev")));
@@ -199,16 +202,26 @@ export async function projectDenied(hub: Hub, c: Context<{ Variables: AuthVars &
     const t = rt.engine.store.ticket(decodeURIComponent(ticket[1]));
     return !t || !t.to_dev || t.to_dev === me ? undefined : { status: 403, error: "forbidden: this question was sent to someone else" };
   }
+  if (sub === "/board" && method === "POST") {
+    const body = (await c.req.json().catch(() => ({}))) as { assignee?: string | null };
+    return !body.assignee || body.assignee === me ? undefined : FORBIDDEN_OTHERS_TASK;
+  }
   const board = /^\/board\/([^/]+)(\/notes)?$/.exec(sub);
   if (board && (method === "PATCH" || (method === "POST" && board[2]))) {
     const item = rt.engine.board.get(decodeURIComponent(board[1]));
     if (item && item.assignee !== me) return { status: 403, error: "forbidden: you can only change tasks assigned to you" };
     if (method === "PATCH") {
       const body = (await c.req.json().catch(() => ({}))) as { assignee?: string | null };
-      if ("assignee" in body && (body.assignee || undefined) !== item?.assignee) return FORBIDDEN_MANAGER;
+      if ("assignee" in body && (body.assignee || undefined) !== item?.assignee) return FORBIDDEN_OTHERS_TASK;
     }
     return undefined;
   }
+  if (
+    (sub === "/kb" && method === "POST") ||
+    (/^\/kb\/[^/]+$/.test(sub) && method === "PATCH") ||
+    (/^\/kb\/[^/]+\/(confirm|reject)$/.test(sub) && method === "POST")
+  )
+    return undefined;
   return FORBIDDEN_MANAGER;
 }
 

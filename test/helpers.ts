@@ -96,6 +96,16 @@ export async function signup(app: App, name: string, opts: { invite?: string; pa
   return r.cookie;
 }
 
+/**
+ * Creates a project on the dashboard as this person (who becomes its manager). Test repos are local paths, which only
+ * server admins may use, so the repo check is replaced here (test/projects.test.ts checks the real one).
+ */
+export async function newProject(srv: { hub: Hub; app: App }, cookie: string, id: string, repo_url: string): Promise<void> {
+  srv.hub.checkRepo = async () => ({ default_branch: "main" });
+  const r = await api(srv.app, "/api/projects", { method: "POST", cookie, body: { id, name: id.toUpperCase(), repo_url } });
+  if (r.status !== 200) throw new Error(`new project ${id}: ${r.status} ${JSON.stringify(r.json)}`);
+}
+
 /** Connects a computer to the logged-in account the way gtv login does; returns its key. */
 export async function connectDevice(app: App, cookie: string, name = "laptop"): Promise<{ token: string; device_id: string }> {
   const start = (await api(app, "/v1/connect/start", { method: "POST", body: { device_name: name, platform: "linux" } })).json;
@@ -114,7 +124,7 @@ export async function addPerson(
 ): Promise<{ device: string; session?: string }> {
   const { hub } = srv;
   if (!hub.accounts.user(name)) hub.accounts.createUser(name, { role: opts.role ?? "member", password: opts.password ?? null });
-  for (const [id, access] of Object.entries(opts.projects ?? {})) (await hub.runtime(id)).engine.store.saveMember(name, { access });
+  for (const [id, access] of Object.entries(opts.projects ?? {})) hub.members.add(id, name, access, null);
   const device = `gtvd_test_${name}_${randomBytes(6).toString("hex")}`;
   hub.accounts.addDevice(name, hashToken(device), `${name}-laptop`, "linux");
   if (!opts.password) return { device };

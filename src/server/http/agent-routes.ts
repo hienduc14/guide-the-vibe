@@ -34,6 +34,7 @@ export function agentRoutes(): Hono<ProjectEnv> {
     const events = "events" in body && body.events ? body.events : [body as GtvEvent];
     const results = [];
     for (const ev of events) {
+      if (ev.type === "session_start") ev.session = { ...ev.session, device: c.get("principal")?.device ?? null };
       const wsId = ev.type === "snapshot" ? ev.workspace_id : ev.type === "session_start" ? ev.session.workspace_id : undefined;
       const ws = wsId ? engine.store.workspace(wsId) : undefined;
       if (ws && ws.dev !== c.get("dev") && !c.get("admin")) throw new Error(`unknown workspace ${wsId}`);

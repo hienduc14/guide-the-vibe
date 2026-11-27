@@ -58,6 +58,7 @@ export class Engine {
     opts.db.ensureColumn("board_notes", "summary", "TEXT");
     opts.db.ensureColumn("tickets", "options", "TEXT");
     opts.db.ensureColumn("tasks", "summary", "TEXT");
+    opts.db.ensureColumn("sessions", "device", "TEXT");
     this.store = new Store(opts.db);
     this.store.team = opts.team;
     this.board = new Board(opts.db, this.store);

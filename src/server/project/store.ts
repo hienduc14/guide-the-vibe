@@ -80,6 +80,7 @@ export class Store extends EventEmitter {
       status: "active",
       capabilities: AGENT_CAPABILITIES[hello.agent] ?? AGENT_CAPABILITIES.other,
       last_seen: now,
+      device: hello.device ?? null,
     };
     this.db.upsert("sessions", { ...session, capabilities: session.capabilities });
     this.changed();

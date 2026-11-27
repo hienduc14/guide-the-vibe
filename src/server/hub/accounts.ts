@@ -6,7 +6,7 @@
 // A share link (gtvl_…) is a read-only viewer limited to one project.
 
 import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
-import type { Db } from "../../shared/db.ts";
+import { parseJson, type Db } from "../../shared/db.ts";
 import { newId, nowIso } from "../../shared/util.ts";
 
 export type Role = "admin" | "member";
@@ -89,6 +89,16 @@ export interface DeviceRow {
   platform: string;
   created_at: string;
   last_seen: string | null;
+  gtv_version: string | null;
+  agents: { kind: string; version: string | null }[];
+  reported_at: string | null;
+}
+
+export interface DeviceRepo {
+  path: string;
+  project: string;
+  agents: string[];
+  updated_at: string;
 }
 
 export interface ShareLinkRow {
@@ -208,6 +218,7 @@ export class Accounts {
     if (!this.user(name)) throw new Error(`unknown account ${name}`);
     this.keepAnAdmin(name);
     this.db.run(`UPDATE users SET deleted_at = ?, pass_hash = '', role = 'member' WHERE name = ?`, nowIso(), name);
+    this.db.run(`DELETE FROM device_repos WHERE device IN (SELECT id FROM devices WHERE user = ?)`, name);
     for (const t of ["user_sessions", "devices", "password_resets", "device_requests"]) this.db.run(`DELETE FROM ${t} WHERE user = ?`, name);
   }
 
@@ -290,10 +301,43 @@ export class Accounts {
   // ---- devices (computers connected to an account) -----------------------------------------
 
   devices(user?: string): DeviceRow[] {
-    const cols = `id, user, name, platform, created_at, last_seen`;
-    return user
-      ? this.db.all<DeviceRow>(`SELECT ${cols} FROM devices WHERE user = ? ORDER BY created_at`, user)
-      : this.db.all<DeviceRow>(`SELECT ${cols} FROM devices ORDER BY created_at`);
+    const cols = `id, user, name, platform, created_at, last_seen, gtv_version, agents, reported_at`;
+    const rows = user
+      ? this.db.all<DeviceRow & { agents: string | null }>(`SELECT ${cols} FROM devices WHERE user = ? ORDER BY created_at`, user)
+      : this.db.all<DeviceRow & { agents: string | null }>(`SELECT ${cols} FROM devices ORDER BY created_at`);
+    return rows.map((d) => ({ ...d, agents: parseJson(d.agents, []) }));
+  }
+
+  deviceRepos(device: string): DeviceRepo[] {
+    return this.db
+      .all<DeviceRepo & { agents: string }>(`SELECT path, project, agents, updated_at FROM device_repos WHERE device = ? ORDER BY path`, device)
+      .map((r) => ({ ...r, agents: parseJson(r.agents, []) }));
+  }
+
+  /** What a computer's daemon reports (untrusted, so trimmed): its gtv version, agents, and the repos where gtv is on. */
+  reportDevice(id: string, report: unknown): void {
+    const b = (report ?? {}) as { gtv_version?: unknown; agents?: unknown; repos?: unknown };
+    const text = (v: unknown, max: number) => (typeof v === "string" && v ? v.slice(0, max) : null);
+    const list = (v: unknown, max: number) => (Array.isArray(v) ? v.slice(0, max) : []) as Record<string, unknown>[];
+    const agents = list(b.agents, 10).flatMap((a) => (text(a?.kind, 20) ? [{ kind: text(a.kind, 20)!, version: text(a.version, 40) }] : []));
+    const repos = list(b.repos, 200).flatMap((r) =>
+      text(r?.path, 500) && text(r?.project, 60)
+        ? [{ path: text(r.path, 500)!, project: text(r.project, 60)!, agents: (list(r.agents, 10) as unknown[]).flatMap((k) => text(k, 20) ?? []) }]
+        : [],
+    );
+    const now = nowIso();
+    this.db.tx(() => {
+      this.db.run(`UPDATE devices SET gtv_version = ?, agents = ?, reported_at = ? WHERE id = ?`, text(b.gtv_version, 40), JSON.stringify(agents), now, id);
+      this.db.run(`DELETE FROM device_repos WHERE device = ?`, id);
+      for (const r of repos) this.db.upsert("device_repos", { device: id, ...r, updated_at: now });
+    });
+  }
+
+  renameDevice(id: string, user: string, name: string): void {
+    const n = String(name ?? "").trim();
+    if (!n || n.length > 80) throw new Error("computer name: 1-80 characters");
+    if (!this.devices(user).some((d) => d.id === id)) throw new Error("unknown computer");
+    this.db.run(`UPDATE devices SET name = ? WHERE id = ?`, n, id);
   }
 
   /** Adds a computer with a known token (GTV_TOKENS, tests); no-op if the token is known. */
@@ -311,16 +355,17 @@ export class Accounts {
   }
 
   removeDevice(id: string, user?: string): boolean {
-    const before = this.devices().length;
-    if (user) this.db.run(`DELETE FROM devices WHERE id = ? AND user = ?`, id, user);
-    else this.db.run(`DELETE FROM devices WHERE id = ?`, id);
-    return this.devices().length < before;
+    const d = this.devices(user).find((x) => x.id === id);
+    if (!d) return false;
+    this.db.run(`DELETE FROM devices WHERE id = ?`, id);
+    this.db.run(`DELETE FROM device_repos WHERE device = ?`, id);
+    return true;
   }
 
   /** The computer a token belongs to (and marks it seen). */
-  deviceFor(token: string): (DeviceRow & { role: Role }) | undefined {
-    const row = this.db.get<DeviceRow & { role: Role }>(
-      `SELECT d.id, d.user, d.name, d.platform, d.created_at, d.last_seen, u.role FROM devices d JOIN users u ON u.name = d.user WHERE d.token_hash = ? AND ${ACTIVE}`,
+  deviceFor(token: string): { id: string; user: string; role: Role } | undefined {
+    const row = this.db.get<{ id: string; user: string; role: Role }>(
+      `SELECT d.id, d.user, u.role FROM devices d JOIN users u ON u.name = d.user WHERE d.token_hash = ? AND ${ACTIVE}`,
       hashToken(token),
     );
     if (row) this.db.run(`UPDATE devices SET last_seen = ? WHERE id = ?`, nowIso(), row.id);

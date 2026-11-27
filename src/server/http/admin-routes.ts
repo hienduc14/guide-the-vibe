@@ -6,7 +6,7 @@ import type { Hub, ProjectInput } from "../hub/hub.ts";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
 import { openMode, publicOrigin, rateLimited } from "./auth.ts";
-import { accountRoutes } from "./account-routes.ts";
+import { accountRoutes, online } from "./account-routes.ts";
 import { FEATURES, FEATURE_KEYS, isActive } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level, MemberAccess, MemberLevel } from "../../shared/types.ts";
@@ -293,6 +293,8 @@ export function adminRoutes(hub: Hub): Hono<Env> {
       display_name: hub.accounts.user(m.dev)?.display_name ?? m.dev,
       joined_at: joined.get(m.dev)?.joined_at ?? null,
       invited_by: joined.get(m.dev)?.invited_by ?? null,
+      // Members see each other's computers by name only, never their folders.
+      devices: hub.accounts.devices(m.dev).map((d) => ({ id: d.id, name: d.name, online: online(d.last_seen), last_seen: d.last_seen })),
     }));
   };
   const memberOf = async (id: string, user: string) => (await membersOf(id)).find((m) => m.dev === user);

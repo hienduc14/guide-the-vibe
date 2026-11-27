@@ -36,9 +36,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS user_sessions (
   token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_used TEXT, user_agent TEXT, ip TEXT
 );
+-- A computer reports its gtv version, the agents installed (JSON [{kind, version}]) and the repos where gtv is on
+-- (device_repos, replaced on each report). last_seen is the daemon's /health ping (every 15 s).
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY, user TEXT NOT NULL, name TEXT NOT NULL, platform TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
-  created_at TEXT NOT NULL, last_seen TEXT
+  created_at TEXT NOT NULL, last_seen TEXT, gtv_version TEXT, agents TEXT, reported_at TEXT
+);
+CREATE TABLE IF NOT EXISTS device_repos (
+  device TEXT NOT NULL, path TEXT NOT NULL, project TEXT NOT NULL, agents TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (device, path)
 );
 CREATE TABLE IF NOT EXISTS password_resets (code_hash TEXT PRIMARY KEY, user TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS device_requests (

@@ -62,6 +62,8 @@ export interface Session {
   status: "active" | "idle" | "ended";
   capabilities: AgentCapabilities;
   last_seen: string;
+  /** The computer the agent runs on (hub device id), from the key that registered the session. */
+  device?: string | null;
 }
 
 export interface AgentCapabilities {
@@ -168,6 +170,8 @@ export interface SessionHello {
   workspace_label: string;
   cwd?: string;
   branch?: string;
+  /** Set by the server from the caller's key, never taken from the daemon. */
+  device?: string | null;
 }
 
 /** What the server pushes to daemons over SSE so hooks can decide locally. */

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
 );
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, dev TEXT NOT NULL, agent TEXT NOT NULL, workspace_id TEXT NOT NULL,
-  agent_session_id TEXT, cwd TEXT, status TEXT NOT NULL, capabilities TEXT NOT NULL, last_seen TEXT NOT NULL
+  agent_session_id TEXT, cwd TEXT, status TEXT NOT NULL, capabilities TEXT NOT NULL, last_seen TEXT NOT NULL, device TEXT
 );
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY, session_id TEXT NOT NULL, workspace_id TEXT NOT NULL, dev TEXT NOT NULL,

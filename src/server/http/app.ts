@@ -1,7 +1,7 @@
 // Assembles the HTTP surface:
 //   /health                    liveness + brain status
 //   /v1/connect/*              connecting a computer to an account (gtv login), no token needed
-//   /v1/me                     the computer's account and projects
+//   /v1/me                     the computer's account and projects; /v1/me/device its report (agents, repos)
 //   /v1/projects, /v1/resolve  project discovery for daemons (one's own projects; others only "exists")
 //   /v1/p/:project/*           project API (daemons, agents via daemon, CLI, dashboard callers by role)
 //   /api/*                     dashboard API
@@ -62,6 +62,13 @@ export function buildApp(hub: Hub): Hono {
         .myProjects(p)
         .map(({ record: r, access }) => ({ id: r.id, name: r.name, access, repos: [...new Set([r.repo_url, ...r.aliases].map(repoKey))] })),
     });
+  });
+  /** The daemon's report: gtv version, agents installed, repos where gtv is on (start, every 6 h, after gtv on/off). */
+  dev.post("/me/device", async (c) => {
+    const p = c.get("principal")!;
+    if (p.kind !== "device") return c.json({ error: "only a computer's key reports a computer" }, 400);
+    hub.accounts.reportDevice(p.device!, await c.req.json().catch(() => ({})));
+    return c.json({ ok: true });
   });
   dev.post("/me/logout", (c) => {
     const p = c.get("principal")!;

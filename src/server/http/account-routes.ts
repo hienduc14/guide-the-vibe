@@ -10,6 +10,50 @@ type Env = { Variables: AuthVars };
 export type Registration = "open" | "invite" | "closed";
 export const REGISTRATION: Registration[] = ["open", "invite", "closed"];
 
+/** "Connected": the computer's daemon pinged /health (every 15 s) within the last minute. */
+export const online = (lastSeen: string | null) => !!lastSeen && Date.now() - Date.parse(lastSeen) < 60_000;
+
+/** A person's computers as "My computers" shows them. Repo paths are for the owner and server admins only. */
+function devicesOf(hub: Hub, user: string) {
+  const role = hub.accounts.user(user)?.role ?? "member";
+  const running = hub
+    .myProjects({ kind: "user", name: user, role })
+    .flatMap(({ record }) =>
+      (hub.live(record.id)?.engine.store.sessions() ?? [])
+        .filter((s) => s.dev === user && s.device)
+        .map((s) => ({ ...s, project: record.id, project_name: record.name })),
+    );
+  return hub.accounts.devices(user).map((d) => {
+    const sessions = running
+      .filter((s) => s.device === d.id)
+      .map((s) => ({
+        id: s.id,
+        project: s.project,
+        project_name: s.project_name,
+        agent: s.agent,
+        status: s.status,
+        cwd: s.cwd ?? null,
+        last_seen: s.last_seen,
+      }));
+    return {
+      ...d,
+      online: online(d.last_seen),
+      repos: hub.accounts.deviceRepos(d.id).map((r) => {
+        const rec = hub.record(r.project);
+        const visible = rec && !rec.archived && hub.projectAccess({ kind: "user", name: user, role }, r.project) !== "none";
+        return {
+          ...r,
+          project_name: visible ? rec.name : null, // not (or no longer) a member: the name stays private
+          sessions: sessions
+            .filter((s) => s.project === r.project && !!s.cwd && (s.cwd === r.path || s.cwd.startsWith(`${r.path}/`) || s.cwd.startsWith(`${r.path}\\`)))
+            .map(({ id, agent, status }) => ({ id, agent, status })),
+        };
+      }),
+      sessions,
+    };
+  });
+}
+
 const body = async <T>(c: Context) => (await c.req.json().catch(() => ({}))) as T;
 const tooMany = (c: Context) => c.json({ error: "too many attempts: wait a minute" }, 429);
 
@@ -151,7 +195,13 @@ export function accountRoutes(hub: Hub): Hono<Env> {
     return c.json({ ok: true });
   });
 
-  app.get("/me/devices", (c) => c.json(me(c).kind === "user" ? hub.accounts.devices(me(c).name) : []));
+  app.get("/me/devices", (c) => c.json(me(c).kind === "user" ? devicesOf(hub, me(c).name) : []));
+  app.patch("/me/devices/:id", async (c) => {
+    const { name } = await body<{ name?: string }>(c);
+    hub.accounts.renameDevice(c.req.param("id"), myName(c), String(name ?? ""));
+    return c.json({ ok: true });
+  });
+  /** Disconnects a computer: its key stops working and its daemon says "Run: gtv login". */
   app.delete("/me/devices/:id", (c) => {
     if (!hub.accounts.removeDevice(c.req.param("id"), myName(c))) throw new Error("unknown computer");
     return c.json({ ok: true });
@@ -198,6 +248,7 @@ export function accountRoutes(hub: Hub): Hono<Env> {
     const r = hub.accounts.createReset(c.req.param("name"));
     return c.json({ reset_url: `${publicOrigin(c)}/reset/${r.code}`, expires_at: r.expires_at });
   });
+  app.get("/admin/users/:name/devices", (c) => c.json(devicesOf(hub, c.req.param("name"))));
   app.delete("/admin/users/:name", (c) => {
     hub.deleteAccount(c.req.param("name"));
     return c.json({ ok: true });

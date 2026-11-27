@@ -197,9 +197,11 @@ export async function projectDenied(hub: Hub, c: Context<{ Variables: AuthVars &
   if (p.kind === "share" || access !== "developer") return FORBIDDEN_MANAGER;
   const me = p.name;
   const sub = c.req.path.replace(/^\/v1\/p\/[^/]+/, "");
-  const ticket = /^\/tickets\/([^/]+)\/reply$/.exec(sub);
+  const ticket = /^\/tickets\/([^/]+)\/(reply|withdraw)$/.exec(sub);
   if (ticket && method === "POST") {
     const t = rt.engine.store.ticket(decodeURIComponent(ticket[1]));
+    if (ticket[2] === "withdraw")
+      return !t || t.from_dev === me ? undefined : { status: 403, error: "forbidden: only the asker or a manager closes a question" };
     return !t || !t.to_dev || t.to_dev === me ? undefined : { status: 403, error: "forbidden: this question was sent to someone else" };
   }
   if (sub === "/board" && method === "POST") {

@@ -49,7 +49,8 @@ Call `gtv_ask` when:
 - you would otherwise stop and wait for your user only to learn what someone else is doing.
 
 `gtv_ask` returns quickly. If the question was forwarded to a teammate, keep working on independent parts —
-the answer will be injected into your context automatically.
+the answer will be injected into your context automatically. If it stops mattering before anyone answers (you and
+the teammate settled it, or the plan changed), call `gtv_withdraw` with its ticket id so nobody is left deciding it.
 
 If you start touching files outside your registered scope, call `gtv_update_task` with `add_resources`.
 

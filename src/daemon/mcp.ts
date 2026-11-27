@@ -125,6 +125,15 @@ export async function runMcp(agentArg?: string, daemon = daemonUrl()): Promise<v
     },
     (args) => call("reply", args),
   );
+  server.registerTool(
+    "gtv_withdraw",
+    {
+      description:
+        "Withdraw a question you asked (gtv_ask) that no longer needs an answer, e.g. you and the teammate already settled it. It leaves the team lead's list and the teammate stops being asked.",
+      inputSchema: { ticket_id: z.string(), reason: z.string().optional().describe("One short line in the team's language: why it is no longer needed") },
+    },
+    (args) => call("withdraw", args),
+  );
   server.registerTool("gtv_status", { description: "Who is working on what right now: teammates' tasks, files being edited, open conflicts." }, () =>
     call("status", {}),
   );

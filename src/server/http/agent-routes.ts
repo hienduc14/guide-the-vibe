@@ -257,6 +257,16 @@ export function agentRoutes(): Hono<ProjectEnv> {
     return c.json(c.get("rt").tickets.reply({ ticket_id: c.req.param("id"), answer: body.answer ?? "", by, escalate: body.escalate }));
   });
 
+  app.post("/tickets/:id/withdraw", async (c) => {
+    const { tickets, engine } = c.get("rt");
+    const body = (await c.req.json().catch(() => ({}))) as { reason?: string; session_id?: string };
+    const dev = c.get("dev");
+    const t = engine.store.ticket(c.req.param("id"));
+    if (t && t.from_dev !== dev && !c.get("admin")) return c.json({ error: "forbidden: only the asker or a manager closes a question" }, 403);
+    const by = body.session_id ? `${dev}'s agent` : `${dev} (human)`;
+    return c.json(tickets.withdraw({ ticket_id: c.req.param("id"), by, reason: body.reason }));
+  });
+
   // ---- conflicts ------------------------------------------------------------------------
 
   app.get("/conflicts", (c) => c.json(c.get("rt").engine.store.conflicts(c.req.query("all") ? "all" : "open")));

@@ -6,7 +6,7 @@ import { startServer, type Running } from "../src/server/main.ts";
 import { loadConfig } from "../src/server/config.ts";
 import { NullBrain } from "../src/server/brain/types.ts";
 import type { Conflict } from "../src/shared/types.ts";
-import { makeOrigin, tempDir, type Origin } from "./helpers.ts";
+import { addPerson, makeOrigin, tempDir, type Origin } from "./helpers.ts";
 
 process.env.GTV_QUIET = "1";
 
@@ -198,6 +198,43 @@ test("a question waiting for a person blocks the asker's work; idle work goes st
   engine().db.run(`UPDATE board_tasks SET updated_at = ? WHERE id = ?`, old, item.id);
   const stale = (await call<any[]>("/api/projects/shop/attention")).json.find((a) => a.kind === "stale");
   assert.equal(stale?.ref, item.id);
+});
+
+test("the asker (or a manager) withdraws a question nobody needs to answer any more", async () => {
+  const now = new Date().toISOString();
+  engine().store.saveTicket({
+    id: "tk_drop",
+    from_session: sessions.carol,
+    from_dev: "carol",
+    question: "Move everything to a new branch first?",
+    tier: 3,
+    status: "waiting_human",
+    to_dev: "alice",
+    sources: [],
+    created_at: now,
+    updated_at: now,
+  });
+  const as = async (device: string) =>
+    srv.app.request("/v1/p/shop/tickets/tk_drop/withdraw", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${device}` },
+      body: JSON.stringify({ reason: "settled with alice", session_id: sessions.carol }),
+    });
+  const bob = await addPerson(srv, "bob");
+  assert.equal((await as(bob.device)).status, 403, "someone else's question");
+  const carol = await addPerson(srv, "carol");
+  const res = await as(carol.device);
+  assert.equal(res.status, 200);
+  const t = engine().store.ticket("tk_drop")!;
+  assert.equal(t.status, "closed");
+  assert.match(t.answer!, /settled with alice/);
+  assert.ok(!(await call<any[]>("/api/projects/shop/attention")).json.some((a) => a.ref === "tk_drop"), "it leaves the lead's list");
+  assert.ok(
+    engine()
+      .store.pendingMessages("alice")
+      .some((m) => m.ref_id === "tk_drop" && /no longer needs an answer/.test(m.body)),
+    "the teammate is told to drop it",
+  );
 });
 
 test("brain failures show on /health even when the provider is configured", async () => {

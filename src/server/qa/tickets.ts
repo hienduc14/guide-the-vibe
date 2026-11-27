@@ -220,6 +220,25 @@ export class TicketService {
     return this.finish(t, { status: "answered", answer: input.answer, answered_by: input.by, confidence: "high" });
   }
 
+  /** The question no longer matters (the asker's agent, the asker, or a manager): close it and tell whoever had it. */
+  withdraw(input: { ticket_id: string; by: string; reason?: string }): Ticket {
+    const t = this.store.ticket(input.ticket_id);
+    if (!t) throw new Error(`unknown ticket ${input.ticket_id}`);
+    if (t.status === "answered" || t.status === "closed" || t.status === "expired") throw new Error(`ticket ${t.id} is already ${t.status}`);
+    const reason = input.reason?.trim();
+    if (t.to_dev && t.to_dev !== t.from_dev)
+      this.store.addMessage({
+        to_dev: t.to_dev,
+        kind: "info",
+        ref_id: t.id,
+        from_dev: t.from_dev,
+        body: `[gtv] Question ${t.id} from ${t.from_dev} no longer needs an answer${reason ? `: ${reason}` : ""}.`,
+      });
+    this.store.logEvent("ticket_withdraw", input.by, { id: t.id, reason });
+    this.detached.delete(t.id); // the asker withdrew it: no answer to push back
+    return this.finish(t, { status: "closed", answer: reason ? `Không cần trả lời nữa: ${reason}` : "Không cần trả lời nữa", answered_by: input.by });
+  }
+
   /** Timeouts: forwarded → human, human → expired. */
   tick(now = Date.now()): void {
     for (const t of this.store.tickets({ status: ["forwarded", "waiting_human"] })) {

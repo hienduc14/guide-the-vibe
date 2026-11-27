@@ -17,6 +17,7 @@ import {
   Send,
   Sparkles,
   UserX,
+  X,
   Zap,
 } from "lucide-react";
 import { api } from "../../api/endpoints";
@@ -154,12 +155,24 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
   const open = t.status === "waiting_human" || t.status === "forwarded";
   const to = t.to_dev ?? "cả nhóm";
   const answer = text.trim() || (pick !== null ? (t.options?.[pick] ?? "") : "");
+  const withdraw = open && (manage || t.from_dev === me?.name) && (
+    <button
+      type="button"
+      className="p-btn quiet"
+      onClick={async () => {
+        if (await run(() => api.tickets.withdraw(id, t.id), "Đã đóng câu hỏi")) onChanged();
+      }}
+    >
+      <X />
+      Không cần trả lời nữa
+    </button>
+  );
   return (
     <>
       <div className="eyebrow">
         <span className={`p-chip ${open ? "warn" : "ok"}`}>
           {open ? <CircleHelp /> : <Check />}
-          {open ? "Câu hỏi" : "Đã trả lời"}
+          {open ? "Câu hỏi" : t.status === "closed" ? "Đã đóng" : "Đã trả lời"}
         </span>
         <Av who={t.from_dev} size="sm" />
         <span>
@@ -263,10 +276,16 @@ function QuestionDetail({ t, item, onChanged }: { t: Ticket; item?: AttentionIte
                 Nhắc {t.to_dev}
               </button>
             )}
+            {withdraw}
           </div>
         </form>
       ) : (
-        <p className="p-hint block">{access === "developer" ? `Câu này gửi cho ${to}: cần quyền quản lý để trả lời thay.` : "Cần quyền quản lý để trả lời."}</p>
+        <>
+          <p className="p-hint block">
+            {access === "developer" ? `Câu này gửi cho ${to}: cần quyền quản lý để trả lời thay.` : "Cần quyền quản lý để trả lời."}
+          </p>
+          {withdraw && <div className="acts">{withdraw}</div>}
+        </>
       )}
     </>
   );

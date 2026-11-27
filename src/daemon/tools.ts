@@ -69,6 +69,10 @@ export async function runTool(ctx: ToolContext, name: string, args: Record<strin
       });
       return args.escalate ? `Escalated ${t.id} to your user. Ask them and they can answer with: gtv answer ${t.id} "<answer>"` : `Answer sent for ${t.id}.`;
     }
+    case "withdraw": {
+      const t = await client.call<Ticket>("POST", `${p}/tickets/${args.ticket_id}/withdraw`, { reason: args.reason, session_id: session.id });
+      return `Withdrew ${t.id}: nobody needs to answer it any more.`;
+    }
     case "status":
       return describeStatus(state, ctx.serverUrl, session.dev, ws);
     case "check": {

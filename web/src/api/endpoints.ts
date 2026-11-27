@@ -184,6 +184,7 @@ export const api = {
     /** Questions waiting for my answer. */
     forMe: (id: string) => get<Ticket[]>(`${p(id)}/tickets?scope=for_me`),
     reply: (id: string, ticketId: string, answer: string) => post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }),
+    withdraw: (id: string, ticketId: string) => post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/withdraw`, {}),
   },
 
   kb: {

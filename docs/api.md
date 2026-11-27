@@ -5,84 +5,139 @@ Kiểu dữ liệu chung: `src/shared/types.ts`. Dashboard sao chép ở `web/sr
 
 ## Xác thực
 
-| Người gọi         | Header                                | Ghi chú                                                                                                              |
-| ----------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Phiên dashboard   | `Authorization: Bearer gtvs_…`        | `POST /api/login` hoặc `POST /api/activate/:code`; 14 ngày                                                           |
-| Máy (agent, CLI)  | `Authorization: Bearer gtvd_…`        | `gtv login` (luồng kết nối máy). Token dev cũ `gtv_…` đã chuyển thành máy, vẫn dùng được. Chỉ dùng được trên `/v1`   |
-| Link chia sẻ      | `Authorization: Bearer gtvl_…`        | `/s/<code>` trên dashboard; chỉ đọc một project                                                                      |
-| `GTV_ADMIN_TOKEN` | `Authorization: Bearer <admin token>` | cứu hộ, script, test; quyền admin. Trên `/v1` đóng vai dev ghi trong `X-Gtv-Dev`                                     |
-| Chế độ mở         | `X-Gtv-Dev: <tên>` (không token)      | khi không có admin token và chưa có tài khoản nào (hoặc `GTV_AUTH=open`)                                             |
-| `GET /health`     | —                                     | `{ ok, brain: {backend, model, ok, detail, failing}, projects: [id], commit }`; có khoá máy thì cập nhật `last_seen` |
+| Người gọi         | Gửi                                   | Ghi chú                                                                                                                  |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Phiên dashboard   | cookie `gtv_session` (`gtvs_…`)       | đặt bởi `/api/auth/setup\|signup\|login\|reset`; httpOnly, `SameSite=Lax`, `Secure` khi https; 30 ngày, gia hạn khi dùng |
+| Máy (agent, CLI)  | `Authorization: Bearer gtvd_…`        | `gtv login` (luồng kết nối máy). Chỉ dùng được trên `/v1`                                                                |
+| Link chia sẻ      | `Authorization: Bearer gtvl_…`        | `/s/<code>` trên dashboard; chỉ đọc một project                                                                          |
+| `GTV_ADMIN_TOKEN` | `Authorization: Bearer <admin token>` | cứu hộ, script, test; quyền admin. Trên `/v1` đóng vai dev ghi trong `X-Gtv-Dev`                                         |
+| Chế độ mở         | `X-Gtv-Dev: <tên>` (không token)      | khi không có admin token và chưa có tài khoản nào (hoặc `GTV_AUTH=open`)                                                 |
+| `GET /health`     | —                                     | `{ ok, brain: {backend, model, ok, detail, failing}, commit }`; có khoá máy thì cập nhật `last_seen`                     |
 
-Token cũng nhận qua `?token=`. Lỗi: 401 chưa đăng nhập, 403 thiếu quyền, 404 project không có (hoặc mình không phải
-thành viên), 429 quá nhiều lần thử. Mã nguồn: `src/server/http/auth.ts`, `Hub.projectAccess`.
+Bearer cũng nhận qua `?token=`; `gtvs_…` gửi bằng Bearer vẫn được nhận (script), nhưng server không bao giờ trả token
+phiên trong JSON. **Chống CSRF**: lệnh ghi (không phải GET/HEAD) dùng cookie phải có header `Origin` cùng host với server
+(so host, vì sau tunnel giao thức server thấy có thể khác); lệnh ghi nào có `Origin` lạ cũng bị 403. Tài khoản bị khoá
+hoặc đã xoá: mọi phiên và máy của họ nhận 401. Lỗi: 401 chưa đăng nhập, 403 thiếu quyền, 404 project không có (hoặc
+mình không phải thành viên), 429 quá nhiều lần thử. Mã nguồn: `src/server/http/auth.ts` (bảng `ROUTES`), `Hub.projectAccess`.
 
 ### Quyền: hai tầng
 
-**Quyền hệ thống** (`users.role`): `admin` làm mọi thứ và quản lý mọi project; `member` làm những gì quyền project cho
-phép. **Quyền trong project** (`members.access` của từng project): `manager` | `developer` | `viewer`, hoặc không phải
-thành viên. Admin, admin token và chế độ mở được tính là `manager` ở mọi project; link chia sẻ là `viewer` ở project
-của nó.
+**Quyền hệ thống** (`users.role`): `admin` lo server (tài khoản, AI, chế độ đăng ký) và quản lý mọi project; `member`
+làm những gì quyền project cho phép. **Quyền trong project** (bảng `project_members` của `hub.db`, đọc được cả khi
+project chưa mở): `manager` | `developer` | `viewer`, hoặc không phải thành viên. Admin, admin token và chế độ mở được
+tính là `manager` ở mọi project; link chia sẻ là `viewer` ở project của nó. Project luôn còn ít nhất một `manager`.
 
-| Việc                                                                            | Cần                                                      |
-| ------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `/api/users*`, `/api/brain/*`, `POST /api/projects`, `DELETE /api/projects/:id` | admin                                                    |
-| `GET /api/projects/:id/…`, `GET /v1/p/:id/…` (phiên dashboard)                  | ≥ `viewer` (không phải thành viên → 404)                 |
-| ghi `/api/projects/:id/…` (kể cả `share-links`, đọc lẫn ghi)                    | `manager`                                                |
-| ghi `/v1/p/:id/…` từ dashboard                                                  | `manager`, trừ ngoại lệ của `developer` ở dưới           |
-| `POST /v1/p/:id/tickets/:tid/reply`                                             | `developer` khi câu hỏi gửi cho mình hoặc cả nhóm        |
-| `PATCH /v1/p/:id/board/:bid`, `POST /v1/p/:id/board/:bid/notes`                 | `developer` khi việc giao cho mình; không đổi `assignee` |
-| mọi route `/v1/p/:id/…` từ **máy**                                              | `developer` hoặc `manager`; không thì 403 (xem dưới)     |
-| `/api/overview`, `GET /api/projects`                                            | ai cũng được; chỉ liệt kê project mình là thành viên     |
+| Việc                                                                                                   | Cần                                                      |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `/api/auth/config\|setup\|signup\|login`, `/api/auth/reset/:code`, `GET /api/invites/:code`            | công khai                                                |
+| `/api/me*`, `/api/connect/*`, `/api/overview`, `/api/projects` (GET, POST), `check-repo`, nhận lời mời | đã đăng nhập (người, không phải máy hay link chia sẻ)    |
+| `/api/admin/*`, `/api/brain/*`                                                                         | admin                                                    |
+| `GET /api/projects/:id/…`, `GET /v1/p/:id/…` (phiên dashboard)                                         | ≥ `viewer` (không phải thành viên → 404)                 |
+| `…/share-links`, `…/invites` (đọc lẫn ghi), mọi lệnh ghi khác `/api/projects/:id/…`                    | `manager`                                                |
+| `DELETE /api/projects/:id/members/:user`                                                               | `manager`, hoặc chính `:user` (rời project)              |
+| ghi `/v1/p/:id/…` từ dashboard                                                                         | `manager`, trừ ngoại lệ của `developer` ở dưới           |
+| `POST /v1/p/:id/tickets/:tid/reply`                                                                    | `developer` khi câu hỏi gửi cho mình hoặc cả nhóm        |
+| `PATCH /v1/p/:id/board/:bid`, `POST /v1/p/:id/board/:bid/notes`                                        | `developer` khi việc giao cho mình; không đổi `assignee` |
+| `POST /v1/p/:id/board`                                                                                 | `developer` khi `assignee` trống hoặc là mình            |
+| `POST /v1/p/:id/kb`, `PATCH /v1/p/:id/kb/:kid`, `POST /v1/p/:id/kb/:kid/confirm\|reject`               | `developer` (xoá tài liệu: `manager`)                    |
+| mọi route `/v1/p/:id/…` từ **máy**                                                                     | `developer` hoặc `manager`; không thì 403 (xem dưới)     |
 
-Máy không phải thành viên nhận 403 `You are not a member of project <name>. Ask a project manager to add you.` (người
-xem: `You are a viewer in project <name>; agents need developer access. …`); CLI và daemon in lại nguyên văn. Trên
-`/v1`, danh tính lấy từ token (phiên, máy); chỉ admin token và chế độ mở dùng `X-Gtv-Dev`.
+Máy không phải thành viên nhận 403 `You are not a member of project <id>. Ask a project manager for an invite link.`
+(chỉ id mà máy đã biết, không lộ tên; người xem: `You are a viewer in project <name>; agents need developer access. …`);
+CLI và daemon in lại nguyên văn. Trên `/v1`, danh tính lấy từ token (phiên, máy); chỉ admin token và chế độ mở dùng `X-Gtv-Dev`.
 
-## Tài khoản, máy và kết nối máy
+## Tài khoản và phiên đăng nhập
 
-| Method         | Path                                    | Ai        | Mô tả                                                                                                                         |
-| -------------- | --------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| POST           | `/api/login`                            | công khai | `{ name, password }` → `{ token: gtvs_…, name, role, expires_at }`; tài khoản chưa kích hoạt → 400                            |
-| POST / GET     | `/api/logout`, `/api/me`                | đăng nhập | huỷ phiên / `{ name, role, kind, project, open_mode, has_users, projects: [{ id, name, access }] }`                           |
-| GET            | `/api/users`                            | admin     | `[{ name, role, activated, created_at, created_by, last_login, last_seen (máy), devices, projects: [{ id, name, access }] }]` |
-| POST           | `/api/users`                            | admin     | `{ name, role, projects: [{ id, access }] }` → `{ user, activation_url, expires_at }`; tài khoản chưa có mật khẩu             |
-| PATCH / DELETE | `/api/users/:name`                      | admin     | `{ role }` (hạ quyền ⇒ đăng xuất mọi phiên) / xoá tài khoản, mọi máy, phiên và tư cách thành viên; không tự hạ hay xoá mình   |
-| POST           | `/api/users/:name/activation`           | admin     | link mới (kích hoạt, hoặc đặt lại mật khẩu nếu đã kích hoạt); link cũ hết hiệu lực                                            |
-| GET / DELETE   | `/api/users/:name/devices[/:id]`        | admin     | máy của một người / thu hồi                                                                                                   |
-| GET / POST     | `/api/activate/:code`                   | công khai | `{ user, kind: activate\|reset }` / `{ password }` (≥ 8 ký tự) → phiên như `/login`. Link dùng một lần, 48 giờ; sai → 400     |
-| GET / DELETE   | `/api/me/devices[/:id]`                 | đăng nhập | máy của tôi / thu hồi một máy                                                                                                 |
-| PUT            | `/api/me/password`                      | đăng nhập | `{ current, password }` → phiên mới (các phiên khác bị đăng xuất)                                                             |
-| GET            | `/api/connect/:user_code`               | đăng nhập | `{ device_name, platform, created_at }` hoặc 404                                                                              |
-| POST           | `/api/connect/:user_code/approve\|deny` | đăng nhập | gắn máy vào tài khoản đang đăng nhập / từ chối                                                                                |
-| GET            | `/api/people`                           | đăng nhập | `[{ name }]`: mọi tài khoản, để chọn thành viên                                                                               |
-| POST           | `/v1/connect/start`                     | công khai | `{ device_name, platform }` → `{ device_code, user_code: "KQ7M-2XPD", verify_url, interval: 2, expires_at }` (10 phút)        |
-| POST           | `/v1/connect/poll`                      | công khai | `{ device_code }` → `{ status: pending }` \| `{ status: approved, user, token: gtvd_…, device_id }` (một lần) \| 400          |
-| GET            | `/v1/me`                                | máy       | `{ user, role, device: { id, name }, projects: [{ id, name, access, repos: [repoKey…] }] }`; `repos` không bao giờ là URL     |
-| POST           | `/v1/me/logout`                         | máy       | thu hồi khoá của chính máy này                                                                                                |
-| POST           | `/v1/join`                              | —         | 410: `Invite links are gone. Run: npx guide-the-vibe, then gtv login`                                                         |
+Tên đăng nhập: 3–32 ký tự `a-z 0-9 . _ -`, không trùng (kể cả tài khoản đã xoá), không dùng `admin root gtv system
+everyone all share me api`. Mật khẩu ≥ 8 ký tự. Phản hồi đăng nhập `Login = { name, display_name, role }` kèm
+`Set-Cookie`.
 
-`/api/login`, `/api/activate/*` (POST) và `/v1/connect/start`: tối đa 30 lần/phút mỗi địa chỉ; `/v1/connect/poll`: 120.
+| Method     | Path                             | Ai                      | Mô tả                                                                                                                                                                                                   |
+| ---------- | -------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET        | `/api/auth/config`               | công khai               | `{ setup_needed, registration: open\|invite\|closed, needs_admin_token }`                                                                                                                               |
+| POST       | `/api/auth/setup`                | công khai, server trống | `{ name, display_name?, password, admin_token? }` → `Login` (role `admin`); có `GTV_ADMIN_TOKEN` thì phải đúng token (403); đã có tài khoản → 409                                                       |
+| POST       | `/api/auth/signup`               | công khai               | `{ name, display_name?, password, invite? }` → `Login + { project: { id, access } \| null }`; `closed` → 403; `invite` mà không có `invite` → 403; link mời hết hiệu lực → 400; server chưa setup → 403 |
+| POST       | `/api/auth/login`                | công khai               | `{ name, password }` → `Login`; sai → 400 `wrong user name or password`; bị khoá → 400 `this account is locked…`                                                                                        |
+| POST       | `/api/auth/logout`               | đã đăng nhập            | xoá phiên hiện tại, xoá cookie                                                                                                                                                                          |
+| GET / POST | `/api/auth/reset/:code`          | công khai               | `{ user, display_name, expires_at }` / `{ password }` → `Login`; mọi phiên cũ bị đăng xuất, máy giữ nguyên. Một lần, 1 giờ; sai/hết hạn → 400                                                           |
+| GET        | `/api/me`                        | đã đăng nhập            | `{ name, display_name, role, kind, project, open_mode, projects: [{ id, name, access }] }` (`kind`/`project` cho link chia sẻ)                                                                          |
+| PATCH      | `/api/me`                        | đã đăng nhập            | `{ display_name }` → `Login`                                                                                                                                                                            |
+| PUT        | `/api/me/password`               | đã đăng nhập            | `{ current, password }` → `{ ok }`; các phiên khác bị đăng xuất, phiên này giữ                                                                                                                          |
+| DELETE     | `/api/me`                        | đã đăng nhập            | `{ password }` → xoá tài khoản (phiên, máy, tư cách thành viên; tên giữ lại); Quản lý cuối của project hoặc admin cuối → 400                                                                            |
+| GET        | `/api/me/sessions`               | đã đăng nhập            | `[{ id, created_at, expires_at, last_used, user_agent, ip, current }]`                                                                                                                                  |
+| DELETE     | `/api/me/sessions[/:id]`         | đã đăng nhập            | không `:id`: đăng xuất mọi nơi khác; có `:id`: một phiên                                                                                                                                                |
+| GET        | `/api/admin/users`               | admin                   | `[{ name, display_name, role, created_at, last_login, disabled_at, disabled, projects: n, devices: n, last_seen }]`                                                                                     |
+| PATCH      | `/api/admin/users/:name`         | admin                   | `{ role?: admin\|member, disabled?: bool }` → user; không hạ quyền/khoá admin cuối (400)                                                                                                                |
+| POST       | `/api/admin/users/:name/reset`   | admin                   | `{ reset_url: <origin>/reset/<code>, expires_at }`; link trước đó hết hiệu lực                                                                                                                          |
+| DELETE     | `/api/admin/users/:name`         | admin                   | như tự xoá (không cần mật khẩu)                                                                                                                                                                         |
+| GET        | `/api/admin/users/:name/devices` | admin                   | như `/api/me/devices` của người đó (kể cả đường dẫn repo)                                                                                                                                               |
+| GET / PUT  | `/api/admin/settings`            | admin                   | `{ registration: open\|invite\|closed }` (mặc định `open`)                                                                                                                                              |
+
+Giới hạn mỗi địa chỉ mỗi phút: login 10, signup 5, setup 10, reset 30, xem/nhận lời mời 30, xem mã kết nối máy 30,
+`check-repo` và tạo project 10, `/v1/connect/start` 30, `/v1/connect/poll` 120.
+
+## Máy và kết nối máy
+
+| Method         | Path                                    | Ai           | Mô tả                                                                                                                          |
+| -------------- | --------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| POST           | `/v1/connect/start`                     | công khai    | `{ device_name, platform }` → `{ device_code, user_code: "KQ7M-2XPD", verify_url, interval: 2, expires_at }` (10 phút)         |
+| POST           | `/v1/connect/poll`                      | công khai    | `{ device_code }` → `{ status: pending }` \| `{ status: approved, user, token: gtvd_…, device_id }` (một lần) \| 400           |
+| GET            | `/api/connect/:user_code`               | đã đăng nhập | `{ device_name, platform, created_at }` hoặc 404                                                                               |
+| POST           | `/api/connect/:user_code/approve\|deny` | đã đăng nhập | gắn máy vào tài khoản đang đăng nhập / từ chối                                                                                 |
+| GET            | `/v1/me`                                | máy          | `{ user, role, device: { id, name }, projects: [{ id, name, access, repos: [repoKey…] }] }`; `repos` không bao giờ là URL      |
+| POST           | `/v1/me/device`                         | máy          | `{ gtv_version, agents: [{ kind, version }], repos: [{ path, project, agents: [kind] }] }` → `{ ok }`; ghi đè repo của máy này |
+| POST           | `/v1/me/logout`                         | máy          | thu hồi khoá của chính máy này                                                                                                 |
+| GET            | `/api/me/devices`                       | đã đăng nhập | `[Device]` (dưới)                                                                                                              |
+| PATCH / DELETE | `/api/me/devices/:id`                   | đã đăng nhập | `{ name }` đổi tên / ngắt máy (khoá bị thu hồi, daemon nhận 401 và báo `Run: gtv login`); máy người khác → 400                 |
+| POST           | `/v1/join`                              | —            | 410: `Invite links are gone. Run: npx guide-the-vibe, then gtv login`                                                          |
+
+`Device = { id, name, platform, created_at, last_seen, online (last_seen trong 60 giây), gtv_version, agents: [{ kind,
+version }], reported_at (null: bản gtv cũ chưa báo), repos: [{ path, project, project_name (null nếu mình không còn ở
+project đó), agents, updated_at, sessions: [{ id, agent, status }] }], sessions: [{ id, project, project_name, agent,
+status, cwd, last_seen }] }` — `sessions` là phiên agent chưa kết thúc chạy trên máy này. Đường dẫn repo chỉ chủ máy và
+admin thấy; thành viên project chỉ thấy tên máy (`/api/projects/:id/members`).
+
+## Project, thành viên, lời mời
+
+| Method | Path                                | Ai                        | Mô tả                                                                                                                                                        |
+| ------ | ----------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/projects/check-repo`          | đã đăng nhập              | `{ repo_url }` → `{ ok: true, default_branch }` \| `{ ok: false, error }` (luôn 200)                                                                         |
+| POST   | `/api/projects`                     | đã đăng nhập              | `{ id, name?, repo_url, main_branch? (mặc định: nhánh mặc định của repo), description?, … }` → summary; người tạo là `manager`; id đã dùng → 400             |
+| DELETE | `/api/projects/:id`                 | `manager`                 | lưu trữ project (id vẫn bị giữ; chỉ admin tạo lại được, kèm dữ liệu và thành viên cũ)                                                                        |
+| GET    | `/api/projects/:id/members`         | `viewer`                  | `[Member + { display_name, joined_at, invited_by, devices: [{ id, name, online, last_seen }] }]`                                                             |
+| POST   | `/api/projects/:id/members`         | `manager`                 | `{ user, access? (mặc định developer) }` → member; chưa có tài khoản / đã là thành viên → 400                                                                |
+| PATCH  | `/api/projects/:id/members/:user`   | `manager`                 | `{ access?, role?, level?, note? }` → member; hạ quyền Quản lý cuối → 400                                                                                    |
+| DELETE | `/api/projects/:id/members/:user`   | `manager` hoặc chính mình | xoá / rời project; Quản lý cuối → 400. Máy của người đó nhận 403 từ lần gọi kế tiếp                                                                          |
+| GET    | `/api/projects/:id/invites`         | `manager`                 | link đang dùng được: `[{ id, project, access, created_by, created_at, expires_at, max_uses, uses, revoked_at }]` (không có URL: chỉ lưu bản băm)             |
+| POST   | `/api/projects/:id/invites`         | `manager`                 | `{ access?: developer\|viewer, days?: 1\|7\|30 (7), max_uses?: 1\|10\|null (null) }` → invite `+ { code, url: <origin>/join/<code> }` (URL chỉ hiện lần này) |
+| DELETE | `/api/projects/:id/invites/:invite` | `manager`                 | thu hồi                                                                                                                                                      |
+| GET    | `/api/invites/:code`                | công khai                 | `{ valid: true, project_name, access, invited_by, invited_by_name, member }` (+ `project_id` khi đã là thành viên) \| `{ valid: false }`                     |
+| POST   | `/api/invites/:code/accept`         | đã đăng nhập              | `{ project: { id, name }, access, already_member }`; đã là thành viên thì giữ quyền cũ, không tốn lượt; link hết hiệu lực → 400                              |
+
+Địa chỉ repo người thường được dùng: `https://…` hoặc `git@host:owner/repo`; không `file://`, `ext::`, `ssh://`,
+`http://`, đường dẫn trên máy, hay host phân giải ra địa chỉ của chính server/mạng nội bộ (127/8, 10/8, 172.16/12,
+192.168/16, 169.254/16, 100.64/10, ::1, fc00::/7, fe80::/10…). Server chạy `git ls-remote` (15 giây, không hỏi mật
+khẩu) trước khi tạo hoặc đổi `repo_url`. Admin được dùng thêm đường dẫn trên máy (demo, sandbox).
 
 ## Khám phá project (máy)
 
-| Method | Path                       | Mô tả                                                                             |
-| ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| GET    | `/v1/projects`             | `[{ id, name, repo_url (che token), main_branch }]`                               |
-| GET    | `/v1/resolve?remote=<url>` | Project khớp remote URL (so `owner/repo`, kèm `aliases`): `{ id, name }` hoặc 404 |
+| Method | Path                       | Mô tả                                                                                                                                               |
+| ------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/projects`             | project của chính mình: `[{ id, name, repo_url (che token), main_branch }]`                                                                         |
+| GET    | `/v1/resolve?remote=<url>` | project khớp remote URL (so `owner/repo`, kèm `aliases`): thành viên nhận `{ id, name }`, người ngoài chỉ nhận `{ exists: true }`; không khớp → 404 |
 
 ## Project API — `/v1/p/:project`
 
 ### Event, state, stream
 
-| Method | Path                 | Body / trả về                                                                                                                          |
-| ------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/events`            | 1 `GtvEvent` hoặc `{ events: GtvEvent[] }` → `{ results: [...] }`. Chỉ cho session/workspace của chính dev gửi (admin: mọi workspace). |
-| GET    | `/state`             | `TeamState` (workspaces, sessions, tasks, footprints, conflicts, features, policy)                                                     |
-| GET    | `/stream`            | SSE: `state` (TeamState, debounce 150 ms), `message` (Message cho dev này), `ping` (15 s). Khi mở: gửi state + tin chưa giao           |
-| GET    | `/messages`          | Tin chưa giao của dev                                                                                                                  |
-| POST   | `/messages/ack`      | `{ ids: [] }` đánh dấu đã giao                                                                                                         |
-| GET    | `/events/log?limit=` | `event_log` mới nhất                                                                                                                   |
+| Method | Path                 | Body / trả về                                                                                                                                          |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/events`            | 1 `GtvEvent` hoặc `{ events: GtvEvent[] }` → `{ results: [...] }`. Chỉ cho session/workspace của chính dev gửi (admin: mọi workspace).                 |
+| GET    | `/state`             | `TeamState` (workspaces, sessions, tasks, footprints, conflicts, features, policy); mỗi session có `device` (id máy đã đăng ký phiên, lấy từ khoá máy) |
+| GET    | `/stream`            | SSE: `state` (TeamState, debounce 150 ms), `message` (Message cho dev này), `ping` (15 s). Khi mở: gửi state + tin chưa giao                           |
+| GET    | `/messages`          | Tin chưa giao của dev                                                                                                                                  |
+| POST   | `/messages/ack`      | `{ ids: [] }` đánh dấu đã giao                                                                                                                         |
+| GET    | `/events/log?limit=` | `event_log` mới nhất                                                                                                                                   |
 
 `GtvEvent`:
 
@@ -157,7 +212,7 @@ xem: `You are a viewer in project <name>; agents need developer access. …`); C
 | GET / PATCH / DELETE | `/board/:id`       | chi tiết `+ { notes[], registrations[] }` / sửa (mọi thay đổi ghi vào nhật ký) / xoá                                                                                                            |
 | POST                 | `/board/:id/notes` | `{ body }` → ghi chú vào nhật ký                                                                                                                                                                |
 | POST                 | `/board/:id/pick`  | `{ session_id }` → agent nhận việc (gán cho dev, `in_progress`); việc đã giao cho người khác → 400                                                                                              |
-| GET                  | `/members`         | `[{ dev, role, level: intern\|junior\|mid\|senior\|lead, access: manager\|developer\|viewer, note }]`; không còn tự thêm thành viên khi ai đó làm việc                                          |
+| GET                  | `/members`         | `[{ dev, role, level: intern\|junior\|mid\|senior\|lead, access: manager\|developer\|viewer, note }]`: thành viên lấy từ hub, ghép hồ sơ trong project; làm việc không biến ai thành thành viên |
 
 ### Tài liệu, sơ đồ code (v0.8)
 
@@ -177,7 +232,6 @@ Trạng thái việc đi theo đăng ký: đăng ký → `in_progress`; `gtv_fin
 | Method           | Path                                   | Mô tả                                                                                                                                                                                                                               |
 | ---------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET / POST / DEL | `/projects/:id/share-links[/:link]`    | link xem chỉ đọc: liệt kê / tạo `{ label?, days? }` → `{ …, code }` (hiện 1 lần) / thu hồi                                                                                                                                          |
-| GET / PUT / DEL  | `/projects/:id/members[/:dev]`         | thành viên: `{ role?, level?, note?, access? }`; thêm mới chỉ người có tài khoản                                                                                                                                                    |
 | GET              | `/projects/:id/conversations?limit=`   | `[Thread]`: luồng trao đổi (question \| conflict \| task \| note) với `entries: [{ from, to, at, kind, body }]`                                                                                                                     |
 | GET              | `/projects/:id/attention`              | `[{ kind, level, title, detail, ref, at, ticket?, board? }]`: vụ đụng nhau high/critical chưa xử lý (`ref` = id vụ), câu hỏi chờ người, việc quá hạn / bị chặn / gấp chưa giao / im lặng (`stale`, không agent nào chạy quá 24 giờ) |
 | GET              | `/projects/:id/incidents/:iid/plans`   | `{ plans: [{ title, text }] }`: 2–3 hướng xử lý AI soạn (lưu đệm); `[]` khi AI tắt hoặc chưa soạn xong (hỏi lại sau vài giây)                                                                                                       |
@@ -193,7 +247,7 @@ Trạng thái việc đi theo đăng ký: đăng ký → `in_progress`; `gtv_fin
 | Method               | Path                                       | Mô tả                                                                                                                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET                  | `/overview`                                | `{ open_mode, brain, brain_stats (7 ngày), projects: [summary] }` (chỉ project mình là thành viên)                                                                                                                                                                                                |
-| GET / POST           | `/projects`                                | danh sách summary / tạo `{ id, repo_url, main_branch?, name?, aliases?, policy?, description? }`                                                                                                                                                                                                  |
+| GET / POST           | `/projects`                                | danh sách summary (project của mình) / tạo (xem _Project, thành viên, lời mời_)                                                                                                                                                                                                                   |
 | GET / PATCH / DELETE | `/projects/:id`                            | chi tiết (+ `my_access`) / sửa (đổi `repo_url` hoặc `main_branch` ⇒ mở lại runtime) / lưu trữ                                                                                                                                                                                                     |
 | POST                 | `/projects/:id/sync`                       | fetch ngay → `{ last_sync, main }`                                                                                                                                                                                                                                                                |
 | GET                  | `/projects/:id/state`                      | `TeamState`                                                                                                                                                                                                                                                                                       |

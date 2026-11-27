@@ -541,7 +541,6 @@ const lines = (s: string) =>
 export function RepoSection() {
   const { id, detail, reload } = useProject();
   const { reload: reloadOverview } = useOverview();
-  const { can } = useAuth();
   const run = useAction();
   const navigate = useNavigate();
   const r = detail.record;
@@ -555,6 +554,7 @@ export function RepoSection() {
     repo_url: "",
   });
   const [syncing, setSyncing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const save = async (e: FormEvent) => {
     e.preventDefault();
     await run(
@@ -657,22 +657,42 @@ export function RepoSection() {
             <RefreshCw />
             {syncing ? "Đang đồng bộ…" : "Đồng bộ ngay"}
           </button>
-          {can("admin") && (
-            <ConfirmButton
-              className={DANGER}
-              confirmLabel="Bấm lần nữa để lưu trữ"
-              onConfirm={async () => {
-                if (await run(() => api.projects.archive(id), "Đã lưu trữ project")) {
-                  void reloadOverview();
-                  navigate("/");
-                }
-              }}
-            >
-              Lưu trữ project
-            </ConfirmButton>
-          )}
         </div>
       </form>
+
+      <div className="sec">
+        <span className="sect">Xoá project</span>
+        <div className="hrow">
+          <p className="muted grow">
+            Mọi người thôi thấy project này và máy của họ thôi làm việc ở đây. Repo không bị đụng tới; dữ liệu gtv vẫn giữ trên server để admin khôi phục nếu
+            cần.
+          </p>
+          {deleting ? (
+            <>
+              <button
+                type="button"
+                className="p-btn danger"
+                onClick={async () => {
+                  if (await run(() => api.projects.archive(id), `Đã xoá ${r.name}`)) {
+                    void reloadOverview();
+                    navigate("/");
+                  }
+                }}
+              >
+                Xoá {r.name}
+              </button>
+              <button type="button" className="p-btn quiet" onClick={() => setDeleting(false)}>
+                Huỷ
+              </button>
+            </>
+          ) : (
+            <button type="button" className="p-btn danger" onClick={() => setDeleting(true)}>
+              <Trash2 />
+              Xoá project
+            </button>
+          )}
+        </div>
+      </div>
     </>
   );
 }

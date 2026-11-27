@@ -505,9 +505,28 @@
   .pj .now.solo .map {
     flex: 1;
   }
-  .pj .now.solo .agents,
+  /* blocks grow into the free height (up to a cap), so few files means taller blocks, many means the usual size */
+  .pj .now.solo .agents {
+    justify-content: center;
+    gap: 16px;
+  }
+  .pj .now.solo .agent {
+    flex: 1 1 auto;
+    max-height: 168px;
+    align-content: center;
+  }
   .pj .now.solo .files {
-    justify-content: space-evenly;
+    justify-content: center;
+  }
+  .pj .now.solo .fgroup {
+    display: contents;
+  }
+  .pj .now.solo .fgroup + .fgroup .folder {
+    margin-top: 14px;
+  }
+  .pj .now.solo .file {
+    flex: 1 1 auto;
+    max-height: 72px;
   }
 }
 .pj .digest-panel {

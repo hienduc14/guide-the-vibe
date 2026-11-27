@@ -478,9 +478,37 @@
   gap: 16px;
   align-items: start;
 }
-/* no agent picked: the map takes the whole width */
+/* no agent picked: the map takes the whole width and the rest of the screen's height; agents and file groups spread out
+   over it when there are few, and the page scrolls as before when there are many */
 .pj .now.solo {
   grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 901px) {
+  .pj .now.solo {
+    align-items: stretch;
+  }
+  .pj .screen:has(> .now.solo) {
+    display: flex;
+    flex-direction: column;
+  }
+  .pj .screen > .now.solo {
+    flex: 1;
+  }
+  .pj .now.solo > .panel {
+    display: flex;
+    flex-direction: column;
+  }
+  .pj .now.solo .mapwrap {
+    flex: 1;
+    display: flex;
+  }
+  .pj .now.solo .map {
+    flex: 1;
+  }
+  .pj .now.solo .agents,
+  .pj .now.solo .files {
+    justify-content: space-evenly;
+  }
 }
 .pj .digest-panel {
   margin-top: 16px;
@@ -515,16 +543,15 @@
   stroke-width: 1.25;
   opacity: 0.55;
 }
+/* live: beads of the person's colour travel to the file (a still frame reads as a line with beads, never as dashes) */
 .pj .wires path.flow {
-  stroke: var(--surface);
-  stroke-width: 2.5;
-  stroke-dasharray: 2 48;
-  opacity: 0.9;
-  animation: wire-flow 1.4s linear infinite;
+  stroke-width: 5;
+  stroke-dasharray: 0.1 110;
+  animation: wire-flow 3s linear infinite;
 }
 @keyframes wire-flow {
   to {
-    stroke-dashoffset: -50;
+    stroke-dashoffset: -110.1;
   }
 }
 .pj .wires path.declared {
@@ -716,16 +743,17 @@
 .pj .p-legend i.live::after {
   content: "";
   position: absolute;
-  top: -2px;
+  top: -3.5px;
   left: 0;
-  width: 3px;
-  height: 2px;
-  background: var(--surface);
-  animation: legend-flow 1.4s linear infinite;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: legend-flow 2s linear infinite;
 }
 @keyframes legend-flow {
   to {
-    left: 27px;
+    left: 25px;
   }
 }
 .pj .p-legend i.thin {

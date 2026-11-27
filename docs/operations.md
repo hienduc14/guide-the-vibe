@@ -74,27 +74,33 @@ l3: { daily_budget: 60 }
 
 ## Tài khoản và máy
 
-- **Một người một tài khoản**, vừa đăng nhập dashboard vừa là danh tính của agent trên máy người đó. Admin thêm người ở
-  trang **Người** (tên, có là Quản trị không, quyền trong từng project) → gtv hiện **link kích hoạt** (dùng một lần, 48
-  giờ) để gửi riêng. Người đó tự đặt mật khẩu; admin không bao giờ biết mật khẩu. Quên mật khẩu: admin bấm **Link đặt
-  lại mật khẩu**.
-- **Quyền trong project** (Thiết lập › Thành viên): Quản lý / Developer / Người xem. Agent chỉ làm việc ở project mà
-  người đó là Developer hoặc Quản lý; giao việc chỉ cho thành viên. Bảng quyền: [api.md](api.md#quyền-hai-tầng).
+- **Một người một tài khoản**, vừa đăng nhập dashboard vừa là danh tính của agent trên máy người đó. Người dùng tự đăng
+  ký ở `/signup` (tên đăng nhập không đổi được, tên hiển thị đổi được). Quản trị chọn ai được đăng ký ở **Quản trị
+  server › Đăng ký**: mở (mặc định), chỉ khi có link mời, hoặc đóng.
+- **Server mới**: chưa có tài khoản nào thì mọi trang về **Tạo tài khoản quản trị** (`/setup`); có `GTV_ADMIN_TOKEN`
+  thì trang hỏi thêm token đó để người lạ không giành quyền quản trị trước.
+- **Quên mật khẩu**: server không gửi email. Quản trị bấm **Đặt lại mật khẩu** ở **Quản trị server › Tài khoản**, gửi
+  link (dùng một lần, 1 giờ) qua chat. Đặt lại xong mọi phiên cũ bị đăng xuất, máy giữ nguyên.
+- **Khoá / xoá tài khoản** ở cùng trang: khoá thì không đăng nhập được và máy bị từ chối, mở khoá là chạy lại. Xoá thì
+  mất phiên, máy, tư cách thành viên; tên giữ lại để lịch sử không bị nhận nhầm người. Server luôn còn ít nhất một quản
+  trị; không xoá được Quản lý cuối của một project.
+- **Project**: ai đăng nhập cũng tạo được, người tạo là Quản lý. Repo chỉ nhận `https://` hoặc `git@host:owner/repo`
+  (không đường dẫn trên máy, `file://`, localhost, mạng nội bộ) và phải đọc được (`git ls-remote`). Quản trị (và
+  `GTV_ADMIN_TOKEN`) được dùng thêm đường dẫn trên máy cho demo, sandbox.
+- **Thành viên** (Thiết lập › Thành viên): Quản lý / Developer / Người xem, lưu ở `hub.db` (`project_members`). Quản lý
+  thêm người theo tên đăng nhập hoặc tạo **link mời** (Developer hoặc Người xem, 1/7/30 ngày, 1/10/không giới hạn lượt;
+  link chỉ hiện một lần lúc tạo). Ai cũng rời được project, trừ Quản lý cuối. Bảng quyền: [api.md](api.md#quyền-hai-tầng).
 - **Kết nối máy**: người dùng chạy `npx guide-the-vibe`, `gtv login`, `gtv on` ([cli.md](cli.md)); `gtv login` mở trang
-  `/connect` để họ bấm Cho phép. Mỗi máy một khoá (`gtvd_…`, server chỉ lưu SHA-256), thu hồi ở **Tài khoản của tôi**
-  hoặc trang **Người**.
-- **Server mới**: chưa có tài khoản nào và không có `GTV_ADMIN_TOKEN` thì dashboard mở trang **Tạo tài khoản quản trị
-  đầu tiên**; có tài khoản đầu tiên là phải đăng nhập.
-- **`GTV_ADMIN_TOKEN`** vẫn dùng được (cứu hộ, script, test): quyền admin trên `/api`, trên `/v1` đóng vai dev ghi trong
-  `X-Gtv-Dev`. Vào dashboard bằng nó: mở `https://<server>/#admin-token=<token>` (giao diện không nhắc tới).
-- **Script, sandbox**: `GTV_TOKENS=alice:<khoá>,bob:<khoá>` khi khởi động server tạo tài khoản `alice`, `bob` (chưa kích
-  hoạt) với máy dùng khoá đó; vẫn phải thêm họ làm thành viên project.
+  `/connect` để họ bấm Cho phép. Mỗi máy một khoá (`gtvd_…`, server chỉ lưu SHA-256). Daemon báo phiên bản gtv, agent và
+  repo đã bật; **Máy của tôi** hiện những thứ đó, phiên đang chạy, và cho đổi tên hoặc ngắt máy.
+- **Phiên dashboard** là cookie httpOnly `gtv_session` (30 ngày, gia hạn khi dùng); lệnh ghi phải có `Origin` cùng host.
+- **`GTV_ADMIN_TOKEN`** vẫn dùng được cho script, test, cứu hộ (`Authorization: Bearer`): quyền admin trên `/api`, trên
+  `/v1` đóng vai dev ghi trong `X-Gtv-Dev`. Dashboard không đăng nhập bằng nó nữa.
+- **Script, sandbox**: `GTV_TOKENS=alice:<khoá>,bob:<khoá>` khi khởi động server tạo tài khoản `alice`, `bob` (không có
+  mật khẩu, không đăng nhập dashboard được) với máy dùng khoá đó; vẫn phải thêm họ làm thành viên project.
 - **Chế độ mở** (`src/server/http/auth.ts`): khi `GTV_AUTH=open`, hoặc không có `GTV_ADMIN_TOKEN` **và** chưa có tài
   khoản nào. Lúc đó `/v1` tin header `X-Gtv-Dev`, `/api` không cần đăng nhập.
-- **Chuyển dữ liệu từ bản trước** (một lần khi khởi động, `settings.accounts_migrated = 1`): mỗi dev cũ thành một tài
-  khoản `member` chưa kích hoạt kèm một máy "máy cũ" giữ nguyên token (daemon đang chạy không bị gián đoạn); tài khoản
-  `manager` cũ thành `member` + Quản lý ở mọi project, `viewer` cũ thành Người xem ở mọi project. Bảng `devs`, `invites`
-  được giữ để quay lại bản cũ.
+- **Không chuyển dữ liệu** từ bản tài khoản cũ (admin tạo tài khoản, link kích hoạt): deploy bản này lên volume trống.
 
 ## Brain (Pi)
 

@@ -1,5 +1,9 @@
 # Kế hoạch: một người một tài khoản, quyền theo project, CLI mới
 
+> **Đã thay** bằng [auth-v2.md](auth-v2.md) (27/11/2026): người dùng tự đăng ký, link mời vào project, thành viên lưu ở
+> `hub.db`, trang Máy của tôi. Phần dưới giữ để tham chiếu; mô hình "quản trị tạo tài khoản, gửi link kích hoạt" không
+> còn trong code.
+
 Viết ngày 27/11/2026 cho bản `5ef43b5`. Chủ dự án đã duyệt hướng này; người làm đọc hết file trước khi sửa code.
 
 ## 1. Mục tiêu

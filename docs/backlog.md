@@ -3,6 +3,22 @@
 Những ý đã bàn nhưng chưa làm, và lỗi đã biết. Ghi kèm lý do và chỗ trong code để người làm sau khỏi phải tìm lại từ đầu.
 Làm xong mục nào thì xoá khỏi đây và ghi vào commit.
 
+## Tài khoản v2 (27/11/2026): phần còn lại
+
+Đã làm theo [plans/auth-v2.md](plans/auth-v2.md): tự đăng ký, cookie, link mời, thành viên trong `hub.db`, ai cũng tạo
+project, Máy của tôi, dashboard theo prototype `docs/prototype/auth/`. Còn lại:
+
+- Chưa deploy (bước 7: sao lưu, volume trống, tạo quản trị `hoc` qua `/setup`, chạy thử thật trên server) và chưa
+  publish npm 0.2.0 (bước 8).
+- Link mời chỉ lưu bản băm nên chỉ hiện một lần lúc tạo; danh sách link không có nút Chép (mất link thì thu hồi, tạo mới).
+- Máy của Developer vẫn ghi được mọi route `/v1/p/:id` (như trước); ngoại lệ Developer chỉ áp cho phiên dashboard.
+- Kiểm địa chỉ repo lúc tạo/đổi `repo_url`; host đổi DNS sau đó (DNS rebinding) vẫn được clone; mirror fetch chưa đặt
+  `GTV_ALLOW_PROTOCOL`.
+- Cookie phiên hết hạn 30 ngày sau lần đăng nhập ở phía trình duyệt, dù server gia hạn khi dùng (chưa gửi lại cookie).
+- "Việc/câu hỏi chờ tôi" trên trang chủ và thanh bên hỏi từng project mỗi 30 giây; nhiều project thì nên có một
+  endpoint gộp.
+- Giới hạn số project mỗi người, số việc AI mỗi project: chưa làm (chủ dự án chốt 27/11).
+
 ## Tài khoản và CLI (27/11/2026): phần còn lại
 
 - Hiện trường chỉ biết file một người sửa qua hook sửa file (Edit/Write, apply_patch). Agent sửa bằng lệnh shell (`sed -i`)
@@ -82,7 +98,7 @@ Quy trình hiện tại của repo: **không mở PR**, commit thẳng `main`, p
   Còn thay đổi chưa commit của agent trong `auth.service.ts` (giới hạn username, bio).
 - `D:\Projects\realworld-gtv-bench` (dev **hien**, nhánh `bench/on/X1/c`): còn thay đổi chưa commit của agent trong `auth.service.ts` và
   `utils/validation.ts` (chuẩn hoá email, kiểm tra image). Có `.claude/settings.local.json.bak` (bản trước khi dọn hook nhân bản).
-- Tài khoản `hien-test` có trên server (từ dev cũ); xoá ở trang Người khi không cần nữa.
+- Server thật sẽ được xoá sạch khi deploy bản tài khoản mới (auth v2), nên tài khoản `hien-test` cũ cũng mất theo.
 - Dữ liệu cũ trên project realworld: xung đột và câu hỏi tiếng Anh từ lượt bench 19 ngày trước, 3 câu hỏi vẫn "chờ người quyết" trong
   "Cần xử lý". Nên đóng/bỏ qua trước khi demo.
 

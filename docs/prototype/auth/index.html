@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gtv · tài khoản và project (prototype)</title>
+    <link rel="icon" href="../assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="auth.css" />
+    <script>
+      // same saved theme as the project-page prototype; no saved choice = follow the system
+      try { const t = localStorage.getItem("gtv.proto.theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <nav class="pnav" id="pnav" aria-label="Các màn hình của prototype"></nav>
+    <script src="auth.js"></script>
+  </body>
+</html>

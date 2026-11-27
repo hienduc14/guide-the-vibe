@@ -73,7 +73,9 @@ cp docker/.env.example docker/.env
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
 
-Put port 7390 behind HTTPS, open it and create the first admin account.
+Put port 7390 behind HTTPS and open it: the first page creates the admin account (it asks for `GTV_ADMIN_TOKEN`, so
+a stranger cannot take the server first). Under **Quản trị server › Đăng ký** choose who may sign up: anyone (the
+default), only people with an invite link, or nobody.
 
 **2. Connect an AI model** (optional, but needed for answers and the smartest conflict check)
 
@@ -81,19 +83,17 @@ On **AI trả lời**, either sign in with a subscription you already have (Clau
 paste an API key (Anthropic, OpenAI, Google, OpenRouter and ~30 more), or point to any OpenAI- or
 Anthropic-compatible endpoint. A small, fast model is enough.
 
-**3. Add your repository**
+**3. Everyone signs up, then creates a project or opens an invite**
 
-On the overview page choose **Thêm project** and paste the repository URL. For a private repository use a URL with
-a read token, e.g. `https://x-access-token:<token>@github.com/org/repo.git`.
+Each person signs up on the server with a user name and a password (`/signup`). Whoever starts a project chooses
+**Tạo project**, pastes the repository URL and checks it (for a private repository use a URL with a read token, e.g.
+`https://x-access-token:<token>@github.com/org/repo.git`), and becomes its manager. On **Thiết lập › Thành viên** they
+make an invite link (developer or viewer, 1–30 days) and send it to the team, or add people who already have an account
+by their user name. Opening the link and pressing **Tham gia** joins the project.
 
-**4. Add your people**
+**4. Each developer, once per computer and once per repo**
 
-On **Người** (People), add each person with their access in the project (manager, developer or viewer). gtv shows a
-one-time activation link (valid 48 hours): send it to them. The admin never learns anyone's password.
-
-**5. Each developer, once per computer and once per repo**
-
-They open the link, choose a password, and follow the three steps on **Tài khoản của tôi** (My account):
+The three commands are also under **Máy của tôi › Kết nối máy mới**:
 
 ```bash
 npx guide-the-vibe   # installs the gtv command
@@ -179,11 +179,15 @@ Full list, deployment notes and troubleshooting: [docs/operations.md](docs/opera
 <details>
 <summary><b>Security</b></summary>
 
-- **Accounts**: one per person. Admins create them; people set their own password through a one-time link (48 hours).
-  Each project gives its members manager, developer or viewer access; agents only work where their person is a
-  developer or manager. A read-only link can show one project to outsiders.
+- **Accounts**: one per person, made by signing up (open, invite-only or closed, chosen by the admin). The dashboard
+  session is an httpOnly cookie, and writes must come from the dashboard's own pages. Forgotten passwords: the admin
+  makes a one-time reset link (1 hour). Each project gives its members manager, developer or viewer access; agents only
+  work where their person is a developer or manager. Projects are private: outsiders cannot even see their names. A
+  read-only link can show one project to outsiders.
+- **Repositories**: anyone may create a project, so the server only clones `https://` and `git@host:` addresses, never
+  local paths, other transports or hosts on its own network, and reads the repo before creating the project.
 - **Computers**: `gtv login` approves a computer in the browser; each gets its own key, stored only as a hash on the
-  server and revocable from the dashboard. Login, activation and connection codes are rate limited.
+  server and revocable from the dashboard. Login, sign-up, invite, reset and connection codes are rate limited.
 - **Model credentials**: encrypted with `GTV_SECRET_KEY`; the API only ever returns the last four characters.
 - **Daemon**: listens on `127.0.0.1` only and refuses requests from browsers.
 - **Brain**: read-only tools; it can read code, documents and team state but never change the repository.

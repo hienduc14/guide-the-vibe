@@ -4,7 +4,8 @@
 Codex) trong từng repo, và chạy một dịch vụ nền nhỏ (daemon) để agent nói chuyện với server của nhóm. Chữ trên CLI bằng
 tiếng Anh; lệnh và chữ ví dụ dưới đây giữ nguyên.
 
-Cần: Node.js 20 trở lên, git, và một tài khoản gtv (quản trị tạo và gửi bạn link kích hoạt).
+Cần: Node.js 20 trở lên, git, và một tài khoản gtv: tự đăng ký trên server của nhóm (`/signup`), hoặc mở link mời vào
+project mà người quản lý gửi bạn rồi bấm Tạo tài khoản.
 
 ## 1. Cài đặt
 
@@ -197,8 +198,8 @@ gtv.
 bản chụp code đang làm dở (đẩy lên một ref riêng `refs/gtv/...` của remote) để phát hiện đụng nhau sớm. Tất cả nằm trên
 server của nhóm; AI mà quản trị cấu hình cho server có thể đọc chúng khi trả lời câu hỏi.
 
-**Quản trị có biết mật khẩu của tôi không?** Không. Bạn tự đặt qua link kích hoạt. Quên mật khẩu: nhờ quản trị tạo link
-đặt lại.
+**Quản trị có biết mật khẩu của tôi không?** Không. Bạn tự đặt mật khẩu khi đăng ký. Quên mật khẩu: nhờ quản trị tạo
+link đặt lại (dùng một lần, 1 giờ); máy đã kết nối vẫn chạy, không phải `gtv login` lại.
 
 **Tôi chỉ là Người xem, `gtv on` báo lỗi?** Đúng: agent chỉ làm việc ở project mà bạn là Developer hoặc Quản lý. Người
 xem vẫn xem mọi thứ trên dashboard.

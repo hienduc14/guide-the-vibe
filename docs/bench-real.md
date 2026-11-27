@@ -29,7 +29,7 @@ Hai người có thể đổi agent cho nhau, nhưng giữ nguyên lựa chọn 
 1. Thêm bạn B làm collaborator (quyền Write) của `realworld-gtv-bench`. B cần quyền này để đẩy nhánh và snapshot `refs/gtv/*`.
 2. Trên dashboard của server đã deploy:
    - tạo project `realworld-bench`, repo `https://github.com/hienduc14/realworld-gtv-bench.git`, nhánh `master`;
-   - **Người › Thêm người**: A và B, quyền Developer trong `realworld-bench`; gửi mỗi người link kích hoạt (dùng một lần, hạn 48 giờ).
+   - **Thiết lập › Thành viên › Mời bằng link**: quyền Developer trong `realworld-bench`; A và B mở link, tạo tài khoản rồi bấm Tham gia.
 3. Brain là tùy chọn. Có Brain thì thêm được L3 và hỏi đáp. Không có thì vẫn có L0–L2, là các lớp bắt conflict chính.
 
 **Mỗi người** clone repo **hai lần**, vì daemon gtv tự bật lại mỗi khi agent mở phiên, nên không thể chỉ tắt nó để chạy vòng off:

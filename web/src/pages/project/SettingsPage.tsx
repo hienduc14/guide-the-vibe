@@ -163,7 +163,7 @@ export function SettingsPage() {
   const nav = manage ? all : all.slice(0, 1);
   if (!manage && section !== "members") return <Navigate to={`/p/${id}/settings/members`} replace />;
   return (
-    <>
+    <div className="page-col">
       <div className="head">
         <div>
           <h1>Thiết lập</h1>
@@ -195,6 +195,6 @@ export function SettingsPage() {
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }

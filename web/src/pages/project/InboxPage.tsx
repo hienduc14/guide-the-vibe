@@ -436,7 +436,7 @@ export function InboxPage() {
   const curItem = att.data?.find((a) => a.ref === current);
 
   return (
-    <>
+    <div className="page-col">
       <div className="head">
         <div>
           <h1>Cần xử lý</h1>
@@ -569,6 +569,6 @@ export function InboxPage() {
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }

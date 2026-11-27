@@ -232,7 +232,7 @@ export function KnowledgePage() {
     ["review", "Chờ xác nhận", <CircleHelp key="q" />, detail.counts.kb_unverified],
   ];
   return (
-    <>
+    <div className="page-col">
       <div className="head">
         <div>
           <h1>Tri thức</h1>
@@ -251,6 +251,6 @@ export function KnowledgePage() {
         </nav>
         <section className="panel doc">{section === "docs" ? <DocsSection /> : section === "review" ? <Review /> : <CharterView />}</section>
       </div>
-    </>
+    </div>
   );
 }

@@ -1014,9 +1014,10 @@
 }
 
 /* ---------- the file sheet ---------- */
+/* grows with the screen: about 88% of it either way, never edge to edge (very wide screens stop at 2200px) */
 .pj dialog.sheet {
-  width: min(1320px, 96vw);
-  height: min(900px, 92vh);
+  width: min(2200px, max(88vw, min(1100px, 96vw)));
+  height: max(88vh, min(720px, 94vh));
   max-width: none;
   max-height: none;
   padding: 0;
@@ -3243,4 +3244,14 @@
 .pj .who-title .muted {
   font-size: 13px;
   font-weight: 400;
+}
+
+/* Thiết lập, Tri thức, Cần xử lý: one column in the middle of wide screens; forms and lists fill their panel
+   instead of their own caps (Việc, Trao đổi and Tổng quan use the full width) */
+.pj .page-col {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+.pj .page-col .doc :is(.presets, .layers, .formgrid, .doclist, .p-charter) {
+  max-width: none;
 }

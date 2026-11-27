@@ -505,28 +505,28 @@
   .pj .now.solo .map {
     flex: 1;
   }
-  /* blocks grow into the free height (up to a cap), so few files means taller blocks, many means the usual size */
+  /* blocks keep a comfortable fixed size; the gaps between agents and between folders follow the screen's height
+     (within limits) and the whole set sits in the middle, so a tall screen gets air, not giant boxes */
   .pj .now.solo .agents {
     justify-content: center;
-    gap: 16px;
+    gap: clamp(14px, 4.5vh, 52px);
   }
   .pj .now.solo .agent {
-    flex: 1 1 auto;
-    max-height: 168px;
-    align-content: center;
+    padding: clamp(16px, 2vh, 24px) 18px;
   }
   .pj .now.solo .files {
     justify-content: center;
+    gap: clamp(14px, 4.5vh, 56px);
   }
   .pj .now.solo .fgroup {
-    display: contents;
+    gap: clamp(6px, 0.9vh, 12px);
   }
-  .pj .now.solo .fgroup + .fgroup .folder {
-    margin-top: 14px;
+  .pj .now.solo .fgroup + .fgroup {
+    margin-top: 0;
   }
   .pj .now.solo .file {
-    flex: 1 1 auto;
-    max-height: 72px;
+    min-height: clamp(44px, 4.4vh, 56px);
+    padding-block: 8px;
   }
 }
 .pj .digest-panel {

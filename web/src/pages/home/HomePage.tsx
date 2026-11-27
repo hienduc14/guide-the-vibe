@@ -2,7 +2,8 @@
 // /new and /new?repo=owner/repo (the link `gtv on` prints) open the create popup over this page.
 
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, LayoutGrid, Laptop, Link2, Plus } from "lucide-react";
+import { Check, Copy, LayoutGrid, Laptop, Link2, Plus } from "lucide-react";
+import { useToast } from "../../hooks/useToast";
 import { api } from "../../api/endpoints";
 import type { ProjectAccess, ProjectEntry } from "../../api/types";
 import { isLoaded } from "../../api/types";
@@ -95,6 +96,7 @@ export function HomePage() {
   const { data } = useOverview();
   const waiting = useWaiting();
   const navigate = useNavigate();
+  const toast = useToast();
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const { data: devices } = usePoll(api.account.devices, [], 30_000);
@@ -151,9 +153,26 @@ export function HomePage() {
                 </span>
                 <h2>Vào project của nhóm</h2>
                 <p>
-                  Bấm vào link mời bạn nhận được, như mọi link khác: nó mở trang tham gia. Chưa có link thì nhờ người quản lý project thêm bạn theo tên{" "}
-                  <b className="mono">{me?.name}</b>.
+                  Bấm vào link mời bạn nhận được, nó mở trang tham gia. Chưa có link thì gửi tên <b className="mono">{me?.name}</b> cho người quản lý project để
+                  họ thêm bạn.
                 </p>
+                <div>
+                  <button
+                    type="button"
+                    className="p-btn"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(me?.name ?? "");
+                        toast("Đã chép tên");
+                      } catch {
+                        toast("Trình duyệt chặn chép: bôi đen rồi chép tay", true);
+                      }
+                    }}
+                  >
+                    <Copy size={15} />
+                    Chép tên
+                  </button>
+                </div>
               </div>
             </div>
           ) : (

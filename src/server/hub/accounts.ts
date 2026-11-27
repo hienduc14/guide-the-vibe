@@ -1,8 +1,9 @@
-// Accounts: one per person. An account logs in to the dashboard (password, session gtvs_…) and is the identity of
-// that person's agents through the computers they connected (device key gtvd_…, or an old gtv_ token moved here).
-//   system role: admin (everything) | member (what their project access allows, see hub.projectAccess)
-// Admins create accounts and send a one-time activation link; people set their own password.
-// A share link (gtvl_…) is a read-only viewer limited to one project, for showing the project to others.
+// Accounts: one per person, made by signing up (the first one, on an empty server, is the admin: /setup). An account
+// logs in to the dashboard (password → session gtvs_… in the gtv_session cookie) and is the identity of that person's
+// agents through the computers they connected (device key gtvd_…).
+//   system role: admin (the server: accounts, brain, sign-up mode) | member (what their project access allows, see hub.projectAccess)
+// Names appear in every project record, so they never change and a deleted account's name is never given out again.
+// A share link (gtvl_…) is a read-only viewer limited to one project.
 
 import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import type { Db } from "../../shared/db.ts";
@@ -20,20 +21,24 @@ export interface Principal {
   project?: string;
   /** Device principals: which computer. */
   device?: string;
+  /** Dashboard sessions: the session's token hash (its id is the first 16 characters). */
+  session?: string;
 }
 
-const SESSION_DAYS = 14;
-const ACTIVATION_HOURS = 48;
+export const SESSION_DAYS = 30;
+const RESET_MINUTES = 60;
 const CONNECT_MINUTES = 10;
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 const future = (ms: number) => new Date(Date.now() + ms).toISOString();
+/** Names that would read as something other than a person in project records and messages. */
+const RESERVED = new Set(["admin", "root", "gtv", "system", "everyone", "all", "share", "me", "api"]);
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16);
   return `scrypt:${salt.toString("hex")}:${scryptSync(password, salt, 32).toString("hex")}`;
 }
 
-function checkPassword(password: string, stored: string | null): boolean {
+function checkPassword(password: string, stored: string | null | undefined): boolean {
   const [, salt, expected] = (stored ?? "").split(":");
   if (!salt || !expected) return false;
   const got = scryptSync(password, Buffer.from(salt, "hex"), 32);
@@ -41,14 +46,16 @@ function checkPassword(password: string, stored: string | null): boolean {
   return got.length === want.length && timingSafeEqual(got, want);
 }
 
-/** Account names appear in every project record (tasks, footprints, conflicts), so they follow the dev name rule. */
 export function checkName(name: string): void {
-  if (!/^[a-zA-Z0-9._-]{1,40}$/.test(name)) throw new Error("name: 1-40 letters, digits, . _ -");
+  if (!/^[a-z0-9._-]{3,32}$/.test(name)) throw new Error("user name: 3-32 lowercase letters, digits, . _ -");
+  if (RESERVED.has(name)) throw new Error(`the name ${name} is reserved: pick another one`);
 }
 
 function checkPasswordRule(password: string): void {
   if (typeof password !== "string" || password.length < 8) throw new Error("password: at least 8 characters");
 }
+
+const displayName = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : fallback);
 
 /** KQ7M-2XPD: no 0/O/1/I, so it can be read aloud and typed. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -59,11 +66,20 @@ function userCode(): string {
 
 export interface UserRow {
   name: string;
+  display_name: string;
   role: Role;
-  activated: boolean;
   created_at: string;
-  created_by: string | null;
   last_login: string | null;
+  disabled_at: string | null;
+}
+
+export interface SessionRow {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  last_used: string | null;
+  user_agent: string | null;
+  ip: string | null;
 }
 
 export interface DeviceRow {
@@ -97,6 +113,15 @@ interface ConnectRow {
   created_at: string;
 }
 
+export interface SessionMeta {
+  user_agent?: string;
+  ip?: string;
+}
+
+const USER_COLS = `name, display_name, role, created_at, last_login, disabled_at`;
+/** Accounts that may act: not locked, not deleted. */
+const ACTIVE = `u.disabled_at IS NULL AND u.deleted_at IS NULL`;
+
 export class Accounts {
   private readonly db: Db;
   constructor(db: Db) {
@@ -110,103 +135,156 @@ export class Accounts {
   }
 
   user(name: string): UserRow | undefined {
-    return this.users().find((u) => u.name === name);
+    return this.db.get<UserRow>(`SELECT ${USER_COLS} FROM users WHERE name = ? AND deleted_at IS NULL`, name);
   }
 
   users(): UserRow[] {
-    return this.db
-      .all<Omit<UserRow, "activated"> & { activated: number }>(
-        `SELECT name, role, pass_hash IS NOT NULL AS activated, created_at, created_by, last_login FROM users ORDER BY name`,
-      )
-      .map((u) => ({ ...u, activated: !!u.activated }));
+    return this.db.all<UserRow>(`SELECT ${USER_COLS} FROM users WHERE deleted_at IS NULL ORDER BY name`);
   }
 
-  /** A new account without a password: the person sets one through the activation link. */
-  createUser(name: string, role: Role, by: string | null): UserRow {
+  /** A new account; without a password (GTV_TOKENS accounts) it cannot log in to the dashboard. */
+  createUser(name: string, opts: { display_name?: string; role?: Role; password: string | null }): UserRow {
     checkName(name);
+    const role = opts.role ?? "member";
     if (!ROLES.includes(role)) throw new Error(`role must be one of ${ROLES.join(", ")}`);
-    if (this.user(name)) throw new Error(`an account named ${name} already exists`);
-    this.db.run(`INSERT INTO users (name, role, pass_hash, created_at, created_by) VALUES (?,?,NULL,?,?)`, name, role, nowIso(), by);
+    if (opts.password !== null) checkPasswordRule(opts.password);
+    if (this.db.get(`SELECT 1 FROM users WHERE name = ?`, name)) throw new Error(`the name ${name} is taken: pick another one`);
+    this.db.run(
+      `INSERT INTO users (name, display_name, role, pass_hash, created_at) VALUES (?,?,?,?,?)`,
+      name,
+      displayName(opts.display_name, name),
+      role,
+      opts.password === null ? "" : hashPassword(opts.password),
+      nowIso(),
+    );
     return this.user(name)!;
   }
 
-  setRole(name: string, role: Role): UserRow {
-    if (!ROLES.includes(role)) throw new Error(`role must be one of ${ROLES.join(", ")}`);
+  private activeAdmins(): string[] {
+    return this.db.all<{ name: string }>(`SELECT name FROM users u WHERE role = 'admin' AND ${ACTIVE}`).map((r) => r.name);
+  }
+
+  /** The server always keeps one admin who can log in. */
+  private keepAnAdmin(name: string): void {
+    const admins = this.activeAdmins();
+    if (admins.length === 1 && admins[0] === name) throw new Error(`${name} is the last admin: make someone else an admin first`);
+  }
+
+  update(name: string, patch: { role?: Role; disabled?: boolean; display_name?: string }): UserRow {
     const prev = this.user(name);
     if (!prev) throw new Error(`unknown account ${name}`);
-    this.db.run(`UPDATE users SET role = ? WHERE name = ?`, role, name);
-    // A lower role logs the person out everywhere (their computers keep working: project access decides there).
-    if (prev.role === "admin" && role !== "admin") this.db.run(`DELETE FROM user_sessions WHERE user = ?`, name);
+    if (patch.role !== undefined && !ROLES.includes(patch.role)) throw new Error(`role must be one of ${ROLES.join(", ")}`);
+    if ((patch.role && patch.role !== "admin") || patch.disabled) this.keepAnAdmin(name);
+    if (patch.role) this.db.run(`UPDATE users SET role = ? WHERE name = ?`, patch.role, name);
+    if (patch.disabled !== undefined)
+      this.db.run(`UPDATE users SET disabled_at = ? WHERE name = ?`, patch.disabled ? (prev.disabled_at ?? nowIso()) : null, name);
+    if (patch.display_name !== undefined) this.db.run(`UPDATE users SET display_name = ? WHERE name = ?`, displayName(patch.display_name, name), name);
     return this.user(name)!;
   }
 
-  /** Sets a password directly (scripts, the demo); people use activation links or changePassword. */
-  setPassword(name: string, password: string): void {
+  verifyPassword(name: string, password: string): boolean {
+    const row = this.db.get<{ pass_hash: string }>(`SELECT pass_hash FROM users WHERE name = ? AND deleted_at IS NULL`, name);
+    return checkPassword(String(password ?? ""), row?.pass_hash);
+  }
+
+  /** Sets a password and logs out every session but `keep` (computers stay connected). */
+  setPassword(name: string, password: string, keep?: string): void {
     checkPasswordRule(password);
     if (!this.user(name)) throw new Error(`unknown account ${name}`);
     this.db.run(`UPDATE users SET pass_hash = ? WHERE name = ?`, hashPassword(password), name);
-    this.db.run(`DELETE FROM user_sessions WHERE user = ?`, name);
+    this.db.run(`DELETE FROM user_sessions WHERE user = ? AND token_hash IS NOT ?`, name, keep ?? null);
   }
 
-  changePassword(name: string, current: string, password: string): void {
-    const row = this.db.get<{ pass_hash: string | null }>(`SELECT pass_hash FROM users WHERE name = ?`, name);
-    if (!row || !checkPassword(current, row.pass_hash)) throw new Error("the current password is wrong");
-    this.setPassword(name, password);
+  changePassword(name: string, current: string, password: string, keep?: string): void {
+    if (!this.verifyPassword(name, current)) throw new Error("the current password is wrong");
+    this.setPassword(name, password, keep);
   }
 
-  removeUser(name: string): void {
-    this.db.run(`DELETE FROM users WHERE name = ?`, name);
-    for (const t of ["user_sessions", "devices", "activations", "device_requests"]) this.db.run(`DELETE FROM ${t} WHERE user = ?`, name);
+  /**
+   * Marks the account deleted and removes its sessions, computers and links; the row stays so the name is not
+   * given out again. Project memberships are the hub's (Hub.deleteAccount).
+   */
+  deleteUser(name: string): void {
+    if (!this.user(name)) throw new Error(`unknown account ${name}`);
+    this.keepAnAdmin(name);
+    this.db.run(`UPDATE users SET deleted_at = ?, pass_hash = '', role = 'member' WHERE name = ?`, nowIso(), name);
+    for (const t of ["user_sessions", "devices", "password_resets", "device_requests"]) this.db.run(`DELETE FROM ${t} WHERE user = ?`, name);
   }
 
-  /** Name + password → a session token (shown once, sent as Bearer). */
-  login(name: string, password: string): { token: string; user: UserRow; expires_at: string } {
-    const row = this.db.get<{ pass_hash: string | null }>(`SELECT pass_hash FROM users WHERE name = ?`, name);
-    if (row && row.pass_hash === null) throw new Error("this account is not activated yet: open the link your admin sent you");
-    if (!row || !checkPassword(password, row.pass_hash)) throw new Error("wrong user name or password");
-    return this.session(name);
+  // ---- dashboard sessions ---------------------------------------------------------------
+
+  /** Name + password → a session token for the cookie. */
+  login(name: string, password: string, meta: SessionMeta = {}): { token: string; user: UserRow } {
+    const user = this.user(name);
+    if (!user || !this.verifyPassword(name, password)) throw new Error("wrong user name or password");
+    if (user.disabled_at) throw new Error("this account is locked: ask an admin");
+    return this.newSession(name, meta);
   }
 
-  private session(name: string): { token: string; user: UserRow; expires_at: string } {
+  newSession(name: string, meta: SessionMeta = {}): { token: string; user: UserRow } {
     const token = `gtvs_${randomBytes(24).toString("base64url")}`;
     const now = nowIso();
-    const expires_at = future(SESSION_DAYS * 86_400_000);
     this.db.run(`DELETE FROM user_sessions WHERE expires_at < ?`, now);
-    this.db.run(`INSERT INTO user_sessions (token_hash, user, expires_at, created_at) VALUES (?,?,?,?)`, hashToken(token), name, expires_at, now);
+    this.db.run(
+      `INSERT INTO user_sessions (token_hash, user, created_at, expires_at, last_used, user_agent, ip) VALUES (?,?,?,?,?,?,?)`,
+      hashToken(token),
+      name,
+      now,
+      future(SESSION_DAYS * 86_400_000),
+      now,
+      meta.user_agent?.slice(0, 300) ?? null,
+      meta.ip?.slice(0, 64) ?? null,
+    );
     this.db.run(`UPDATE users SET last_login = ? WHERE name = ?`, now, name);
-    return { token, expires_at, user: this.user(name)! };
+    return { token, user: this.user(name)! };
   }
 
-  logout(token: string): void {
-    this.db.run(`DELETE FROM user_sessions WHERE token_hash = ?`, hashToken(token));
+  /** Ends one session by its token hash. */
+  endSession(tokenHash: string): void {
+    this.db.run(`DELETE FROM user_sessions WHERE token_hash = ?`, tokenHash);
   }
 
-  // ---- activation links (first password, or a reset) ------------------------------------------
+  sessions(user: string): SessionRow[] {
+    return this.db.all<SessionRow>(
+      `SELECT substr(token_hash, 1, 16) AS id, created_at, expires_at, last_used, user_agent, ip FROM user_sessions WHERE user = ? AND expires_at > ? ORDER BY last_used DESC`,
+      user,
+      nowIso(),
+    );
+  }
+
+  /** Ends one of a person's sessions by id, or every session but `keep` when no id is given. */
+  endSessions(user: string, opts: { id?: string; keep?: string }): void {
+    if (opts.id) this.db.run(`DELETE FROM user_sessions WHERE user = ? AND substr(token_hash, 1, 16) = ?`, user, opts.id);
+    else this.db.run(`DELETE FROM user_sessions WHERE user = ? AND token_hash IS NOT ?`, user, opts.keep ?? null);
+  }
+
+  // ---- password reset links (made by an admin, sent by chat: the server sends no email) -----------------
 
   /** A new one-time code for the account; earlier codes stop working. */
-  createActivation(name: string): { code: string; expires_at: string } {
+  createReset(name: string): { code: string; expires_at: string } {
     if (!this.user(name)) throw new Error(`unknown account ${name}`);
     const code = randomBytes(24).toString("base64url");
-    const expires_at = future(ACTIVATION_HOURS * 3600_000);
-    this.db.run(`DELETE FROM activations WHERE user = ? OR expires_at < ?`, name, nowIso());
-    this.db.run(`INSERT INTO activations (code_hash, user, expires_at, created_at) VALUES (?,?,?,?)`, hashToken(code), name, expires_at, nowIso());
+    const expires_at = future(RESET_MINUTES * 60_000);
+    this.db.run(`DELETE FROM password_resets WHERE user = ? OR expires_at < ?`, name, nowIso());
+    this.db.run(`INSERT INTO password_resets (code_hash, user, expires_at, created_at) VALUES (?,?,?,?)`, hashToken(code), name, expires_at, nowIso());
     return { code, expires_at };
   }
 
-  activationInfo(code: string): { user: string; kind: "activate" | "reset" } {
-    const row = this.db.get<{ user: string; expires_at: string }>(`SELECT user, expires_at FROM activations WHERE code_hash = ?`, hashToken(code));
+  resetInfo(code: string): { user: string; display_name: string; expires_at: string } {
+    const row = this.db.get<{ user: string; expires_at: string }>(`SELECT user, expires_at FROM password_resets WHERE code_hash = ?`, hashToken(code));
     const u = row && row.expires_at > nowIso() ? this.user(row.user) : undefined;
     if (!u) throw new Error("this link is invalid, used or expired: ask your admin for a new one");
-    return { user: u.name, kind: u.activated ? "reset" : "activate" };
+    return { user: u.name, display_name: u.display_name, expires_at: row!.expires_at };
   }
 
-  /** Sets the password and logs the person in. */
-  activate(code: string, password: string): { token: string; user: UserRow; expires_at: string } {
-    const { user } = this.activationInfo(code);
+  /** Sets the new password (every earlier session ends, computers stay) and logs the person in. */
+  resetPassword(code: string, password: string, meta: SessionMeta = {}): { token: string; user: UserRow } {
+    const { user } = this.resetInfo(code);
     checkPasswordRule(password);
-    this.db.run(`DELETE FROM activations WHERE code_hash = ?`, hashToken(code));
+    if (this.user(user)!.disabled_at) throw new Error("this account is locked: ask an admin");
+    this.db.run(`DELETE FROM password_resets WHERE user = ?`, user);
     this.setPassword(user, password);
-    return this.session(user);
+    return this.newSession(user, meta);
   }
 
   // ---- devices (computers connected to an account) -----------------------------------------
@@ -218,7 +296,7 @@ export class Accounts {
       : this.db.all<DeviceRow>(`SELECT ${cols} FROM devices ORDER BY created_at`);
   }
 
-  /** Adds a computer with a known token (moved old developer tokens, GTV_TOKENS); no-op if the token is known. */
+  /** Adds a computer with a known token (GTV_TOKENS, tests); no-op if the token is known. */
   addDevice(user: string, tokenHash: string, name: string, platform: string, createdAt = nowIso(), lastSeen: string | null = null): void {
     this.db.run(
       `INSERT OR IGNORE INTO devices (id, user, name, platform, token_hash, created_at, last_seen) VALUES (?,?,?,?,?,?,?)`,
@@ -242,7 +320,7 @@ export class Accounts {
   /** The computer a token belongs to (and marks it seen). */
   deviceFor(token: string): (DeviceRow & { role: Role }) | undefined {
     const row = this.db.get<DeviceRow & { role: Role }>(
-      `SELECT d.id, d.user, d.name, d.platform, d.created_at, d.last_seen, u.role FROM devices d JOIN users u ON u.name = d.user WHERE d.token_hash = ?`,
+      `SELECT d.id, d.user, d.name, d.platform, d.created_at, d.last_seen, u.role FROM devices d JOIN users u ON u.name = d.user WHERE d.token_hash = ? AND ${ACTIVE}`,
       hashToken(token),
     );
     if (row) this.db.run(`UPDATE devices SET last_seen = ? WHERE id = ?`, nowIso(), row.id);
@@ -350,12 +428,17 @@ export class Accounts {
   principal(token: string): Principal | undefined {
     const now = nowIso();
     if (token.startsWith("gtvs_")) {
-      const row = this.db.get<{ name: string; role: Role }>(
-        `SELECT u.name, u.role FROM user_sessions s JOIN users u ON u.name = s.user WHERE s.token_hash = ? AND s.expires_at > ?`,
-        hashToken(token),
+      const h = hashToken(token);
+      const row = this.db.get<{ name: string; role: Role; last_used: string | null }>(
+        `SELECT u.name, u.role, s.last_used FROM user_sessions s JOIN users u ON u.name = s.user WHERE s.token_hash = ? AND s.expires_at > ? AND ${ACTIVE}`,
+        h,
         now,
       );
-      return row ? { kind: "user", name: row.name, role: row.role } : undefined;
+      if (!row) return undefined;
+      // A session in use stays alive (30 days from the last use); written at most once a minute.
+      if (!row.last_used || Date.parse(row.last_used) < Date.now() - 60_000)
+        this.db.run(`UPDATE user_sessions SET last_used = ?, expires_at = ? WHERE token_hash = ?`, now, future(SESSION_DAYS * 86_400_000), h);
+      return { kind: "user", name: row.name, role: row.role, session: h };
     }
     if (token.startsWith("gtvl_")) {
       const row = this.db.get<{ id: string; project: string; label: string | null }>(
@@ -367,7 +450,7 @@ export class Accounts {
       this.db.run(`UPDATE share_links SET last_used = ? WHERE id = ?`, now, row.id);
       return { kind: "share", name: row.label ? `link: ${row.label}` : "share link", role: "member", project: row.project };
     }
-    const d = this.deviceFor(token); // gtvd_… and old gtv_… developer tokens
+    const d = this.deviceFor(token); // gtvd_… (and GTV_TOKENS keys)
     return d ? { kind: "device", name: d.user, role: d.role, device: d.id } : undefined;
   }
 }

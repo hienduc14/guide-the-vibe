@@ -66,26 +66,58 @@ export async function commitAndPush(dir: string, files: Record<string, string>, 
   await git(dir, ["push", "-q", "origin", "HEAD:main"]);
 }
 
+type App = { request: (path: string, init?: RequestInit) => Response | Promise<Response> };
+
+/**
+ * A request as the dashboard sends it (session cookie + this server's Origin) or as a computer, share link or script
+ * does (Bearer). Returns the session cookie the server set, if any.
+ */
+export async function api<T = any>(
+  app: App,
+  path: string,
+  init: { method?: string; body?: unknown; cookie?: string; token?: string; headers?: Record<string, string> } = {},
+): Promise<{ status: number; json: T; cookie?: string }> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (init.token) headers.authorization = `Bearer ${init.token}`;
+  if (init.cookie) Object.assign(headers, { cookie: `gtv_session=${init.cookie}`, origin: "http://localhost" });
+  Object.assign(headers, init.headers);
+  const res = await app.request(path, { method: init.method ?? "GET", headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
+  const cookie = /gtv_session=([^;]*)/.exec(res.headers.get("set-cookie") ?? "")?.[1] || undefined;
+  return { status: res.status, json: (await res.json()) as T, cookie };
+}
+
+/** Signs up on the dashboard; returns the session cookie. */
+export async function signup(app: App, name: string, opts: { invite?: string; password?: string } = {}): Promise<string> {
+  const r = await api(app, "/api/auth/signup", {
+    method: "POST",
+    body: { name, display_name: name.toUpperCase(), password: opts.password ?? `${name}-password`, invite: opts.invite },
+  });
+  if (r.status !== 200 || !r.cookie) throw new Error(`signup ${name}: ${r.status} ${JSON.stringify(r.json)}`);
+  return r.cookie;
+}
+
+/** Connects a computer to the logged-in account the way gtv login does; returns its key. */
+export async function connectDevice(app: App, cookie: string, name = "laptop"): Promise<{ token: string; device_id: string }> {
+  const start = (await api(app, "/v1/connect/start", { method: "POST", body: { device_name: name, platform: "linux" } })).json;
+  await api(app, `/api/connect/${start.user_code}/approve`, { method: "POST", cookie });
+  return (await api(app, "/v1/connect/poll", { method: "POST", body: { device_code: start.device_code } })).json;
+}
+
 /**
  * An account with a connected computer (and a password when given), member of the projects listed.
- * Returns the computer's key (`device`) and, with a password, a dashboard session.
+ * Returns the computer's key (`device`) and, with a password, a dashboard session (sent as Bearer or cookie).
  */
 export async function addPerson(
-  srv: { hub: Hub; app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> } },
+  srv: { hub: Hub; app: App },
   name: string,
   opts: { role?: "admin" | "member"; projects?: Record<string, "manager" | "developer" | "viewer">; password?: string } = {},
 ): Promise<{ device: string; session?: string }> {
   const { hub } = srv;
-  if (!hub.accounts.user(name)) hub.accounts.createUser(name, opts.role ?? "member", "test");
+  if (!hub.accounts.user(name)) hub.accounts.createUser(name, { role: opts.role ?? "member", password: opts.password ?? null });
   for (const [id, access] of Object.entries(opts.projects ?? {})) (await hub.runtime(id)).engine.store.saveMember(name, { access });
   const device = `gtvd_test_${name}_${randomBytes(6).toString("hex")}`;
   hub.accounts.addDevice(name, hashToken(device), `${name}-laptop`, "linux");
   if (!opts.password) return { device };
-  hub.accounts.setPassword(name, opts.password);
-  const res = await srv.app.request("/api/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, password: opts.password }),
-  });
-  return { device, session: ((await res.json()) as { token: string }).token };
+  const r = await api(srv.app, "/api/auth/login", { method: "POST", body: { name, password: opts.password } });
+  return { device, session: r.cookie };
 }

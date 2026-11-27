@@ -71,10 +71,10 @@ await call(
   },
   { method: "PATCH" },
 );
-// One account per person; passwords are set directly here (people normally use the activation link).
+// One account per person, made directly here (people sign up on the dashboard).
 const person = async (name: string, password: string | null, access: "manager" | "developer" | "viewer") => {
-  await call("/api/users", { name, role: name === "hoc" ? "admin" : "member", projects: [{ id: "mini-shop", access }] });
-  if (password) srv.hub.accounts.setPassword(name, password);
+  srv.hub.accounts.createUser(name, { role: name === "hoc" ? "admin" : "member", password });
+  srv.hub.live("mini-shop")!.engine.store.saveMember(name, { access });
 };
 await person("hoc", "hoc-demo-123", "manager");
 await person("minh", "minh-demo-123", "manager");

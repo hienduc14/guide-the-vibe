@@ -44,7 +44,6 @@ export class Hub {
     this.brain = brain;
     this.db = new Db(cfg.dataDir === ":memory:" ? ":memory:" : join(cfg.dataDir, "hub.db"), HUB_SCHEMA);
     this.db.ensureColumn("projects", "charter", "TEXT NOT NULL DEFAULT '{}'");
-    this.upgradeUsersTable();
     this.accounts = new Accounts(this.db);
   }
 
@@ -61,10 +60,9 @@ export class Hub {
     for (const r of this.records()) {
       await this.runtime(r.id).catch((e) => log("hub", `project ${r.id} failed to open: ${(e as Error).message}`));
     }
-    this.migrateAccounts();
     // Env tokens (GTV_TOKENS: scripts, sandboxes) are computers of accounts of that name.
     for (const [token, dev] of this.cfg.tokens) {
-      if (!this.accounts.user(dev)) this.accounts.createUser(dev, "member", "GTV_TOKENS");
+      if (!this.accounts.user(dev)) this.accounts.createUser(dev, { password: null });
       this.accounts.addDevice(dev, hashToken(token), "GTV_TOKENS", "unknown");
     }
   }
@@ -182,45 +180,12 @@ export class Hub {
     });
   }
 
-  // ---- one-off move to accounts ------------------------------------------------------------
+  // ---- accounts ------------------------------------------------------------------------
 
-  /** Old databases: users.pass_hash was NOT NULL and created_by did not exist. */
-  private upgradeUsersTable(): void {
-    const cols = this.db.all<{ name: string; notnull: number }>(`PRAGMA table_info(users)`);
-    if (!cols.find((c) => c.name === "pass_hash")?.notnull) return;
-    this.db.tx(() => {
-      this.db.raw.exec(`ALTER TABLE users RENAME TO users_old`);
-      this.db.raw.exec(HUB_SCHEMA.match(/CREATE TABLE IF NOT EXISTS users \([^;]*\);/)![0]);
-      this.db.raw.exec(`INSERT INTO users (name, role, pass_hash, created_at, last_login) SELECT name, role, pass_hash, created_at, last_login FROM users_old`);
-      this.db.raw.exec(`DROP TABLE users_old`);
-    });
-  }
-
-  /**
-   * Developers (token per dev) and dashboard users (admin/manager/viewer) become one account per person, once:
-   * each dev becomes an account with its token as a computer (running daemons keep working); old managers manage
-   * every project and old viewers view every project.
-   */
-  migrateAccounts(): void {
-    if (this.setting("accounts_migrated") === "1") return;
-    const projects = this.records().flatMap((r) => this.live(r.id) ?? []);
-    this.db.tx(() => {
-      for (const d of this.db.all<{ name: string; token_hash: string; created_at: string; last_seen: string | null }>(`SELECT * FROM devs`)) {
-        if (!this.accounts.user(d.name))
-          this.db.run(`INSERT INTO users (name, role, pass_hash, created_at, created_by) VALUES (?, 'member', NULL, ?, 'migration')`, d.name, d.created_at);
-        this.accounts.addDevice(d.name, d.token_hash, "máy cũ", "unknown", d.created_at, d.last_seen);
-      }
-      for (const u of this.db.all<{ name: string; role: string }>(`SELECT name, role FROM users WHERE role IN ('manager', 'viewer')`)) {
-        this.db.run(`UPDATE users SET role = 'member' WHERE name = ?`, u.name);
-        for (const rt of projects) {
-          const m = rt.engine.store.member(u.name);
-          if (u.role === "manager") rt.engine.store.saveMember(u.name, { access: "manager" });
-          else if (!m) rt.engine.store.saveMember(u.name, { access: "viewer" });
-        }
-      }
-      this.setSetting("accounts_migrated", "1");
-    });
-    log("hub", "accounts: developers and dashboard users moved to one account per person");
+  /** Deletes an account everywhere: sessions, computers and memberships go; project records keep the name. */
+  deleteAccount(name: string): void {
+    this.accounts.deleteUser(name);
+    for (const r of this.records()) if (this.live(r.id)?.engine.store.member(name)) this.live(r.id)!.engine.store.removeMember(name);
   }
 
   // ---- settings & brain stats ---------------------------------------------------------

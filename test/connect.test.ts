@@ -107,11 +107,9 @@ test("a person revokes one of their computers from the dashboard; others' comput
   assert.equal((await call("/v1/me", { token: key.token })).status, 401);
 });
 
-test("short codes and passwords cannot be guessed quickly", async () => {
+test("short codes cannot be guessed quickly", async () => {
   const headers = { "x-forwarded-for": "203.0.113.9" };
   const statuses = [];
-  for (let i = 0; i < 31; i++) statuses.push((await call("/api/login", { method: "POST", headers, body: { name: "hoc", password: "nope" } })).status);
-  assert.equal(statuses.at(-2), 400);
-  assert.equal(statuses.at(-1), 429);
-  assert.equal((await call("/api/login", { method: "POST", headers: { "x-forwarded-for": "203.0.113.10" }, body: { name: "x", password: "y" } })).status, 400);
+  for (let i = 0; i < 31; i++) statuses.push((await call("/api/connect/AAAA-BBBB", { token: hoc.session, headers })).status);
+  assert.deepEqual([statuses.at(-2), statuses.at(-1)], [404, 429]);
 });

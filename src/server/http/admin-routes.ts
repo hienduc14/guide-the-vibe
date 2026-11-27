@@ -1,13 +1,12 @@
-// Dashboard API (/api): accounts and computers, projects, members, statistics, layers and brain settings.
+// Dashboard API (/api): projects, members, statistics, layers and brain settings; accounts are in account-routes.ts.
 // Mutations on a project's tasks/conflicts/tickets/knowledge reuse the project API (/v1/p/:id) with the admin token.
 
 import { Hono } from "hono";
 import type { Hub } from "../hub/hub.ts";
 import type { ProjectRuntime } from "../project/runtime.ts";
 import type { AuthVars } from "./auth.ts";
-import { bearer, openMode, publicOrigin } from "./auth.ts";
-import type { Principal, Role } from "../hub/accounts.ts";
-import type { MemberAccess } from "../../shared/types.ts";
+import { openMode } from "./auth.ts";
+import { accountRoutes } from "./account-routes.ts";
 import { FEATURES, FEATURE_KEYS, isActive } from "../../shared/features.ts";
 import { BASE } from "../../codeintel/graph.ts";
 import type { Level } from "../../shared/types.ts";
@@ -194,130 +193,7 @@ export function adminRoutes(hub: Hub): Hono<Env> {
   const app = new Hono<Env>();
   const rt = (id: string) => hub.runtime(id);
 
-  // ---- accounts ----------------------------------------------------------------------
-
-  const session = (r: { token: string; expires_at: string; user: { name: string; role: Role } }) => ({
-    token: r.token,
-    expires_at: r.expires_at,
-    name: r.user.name,
-    role: r.user.role,
-  });
-  app.post("/login", async (c) => {
-    const { name, password } = (await c.req.json()) as { name?: string; password?: string };
-    return c.json(session(hub.accounts.login(String(name ?? ""), String(password ?? ""))));
-  });
-  app.post("/logout", (c) => {
-    const t = bearer(c);
-    if (t) hub.accounts.logout(t);
-    return c.json({ ok: true });
-  });
-  app.get("/me", (c) => {
-    const p = c.get("principal")!;
-    return c.json({
-      name: p.name,
-      role: p.role,
-      kind: p.kind,
-      project: p.project ?? null,
-      open_mode: openMode(hub),
-      has_users: hub.accounts.hasUsers(),
-      projects: hub.myProjects(p).map(({ record, access }) => ({ id: record.id, name: record.name, access })),
-    });
-  });
-
-  // Activation links: the code is the credential (one use, 48 hours).
-  app.get("/activate/:code", (c) => c.json(hub.accounts.activationInfo(c.req.param("code"))));
-  app.post("/activate/:code", async (c) => {
-    const { password } = (await c.req.json().catch(() => ({}))) as { password?: string };
-    return c.json(session(hub.accounts.activate(c.req.param("code"), String(password ?? ""))));
-  });
-
-  const myName = (c: { get: (k: "principal") => Principal | undefined }) => {
-    const p = c.get("principal")!;
-    if (p.kind !== "user") throw new Error("log in with your own account for this");
-    return p.name;
-  };
-  app.get("/me/devices", (c) => c.json(c.get("principal")!.kind === "user" ? hub.accounts.devices(c.get("principal")!.name) : []));
-  app.delete("/me/devices/:id", (c) => {
-    if (!hub.accounts.removeDevice(c.req.param("id"), myName(c))) throw new Error("unknown computer");
-    return c.json({ ok: true });
-  });
-  app.put("/me/password", async (c) => {
-    const { current, password } = (await c.req.json()) as { current?: string; password?: string };
-    hub.accounts.changePassword(myName(c), String(current ?? ""), String(password ?? ""));
-    return c.json(session(hub.accounts.login(myName(c), String(password))));
-  });
-
-  // Approving a computer that ran `gtv login`: it joins the account of whoever is logged in here.
-  app.get("/connect/:code", (c) => {
-    const r = hub.accounts.connectRequest(c.req.param("code"));
-    return r ? c.json(r) : c.json({ error: "unknown or expired code: run gtv login again" }, 404);
-  });
-  app.post("/connect/:code/:action{approve|deny}", (c) => {
-    hub.accounts.decideConnect(c.req.param("code"), myName(c), c.req.param("action") === "approve");
-    return c.json({ ok: true });
-  });
-
-  /** Account names, for choosing project members. */
-  app.get("/people", (c) => c.json(hub.accounts.users().map((u) => ({ name: u.name }))));
-
-  const activationUrl = (c: Parameters<typeof publicOrigin>[0], name: string) => {
-    const a = hub.accounts.createActivation(name);
-    return { activation_url: `${publicOrigin(c)}/activate/${a.code}`, expires_at: a.expires_at };
-  };
-  app.get("/users", (c) => {
-    const devices = hub.accounts.devices();
-    return c.json(
-      hub.accounts.users().map((u) => {
-        const mine = devices.filter((d) => d.user === u.name);
-        return {
-          ...u,
-          devices: mine.length,
-          last_seen:
-            mine
-              .map((d) => d.last_seen ?? "")
-              .sort()
-              .pop() || null,
-          projects: hub.myProjects({ kind: "user", name: u.name, role: "member" }).map(({ record, access }) => ({ id: record.id, name: record.name, access })),
-        };
-      }),
-    );
-  });
-  app.post("/users", async (c) => {
-    const body = (await c.req.json()) as { name?: string; role?: Role; projects?: { id: string; access: MemberAccess }[] };
-    const name = String(body.name ?? "").trim();
-    // Without GTV_ADMIN_TOKEN the first account is what locks the dashboard: it must be able to administer it.
-    const role = !hub.cfg.adminToken && !hub.accounts.hasUsers() ? "admin" : (body.role ?? "member");
-    for (const p of body.projects ?? []) if (!hub.live(p.id)) throw new Error(`unknown project ${p.id}`);
-    const user = hub.accounts.createUser(name, role, c.get("dev"));
-    for (const p of body.projects ?? []) {
-      const m = hub.live(p.id)!.engine.store.saveMember(name, { access: p.access ?? "developer" });
-      hub.live(p.id)!.engine.store.logEvent("member_set", c.get("dev"), m);
-    }
-    return c.json({ user, ...activationUrl(c, name) });
-  });
-  app.patch("/users/:name", async (c) => {
-    const { role } = (await c.req.json()) as { role?: Role };
-    const me = c.get("principal")!;
-    if (me.kind === "user" && me.name === c.req.param("name") && role !== "admin") throw new Error("you cannot lower your own role");
-    return c.json(hub.accounts.setRole(c.req.param("name"), role ?? "member"));
-  });
-  app.delete("/users/:name", (c) => {
-    const name = c.req.param("name");
-    const me = c.get("principal")!;
-    if (me.kind === "user" && me.name === name) throw new Error("you cannot delete your own account");
-    if (!hub.accounts.user(name)) throw new Error(`unknown account ${name}`);
-    hub.accounts.removeUser(name);
-    // A new account with the same name must not inherit project access.
-    for (const r of hub.records()) if (hub.live(r.id)?.engine.store.member(name)) hub.live(r.id)!.engine.store.removeMember(name);
-    return c.json({ ok: true });
-  });
-  /** A new activation link (or a password reset for an activated account); the previous link stops working. */
-  app.post("/users/:name/activation", (c) => c.json(activationUrl(c, c.req.param("name"))));
-  app.get("/users/:name/devices", (c) => c.json(hub.accounts.devices(c.req.param("name"))));
-  app.delete("/users/:name/devices/:id", (c) => {
-    if (!hub.accounts.removeDevice(c.req.param("id"), c.req.param("name"))) throw new Error("unknown computer");
-    return c.json({ ok: true });
-  });
+  app.route("/", accountRoutes(hub));
 
   app.get("/overview", async (c) => {
     const me = c.get("principal");

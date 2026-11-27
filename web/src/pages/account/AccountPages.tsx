@@ -18,10 +18,6 @@ import { CopyLine } from "../project/SettingsSections";
 import { ConnectGuideModal } from "../home/Popups";
 import { InviteCard, InviteDead } from "../auth/GatePages";
 
-const ACCOUNT_TABS: [string, string, typeof User][] = [
-  ["/account", "Hồ sơ và bảo mật", User],
-  ["/account/devices", "Máy của tôi", Laptop],
-];
 const date = (iso: string) => new Date(iso).toLocaleDateString("vi-VN");
 
 // ---- /account ----------------------------------------------------------------------------------
@@ -51,7 +47,7 @@ export function AccountPage() {
   const blocked = soleProjects ?? [];
   return (
     <div className="pj">
-      <SimpleTop title="Tài khoản của tôi" icon={User} tabs={ACCOUNT_TABS} />
+      <SimpleTop title="Tài khoản của tôi" icon={User} />
       <main className="screen">
         <div className="page narrow stack">
           <form
@@ -366,7 +362,7 @@ export function DevicesPage() {
   const [guide, setGuide] = useState(false);
   return (
     <div className="pj">
-      <SimpleTop title="Tài khoản của tôi" icon={User} tabs={ACCOUNT_TABS} />
+      <SimpleTop title="Máy của tôi" icon={Laptop} />
       <main className="screen">
         <div className="page stack">
           <div className="head" style={{ margin: 0 }}>
@@ -389,9 +385,6 @@ export function DevicesPage() {
           {data?.map((d) => (
             <DeviceCard key={d.id} d={d} reload={() => void reload()} />
           ))}
-          <p className="muted" style={{ fontSize: 13 }}>
-            Thành viên trong project chỉ thấy tên máy của bạn, không thấy đường dẫn trên máy.
-          </p>
         </div>
       </main>
       {guide && <ConnectGuideModal onClose={() => setGuide(false)} />}

@@ -44,6 +44,12 @@ function Sidebar({ open, wide, onToggle, onMenu }: { open: boolean; wide: boolea
           <LayoutGrid className="nav-icon" />
           <span className="nav-label">Project của tôi</span>
         </NavLink>
+        {me?.kind === "user" && !shared && (
+          <NavLink to="/account/devices" className={link} title="Máy của tôi">
+            <Laptop className="nav-icon" />
+            <span className="nav-label">Máy của tôi</span>
+          </NavLink>
+        )}
       </nav>
 
       <nav className="nav projects">

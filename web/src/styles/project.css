@@ -3214,3 +3214,14 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 }
+
+/* the agent popup's title: avatar, name, state */
+.pj .who-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.pj .who-title .muted {
+  font-size: 13px;
+  font-weight: 400;
+}

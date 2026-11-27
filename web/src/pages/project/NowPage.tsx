@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Folder, Send, Sparkles, X } from "lucide-react";
+import { Folder, Send, Sparkles } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { Incident, TeamState } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
@@ -12,6 +12,7 @@ import { useColorOf } from "../../hooks/usePeople";
 import { useProject } from "./ProjectLayout";
 import { Av, Avs, Seg, State, base, dirOf } from "../../components/pj";
 import { Loading } from "../../components/Empty";
+import { Modal } from "../../components/ui";
 import { fileIncident, incidentTitle, isHot } from "../../lib/incident";
 import { NOTE_TAG } from "../../components/Message";
 import { ago, clock } from "../../lib/format";
@@ -216,7 +217,8 @@ function Digest() {
   );
 }
 
-function SideWho({ a, onClose }: { a: AgentCard; onClose: () => void }) {
+/** One agent's details, in a popup over the map (the map keeps its size). */
+function AgentModal({ a, onClose }: { a: AgentCard; onClose: () => void }) {
   const { id } = useProject();
   const { manage } = useProject();
   const run = useAction();
@@ -226,19 +228,18 @@ function SideWho({ a, onClose }: { a: AgentCard; onClose: () => void }) {
   const notes = board.data?.notes.filter((n) => n.kind === "note" && n.author === a.dev).slice(-2) ?? [];
   const t = a.task;
   return (
-    <div className="panel">
-      <div className="dhead">
-        <Av who={a.dev} agent={a.agent} size="lg" />
-        <div>
-          <h2>{a.dev}</h2>
-          <div className="muted">
+    <Modal
+      title={
+        <span className="who-title">
+          <Av who={a.dev} agent={a.agent} />
+          {a.dev}
+          <span className="muted">
             <State status={a.status} />
-          </div>
-        </div>
-        <button type="button" className="iconbtn x" onClick={onClose} aria-label="Đóng">
-          <X />
-        </button>
-      </div>
+          </span>
+        </span>
+      }
+      onClose={onClose}
+    >
       <dl className="p-kv">
         <dt>Việc</dt>
         <dd>{boardId ? <Link to={`/p/${id}/work?task=${boardId}`}>{t?.title}</Link> : (t?.title ?? <span className="faint">Chưa nói đang làm gì</span>)}</dd>
@@ -316,7 +317,7 @@ function SideWho({ a, onClose }: { a: AgentCard; onClose: () => void }) {
           </div>
         </form>
       )}
-    </div>
+    </Modal>
   );
 }
 
@@ -399,7 +400,7 @@ export function NowPage() {
           />
         </div>
       </div>
-      <div className={`now${selected ? "" : " solo"}`}>
+      <div className="now solo">
         <section className="panel">
           {agents.length === 0 && files.length === 0 ? (
             <div className="p-empty">
@@ -430,7 +431,8 @@ export function NowPage() {
                         className={`agent${sel === a.ws ? " sel" : ""}${on && lit ? " lit" : ""}`}
                         style={{ ["--p" as string]: colorOf(a.dev) }}
                         onMouseEnter={() => setHover({ kind: "who", id: a.ws })}
-                        onFocus={() => setHover({ kind: "who", id: a.ws })}
+                        onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ kind: "who", id: a.ws })}
+                        onMouseLeave={() => setHover(null)}
                         onBlur={() => setHover(null)}
                         onClick={() => setSel(sel === a.ws ? null : a.ws)}
                       >
@@ -490,7 +492,8 @@ export function NowPage() {
                             data-file={f.path}
                             className={`file${f.inc ? (isHot(f.inc.level) ? " clash" : " watch") : ""}${on && lit ? " lit" : ""}`}
                             onMouseEnter={() => setHover({ kind: "file", id: f.path })}
-                            onFocus={() => setHover({ kind: "file", id: f.path })}
+                            onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ kind: "file", id: f.path })}
+                            onMouseLeave={() => setHover(null)}
                             onBlur={() => setHover(null)}
                             onClick={() => openFile(f.path)}
                             title={f.path}
@@ -542,11 +545,7 @@ export function NowPage() {
             </span>
           </div>
         </section>
-        {selected && (
-          <aside className="side">
-            <SideWho a={selected} onClose={() => setSel(null)} />
-          </aside>
-        )}
+        {selected && <AgentModal a={selected} onClose={() => setSel(null)} />}
       </div>
       <Digest />
     </>

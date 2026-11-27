@@ -111,7 +111,7 @@ admin thấy; thành viên project chỉ thấy tên máy (`/api/projects/:id/me
 | GET    | `/api/projects/:id/invites`         | `manager`                 | link đang dùng được: `[{ id, project, access, created_by, created_at, expires_at, max_uses, uses, revoked_at }]` (không có URL: chỉ lưu bản băm)             |
 | POST   | `/api/projects/:id/invites`         | `manager`                 | `{ access?: developer\|viewer, days?: 1\|7\|30 (7), max_uses?: 1\|10\|null (null) }` → invite `+ { code, url: <origin>/join/<code> }` (URL chỉ hiện lần này) |
 | DELETE | `/api/projects/:id/invites/:invite` | `manager`                 | thu hồi                                                                                                                                                      |
-| GET    | `/api/invites/:code`                | công khai                 | `{ valid: true, project_name, access, invited_by, invited_by_name, member }` (+ `project_id` khi đã là thành viên) \| `{ valid: false }`                     |
+| GET    | `/api/invites/:code`                | công khai                 | `{ valid: true, project_name, access, invited_by, invited_by_name, expires_at, member }` (+ `project_id` khi đã là thành viên) \| `{ valid: false }`         |
 | POST   | `/api/invites/:code/accept`         | đã đăng nhập              | `{ project: { id, name }, access, already_member }`; đã là thành viên thì giữ quyền cũ, không tốn lượt; link hết hiệu lực → 400                              |
 
 Địa chỉ repo người thường được dùng: `https://…` hoặc `git@host:owner/repo`; không `file://`, `ext::`, `ssh://`,

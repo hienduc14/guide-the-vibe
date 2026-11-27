@@ -97,6 +97,7 @@ function ThemeButton() {
 
 export function ProjectLayout() {
   const { id = "" } = useParams();
+  const { shared } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { data, error, reload } = usePoll(() => api.projects.detail(id), [id], 5000);
@@ -165,7 +166,7 @@ export function ProjectLayout() {
               {tab(`/p/${id}/talk`, "Trao đổi", MessagesSquare)}
               {tab(`/p/${id}/knowledge`, "Tri thức", BookOpen)}
               <span className="gap" />
-              {data.my_access === "manager" && tab(`/p/${id}/settings`, "Thiết lập", SlidersHorizontal)}
+              {!shared && tab(`/p/${id}/settings`, "Thiết lập", SlidersHorizontal)}
             </nav>
           </header>
           <main className="screen">

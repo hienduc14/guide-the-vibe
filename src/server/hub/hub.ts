@@ -213,7 +213,9 @@ export class Hub {
   /** What an invite link shows anyone: the project's name, the access it gives and who made it, nothing else. */
   inviteInfo(
     code: string,
-  ): { valid: false } | { valid: true; project_id: string; project_name: string; access: string; invited_by: string; invited_by_name: string } {
+  ):
+    | { valid: false }
+    | { valid: true; project_id: string; project_name: string; access: string; invited_by: string; invited_by_name: string; expires_at: string } {
     const inv = this.members.invite(code);
     const rec = inv && this.record(inv.project);
     if (!inv || !rec || rec.archived) return { valid: false };
@@ -225,6 +227,7 @@ export class Hub {
       access: inv.access,
       invited_by: inv.created_by,
       invited_by_name: by?.display_name ?? inv.created_by,
+      expires_at: inv.expires_at,
     };
   }
 

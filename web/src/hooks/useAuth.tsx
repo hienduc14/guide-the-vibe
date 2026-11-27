@@ -1,34 +1,27 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { getShareToken, getToken, setShareToken, setToken, UNAUTHORIZED_EVENT } from "../api/client";
+import { getShareToken, setShareToken, UNAUTHORIZED_EVENT } from "../api/client";
 import { api } from "../api/endpoints";
-import type { Me, Role } from "../api/types";
+import type { AuthConfig, Me, Role } from "../api/types";
 
 const RANK: Record<Role, number> = { member: 0, admin: 1 };
 
 interface AuthState {
-  token: string | null;
-  needsLogin: boolean;
-  /** Who is logged in; undefined while loading. */
-  me: Me | undefined;
+  /** Server state for the gate pages; undefined while loading. */
+  config: AuthConfig | undefined;
+  /** Who is logged in: undefined while loading, null when nobody is (the session cookie is missing or ended). */
+  me: Me | null | undefined;
   /** True when the caller's system role is at least `role` (project access: useProject().access). */
   can: (role: Role) => boolean;
   shared: boolean;
-  login: (token: string) => void;
-  logout: () => void;
+  /** Ask the server again who is logged in (after logging in, joining a project, renaming…). */
+  refresh: () => Promise<Me | null>;
+  logout: () => Promise<void>;
   leaveShare: () => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 const ROLE_KEY = "gtv.lastRole";
-function readRole(): Role | null {
-  try {
-    const r = localStorage.getItem(ROLE_KEY);
-    return r && r in RANK ? (r as Role) : null;
-  } catch {
-    return null;
-  }
-}
 function writeRole(role: Role | null) {
   try {
     if (role) localStorage.setItem(ROLE_KEY, role);
@@ -39,52 +32,44 @@ function writeRole(role: Role | null) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTok] = useState<string | null>(getShareToken() ?? getToken());
-  const [needsLogin, setNeedsLogin] = useState(false);
-  const [me, setMe] = useState<Me>();
+  const [config, setConfig] = useState<AuthConfig>();
+  const [me, setMe] = useState<Me | null>();
+
+  const refresh = useCallback(async () => {
+    const next = await api.auth.me().catch(() => null);
+    setMe(next);
+    return next;
+  }, []);
 
   useEffect(() => {
-    const onUnauthorized = () => setNeedsLogin(true);
+    api.auth
+      .config()
+      .then(setConfig)
+      .catch(() => setConfig({ setup_needed: false, registration: "open", needs_admin_token: false }));
+    void refresh();
+    const onUnauthorized = () => {
+      if (!getShareToken()) setMe(null);
+    };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, []);
+  }, [refresh]);
 
+  // Role-dependent CSS: .admin-only controls disappear for members (the server still refuses what a role may not do).
   useEffect(() => {
-    if (needsLogin) return;
-    api.auth
-      .me()
-      .then(setMe)
-      .catch(() => undefined);
-  }, [token, needsLogin]);
-
-  // Role-dependent CSS: .admin-only controls disappear for members.
-  // Until /me answers, keep the role from the last visit so the sidebar does not flash
-  // admin items away and back on every reload; the server still refuses what a role may not do.
-  useEffect(() => {
-    if (!me) {
-      if (!document.body.dataset.role) document.body.dataset.role = readRole() ?? "member";
+    if (me === undefined) {
+      if (!document.body.dataset.role) document.body.dataset.role = localStorage.getItem(ROLE_KEY) ?? "member";
       return;
     }
-    document.body.dataset.role = me.role;
-    writeRole(me.role);
+    document.body.dataset.role = me?.role ?? "member";
+    writeRole(me?.role ?? null);
   }, [me]);
 
-  const login = useCallback((t: string) => {
-    setShareToken(null); // a share link's token would otherwise keep winning over the new login
-    setToken(t);
-    setTok(t);
-    setNeedsLogin(false);
-  }, []);
-
-  const logout = useCallback(() => {
-    void api.auth.logout().catch(() => undefined);
+  const logout = useCallback(async () => {
+    await api.auth.logout().catch(() => undefined);
     setShareToken(null);
-    setToken(null);
-    setTok(null);
-    setMe(undefined);
     writeRole(null);
-    document.body.dataset.role = "member";
-    setNeedsLogin(true);
+    setMe(null);
+    window.location.href = "/login";
   }, []);
 
   const leaveShare = useCallback(() => {
@@ -94,9 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = useCallback((role: Role) => !!me && RANK[me.role] >= RANK[role], [me]);
 
-  return (
-    <AuthContext.Provider value={{ token, needsLogin, me, can, shared: me?.kind === "share", login, logout, leaveShare }}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ config, me, can, shared: me?.kind === "share", refresh, logout, leaveShare }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {
@@ -104,3 +87,6 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error("useAuth outside AuthProvider");
   return ctx;
 }
+
+/** The display name to greet someone with: their own, else the user name. */
+export const displayName = (me: Me | null | undefined) => me?.display_name || me?.name || "";

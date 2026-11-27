@@ -1,7 +1,7 @@
 // Thiết lập (managers only): members, how much gtv steps in, repository, share links, and the raw system log.
 
 import { useState } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { Navigate, NavLink, useParams } from "react-router-dom";
 import { Check, GitBranch, Link2, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { FeatureMode, Layer } from "../../api/types";
@@ -150,21 +150,26 @@ function Log() {
 }
 
 export function SettingsPage() {
-  const { id } = useProject();
+  const { id, manage } = useProject();
   const { section = "members" } = useParams();
-  const nav: [string, string, JSX.Element][] = [
+  const all: [string, string, JSX.Element][] = [
     ["members", "Thành viên", <Users key="u" />],
     ["watch", "Mức giám sát", <ShieldCheck key="s" />],
     ["repo", "Repo và đồng bộ", <GitBranch key="g" />],
     ["share", "Link chia sẻ", <Link2 key="l" />],
     ["log", "Nhật ký hệ thống", <ScrollText key="n" />],
   ];
+  // Everyone sees the members (and can leave); the rest is for managers.
+  const nav = manage ? all : all.slice(0, 1);
+  if (!manage && section !== "members") return <Navigate to={`/p/${id}/settings/members`} replace />;
   return (
     <>
       <div className="head">
         <div>
           <h1>Thiết lập</h1>
-          <p className="lead">Chỉ quản lý của project mới sửa được phần này.</p>
+          <p className="lead">
+            {manage ? "Chỉ quản lý của project mới sửa được phần này." : "Bạn xem được thành viên và rời project ở đây; phần còn lại do quản lý project sửa."}
+          </p>
         </div>
       </div>
       <div className="know">

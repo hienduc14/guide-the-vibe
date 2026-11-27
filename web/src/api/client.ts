@@ -1,8 +1,7 @@
-// Thin fetch wrapper. Every request carries the dashboard token (admin token or a user session); a 401 tells the
-// app to show the login screen. A share link's token lives in sessionStorage and wins while it is set, so opening
-// a link does not log the admin out in other tabs.
+// Thin fetch wrapper. A logged-in person's session is an httpOnly cookie the browser sends by itself (the page never
+// sees it); a 401 tells the app to show the login screen. A share link's token lives in sessionStorage and is sent as
+// a Bearer while it is set, so opening a link does not log anyone out in other tabs.
 
-const TOKEN_KEY = "gtv.adminToken";
 const SHARE_KEY = "gtv.shareToken";
 
 export function getShareToken(): string | null {
@@ -33,26 +32,6 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setToken(token: string | null): void {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // storage unavailable (private mode): token lives only for this page
-  }
-  memoryToken = token;
-}
-
-let memoryToken: string | null = getToken();
-
 export const UNAUTHORIZED_EVENT = "gtv:unauthorized";
 
 export interface RequestOptions {
@@ -64,8 +43,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
   const headers: Record<string, string> = {};
   if (opts.as) headers["x-gtv-dev"] = opts.as;
   if (body !== undefined) headers["content-type"] = "application/json";
-  const token = shareToken ?? memoryToken ?? getToken();
-  if (token) headers.authorization = `Bearer ${token}`;
+  if (shareToken) headers.authorization = `Bearer ${shareToken}`;
   const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   let json: unknown;

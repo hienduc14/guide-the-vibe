@@ -51,8 +51,9 @@ test("only managers make links, never for manager access", async () => {
 
 test("anyone sees the card; joining makes a member; members keep their access", async () => {
   const { code } = await invite();
-  const card = (await call(`/api/invites/${code}`)).json;
+  const { expires_at, ...card } = (await call(`/api/invites/${code}`)).json;
   assert.deepEqual(card, { valid: true, project_name: "SHOP", access: "developer", invited_by: "hoc", invited_by_name: "HOC", member: false });
+  assert.ok(Date.parse(expires_at) > Date.now(), "the card says when the link expires");
   assert.equal((await call(`/api/invites/${code}/accept`, { method: "POST" })).status, 401, "log in or sign up first");
   const joined = await call(`/api/invites/${code}/accept`, { method: "POST", cookie: C.bob });
   assert.deepEqual(joined.json, { project: { id: "shop", name: "SHOP" }, access: "developer", already_member: false });

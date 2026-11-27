@@ -1,18 +1,19 @@
 // The sections of Thiết lập: members, repository, share links and the system log.
 
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Copy, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AlertTriangle, Check, Copy, Link2, Pencil, RefreshCw, Trash2, User as UserIcon, X } from "lucide-react";
 import { api } from "../../api/endpoints";
-import type { ActivityEvent, Level, Member, MemberLevel, ProjectAccess } from "../../api/types";
+import type { ActivityEvent, Invite, Level, Member, MemberLevel, ProjectAccess } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
 import { useAction, useToast } from "../../hooks/useToast";
 import { useAuth } from "../../hooks/useAuth";
 import { useOverview } from "../../hooks/useOverview";
 import { useProject } from "./ProjectLayout";
-import { Av, Blank, Seg, State } from "../../components/pj";
+import { Av, Blank, Seg } from "../../components/pj";
 import { Loading } from "../../components/Empty";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { AccessChip, Modal } from "../../components/ui";
 import { LEVELS, LEVEL_LABEL, ROLE_SUGGESTIONS } from "../../components/Member";
 import { agentName } from "../../components/Badge";
 import { ago, clock, parseJson } from "../../lib/format";
@@ -74,7 +75,7 @@ function MemberEdit({ m, onDone }: { m: Member; onDone: () => void }) {
         </select>
       </label>
       <label className="wide">
-        Ghi chú
+        Ghi chú cho AI
         <input className="p-input" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="phụ trách thanh toán" />
       </label>
       <div className="acts wide" style={{ marginTop: 0 }}>
@@ -84,163 +85,450 @@ function MemberEdit({ m, onDone }: { m: Member; onDone: () => void }) {
         <button type="button" className="p-btn quiet sm" onClick={onDone}>
           Huỷ
         </button>
-        <span style={{ flex: 1 }} />
-        <ConfirmButton
-          className={DANGER}
-          onConfirm={async () => {
-            if (await run(() => api.members.remove(id, m.dev), "Đã bỏ khỏi project")) onDone();
-          }}
-        >
-          <Trash2 size={14} /> Bỏ khỏi project
-        </ConfirmButton>
       </div>
-    </form>
-  );
-}
-
-export function MembersSection() {
-  const { id, detail, reload } = useProject();
-  const { can } = useAuth();
-  const run = useAction();
-  const [editing, setEditing] = useState<string>();
-  const [add, setAdd] = useState({ dev: "", role: "", level: "mid" as MemberLevel, access: "developer" as ProjectAccess });
-  const { data: accounts } = usePoll(api.people, [], 60_000);
-  const people = new Map(detail.people.map((p) => [p.dev, p]));
-  const members = [...detail.members].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || a.dev.localeCompare(b.dev));
-  const candidates = (accounts ?? []).map((u) => u.name).filter((n) => !detail.members.some((m) => m.dev === n));
-  return (
-    <>
-      <h2>Thành viên</h2>
-      <p className="lede">
-        Quyền quyết định ai làm gì: Quản lý làm được mọi thứ, Developer cho agent của mình làm việc ở đây, Người xem chỉ xem. Vai trò và trình độ giúp AI chọn
-        cách trả lời và người để hỏi.
-      </p>
       <datalist id="gtv-roles">
         {ROLE_SUGGESTIONS.map((r) => (
           <option key={r} value={r} />
         ))}
       </datalist>
-      <div className="p-members">
-        {members.length === 0 && <Blank title="Chưa có thành viên">Thêm người đã có tài khoản ở dưới.</Blank>}
+    </form>
+  );
+}
+
+const INVITE_HINT: Record<"developer" | "viewer", string> = {
+  developer: "Agent trên máy người đó làm việc trong project. Trả lời câu hỏi, tạo và sửa việc của mình, sửa tài liệu.",
+  viewer: "Chỉ xem: hợp với giảng viên, người theo dõi. Agent của họ không làm việc trong project.",
+};
+const day = (iso: string) => new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+
+/** Mời bằng link: pick access, lifetime and uses; the link and a message to send appear once, right after. */
+function InviteModal({ onClose, onMade }: { onClose: () => void; onMade: () => void }) {
+  const { id, detail } = useProject();
+  const run = useAction();
+  const toast = useToast();
+  const [o, setO] = useState<{ access: "developer" | "viewer"; days: string; max: string }>({ access: "developer", days: "7", max: "null" });
+  const [made, setMade] = useState<Invite & { url: string }>();
+  const message = made
+    ? `Mời bạn vào project ${detail.name} trên gtv (quyền ${ACCESS_LABEL[made.access]}). Mở link, đăng nhập hoặc tạo tài khoản rồi bấm Tham gia: ${made.url} (hết hạn ${day(made.expires_at)}).`
+    : "";
+  if (made)
+    return (
+      <Modal
+        title="Đã tạo link mời"
+        sub={`${ACCESS_LABEL[made.access]} · hết hạn ${day(made.expires_at)}${made.max_uses ? ` · ${made.max_uses} người` : ""}. Ai có link đều vào được, nên chỉ gửi cho người trong nhóm. Link chỉ hiện lần này.`}
+        onClose={onClose}
+        foot={
+          <>
+            <button type="button" className="p-btn quiet" onClick={onClose}>
+              Xong
+            </button>
+            <button
+              type="button"
+              className="p-btn primary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(message);
+                  toast("Đã chép tin nhắn");
+                } catch {
+                  toast("Trình duyệt chặn chép: bôi đen rồi chép tay", true);
+                }
+              }}
+            >
+              <Copy size={15} />
+              Chép tin nhắn
+            </button>
+          </>
+        }
+      >
+        <div className="stack">
+          <CopyLine text={made.url} />
+          <label className="field">
+            <span>Tin nhắn gửi kèm</span>
+            <textarea className="p-textarea" readOnly value={message} />
+          </label>
+        </div>
+      </Modal>
+    );
+  return (
+    <Modal
+      title="Mời bằng link"
+      sub="Người nhận bấm link, đăng nhập hoặc tạo tài khoản, rồi bấm Tham gia."
+      onClose={onClose}
+      foot={
+        <>
+          <button type="button" className="p-btn quiet" onClick={onClose}>
+            Huỷ
+          </button>
+          <button
+            type="button"
+            className="p-btn primary"
+            onClick={async () => {
+              const r = await run(() => api.invites.create(id, { access: o.access, days: Number(o.days), max_uses: o.max === "null" ? null : Number(o.max) }));
+              if (r) {
+                setMade(r);
+                onMade();
+              }
+            }}
+          >
+            Tạo link mời
+          </button>
+        </>
+      }
+    >
+      <div className="stack">
+        <div className="iopt">
+          <span>Quyền</span>
+          <Seg
+            label="Quyền"
+            value={o.access}
+            onChange={(access) => setO({ ...o, access })}
+            options={[
+              ["developer", "Developer"],
+              ["viewer", "Người xem"],
+            ]}
+          />
+          <small>{INVITE_HINT[o.access]} Muốn ai làm Quản lý thì nâng sau khi họ vào.</small>
+        </div>
+        <div className="iopt">
+          <span>Hết hạn sau</span>
+          <Seg
+            label="Hết hạn sau"
+            value={o.days}
+            onChange={(days) => setO({ ...o, days })}
+            options={[
+              ["1", "1 ngày"],
+              ["7", "7 ngày"],
+              ["30", "30 ngày"],
+            ]}
+          />
+        </div>
+        <div className="iopt">
+          <span>Số người dùng được</span>
+          <Seg
+            label="Số người dùng được"
+            value={o.max}
+            onChange={(max) => setO({ ...o, max })}
+            options={[
+              ["1", "1 người"],
+              ["10", "10 người"],
+              ["null", "Không giới hạn"],
+            ]}
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Thêm theo tên: someone who already has an account joins at once. */
+function AddNameModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const { id } = useProject();
+  const run = useAction();
+  const [user, setUser] = useState("");
+  const [access, setAccess] = useState<ProjectAccess>("developer");
+  return (
+    <Modal
+      title="Thêm người đã có tài khoản"
+      sub="Người đó vào project ngay, không cần bấm gì, và thấy project trong trang Project của tôi."
+      onClose={onClose}
+      foot={
+        <>
+          <button type="button" className="p-btn quiet" onClick={onClose}>
+            Huỷ
+          </button>
+          <button type="submit" form="add-form" className="p-btn primary" disabled={!user.trim()}>
+            Thêm vào project
+          </button>
+        </>
+      }
+    >
+      <form
+        id="add-form"
+        className="formgrid"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await run(() => api.members.add(id, user.trim().toLowerCase(), access), `Đã thêm ${user.trim()}`)) {
+            onAdded();
+            onClose();
+          }
+        }}
+      >
+        <label>
+          Tên đăng nhập
+          <input
+            className="p-input mono"
+            value={user}
+            onChange={(e) => setUser(e.target.value)}
+            placeholder="ví dụ hien"
+            spellCheck={false}
+            autoCapitalize="off"
+            required
+            autoFocus
+          />
+        </label>
+        <label>
+          Quyền
+          <select className="p-input" value={access} onChange={(e) => setAccess(e.target.value as ProjectAccess)}>
+            <option value="developer">Developer</option>
+            <option value="viewer">Người xem</option>
+            <option value="manager">Quản lý</option>
+          </select>
+        </label>
+      </form>
+    </Modal>
+  );
+}
+
+export function MembersSection() {
+  const { id, detail, manage, reload: reloadProject } = useProject();
+  const { me, refresh } = useAuth();
+  const { reload: reloadOverview } = useOverview();
+  const navigate = useNavigate();
+  const run = useAction();
+  const [params, setParams] = useSearchParams();
+  const [editing, setEditing] = useState<string>();
+  const [removing, setRemoving] = useState<string>();
+  const [leaving, setLeaving] = useState(false);
+  const [modal, setModal] = useState<"invite" | "add">();
+  const { data: members, reload } = usePoll(() => api.members.list(id), [id], 15_000);
+  const { data: invites, reload: reloadInvites } = usePoll(() => (manage ? api.invites.list(id) : Promise.resolve([])), [id, manage], 30_000);
+  if (!members) return <Loading />;
+  const working = new Set(detail.people.filter((p) => p.working).map((p) => p.dev));
+  const managers = members.filter((m) => m.access === "manager");
+  const iAmLastManager = managers.length === 1 && managers[0].dev === me?.name;
+  const created = params.get("created") === "1";
+  const after = () => {
+    void reload();
+    void reloadProject();
+  };
+  return (
+    <>
+      {created && (
+        <div className="banner">
+          <span className="big-ok">
+            <Check />
+          </span>
+          <div className="grow">
+            <b>Đã tạo {detail.name}. Bạn là Quản lý.</b>
+            <small>
+              Bước tiếp: mời nhóm bằng link, rồi mỗi người chạy <span className="mono">gtv on</span> trong bản clone của repo.
+            </small>
+          </div>
+          <button type="button" className="p-btn primary" onClick={() => setModal("invite")}>
+            <Link2 size={15} />
+            Mời bằng link
+          </button>
+          <button type="button" className="iconbtn" aria-label="Ẩn" onClick={() => setParams({}, { replace: true })}>
+            <X />
+          </button>
+        </div>
+      )}
+      <div className="hrow" style={{ alignItems: "flex-start" }}>
+        <div className="grow">
+          <h2>
+            Thành viên{" "}
+            <span className="faint" style={{ fontWeight: 500 }}>
+              {members.length}
+            </span>
+          </h2>
+          <p className="lede">Quyền quyết định ai làm gì trong project. Vai trò công việc và trình độ giúp AI chọn người để hỏi.</p>
+        </div>
+        {manage && (
+          <div className="hrow">
+            <button type="button" className="p-btn" onClick={() => setModal("add")}>
+              <UserIcon size={15} />
+              Thêm theo tên
+            </button>
+            <button type="button" className="p-btn primary" onClick={() => setModal("invite")}>
+              <Link2 size={15} />
+              Mời bằng link
+            </button>
+          </div>
+        )}
+      </div>
+      <div>
         {members.map((m) => {
-          const p = people.get(m.dev);
-          const agent = p?.agents[0];
+          const lastMgr = m.access === "manager" && managers.length === 1;
+          const mine = m.dev === me?.name;
+          const seen = m.devices
+            .map((d) => d.last_seen ?? "")
+            .sort()
+            .pop();
           return (
-            <div key={m.dev} className="p-member">
-              <Av who={m.dev} agent={agent} />
+            <div key={m.dev} className="mrow">
+              <Av who={m.dev} />
               <div>
-                <b>{m.dev}</b>
+                <b>
+                  {m.display_name} {mine && <span className="you">(bạn)</span>}
+                </b>
                 <small>
-                  {m.role}
-                  {agent ? ` · ${agentName(agent)}` : ""}
-                  {m.note ? ` · ${m.note}` : ""}
+                  <span className="mono">{m.dev}</span> · {m.role} · {LEVEL_LABEL[m.level]}
+                  {manage && (
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => setEditing(editing === m.dev ? undefined : m.dev)}
+                      aria-label={`Sửa hồ sơ của ${m.dev}`}
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                 </small>
               </div>
-              <div className="work">
-                <small>{p?.tasks.length ? "đang làm" : p ? `hoạt động ${ago(p.last_seen)}` : "chưa mở phiên agent nào"}</small>
-                {p?.tasks[0] ?? ""}
-                {p && p.conflicts > 0 && <small className="bad">đang đụng việc người khác</small>}
+              <div>
+                {manage ? (
+                  <select
+                    className="p-input"
+                    value={m.access}
+                    disabled={lastMgr}
+                    title={lastMgr ? "Project cần ít nhất một Quản lý" : ACCESS_HINT[m.access]}
+                    aria-label={`Quyền của ${m.display_name}`}
+                    onChange={async (e) => {
+                      const access = e.target.value as ProjectAccess;
+                      if (await run(() => api.members.save(id, m.dev, { access }), `${m.display_name} giờ là ${ACCESS_LABEL[access]}`)) after();
+                    }}
+                  >
+                    {ACCESS.map((a) => (
+                      <option key={a} value={a}>
+                        {ACCESS_LABEL[a]}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <AccessChip access={m.access} />
+                )}
+                {lastMgr && manage && (
+                  <small className="faint" style={{ marginTop: 3 }}>
+                    Quản lý duy nhất
+                  </small>
+                )}
               </div>
-              <select
-                className="p-input sm"
-                style={{ width: "auto" }}
-                value={m.access}
-                title={ACCESS_HINT[m.access]}
-                aria-label={`Quyền của ${m.dev}`}
-                onChange={async (e) => {
-                  await run(() => api.members.save(id, m.dev, { access: e.target.value as ProjectAccess }), `Đã đổi quyền của ${m.dev}`);
-                  void reload();
-                }}
-              >
-                {ACCESS.map((a) => (
-                  <option key={a} value={a}>
-                    {ACCESS_LABEL[a]}
-                  </option>
-                ))}
-              </select>
-              <span className="mstate">
-                <span className="p-chip lvl">{LEVEL_LABEL[m.level]}</span>
-                <State status={p?.status ?? "ended"} />
-                <button
-                  type="button"
-                  className="iconbtn"
-                  title={`Sửa ${m.dev}`}
-                  aria-label={`Sửa ${m.dev}`}
-                  onClick={() => setEditing(editing === m.dev ? undefined : m.dev)}
-                >
-                  <Pencil />
-                </button>
-              </span>
+              <div className="seen">
+                {m.devices.length ? `${m.devices.length} máy · ` : "chưa kết nối máy · "}
+                {working.has(m.dev) ? (
+                  <span className="state running">đang làm</span>
+                ) : m.devices.some((d) => d.online) ? (
+                  "đang kết nối"
+                ) : seen ? (
+                  `thấy ${ago(seen)}`
+                ) : (
+                  "chưa thấy"
+                )}
+              </div>
+              <div className="rm">
+                {manage && !mine && !lastMgr && (
+                  <button type="button" className="p-btn sm quiet" onClick={() => setRemoving(m.dev)} aria-label={`Xoá ${m.display_name}`}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+              {removing === m.dev && (
+                <div className="confirm" style={{ gridColumn: "1/-1", borderRadius: 10, border: 0 }}>
+                  <AlertTriangle size={16} />
+                  <span className="grow">
+                    Xoá <b>{m.display_name}</b> khỏi project? Máy của họ thôi làm việc ở đây ngay. Việc đã làm vẫn giữ tên {m.dev}.
+                  </span>
+                  <button
+                    type="button"
+                    className="p-btn sm danger"
+                    onClick={async () => {
+                      if (await run(() => api.members.remove(id, m.dev), `Đã xoá ${m.dev} khỏi project`)) {
+                        setRemoving(undefined);
+                        after();
+                      }
+                    }}
+                  >
+                    Xoá khỏi project
+                  </button>
+                  <button type="button" className="p-btn sm quiet" onClick={() => setRemoving(undefined)}>
+                    Huỷ
+                  </button>
+                </div>
+              )}
               {editing === m.dev && (
-                <MemberEdit
-                  m={m}
-                  onDone={() => {
-                    setEditing(undefined);
-                    void reload();
-                  }}
-                />
+                <div style={{ gridColumn: "1/-1" }}>
+                  <MemberEdit
+                    m={m}
+                    onDone={() => {
+                      setEditing(undefined);
+                      after();
+                    }}
+                  />
+                </div>
               )}
             </div>
           );
         })}
       </div>
-      <form
-        className="block"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const input = { role: add.role.trim() || "developer", level: add.level, access: add.access };
-          if (await run(() => api.members.save(id, add.dev, input), `Đã thêm ${add.dev}`)) {
-            setAdd({ dev: "", role: "", level: "mid", access: "developer" });
-            void reload();
-          }
-        }}
-      >
-        <span className="sect">Thêm thành viên</span>
-        <div className="inline-form">
-          <select className="p-input" required value={add.dev} onChange={(e) => setAdd({ ...add, dev: e.target.value })} aria-label="Người">
-            <option value="">{candidates.length ? "Chọn người" : "Không còn ai để thêm"}</option>
-            {candidates.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-          <select className="p-input" value={add.access} onChange={(e) => setAdd({ ...add, access: e.target.value as ProjectAccess })} aria-label="Quyền">
-            {ACCESS.map((a) => (
-              <option key={a} value={a}>
-                {ACCESS_LABEL[a]}
-              </option>
-            ))}
-          </select>
-          <input
-            className="p-input"
-            list="gtv-roles"
-            value={add.role}
-            onChange={(e) => setAdd({ ...add, role: e.target.value })}
-            placeholder="Vai trò, ví dụ backend"
-            aria-label="Vai trò"
-          />
-          <select className="p-input" value={add.level} onChange={(e) => setAdd({ ...add, level: e.target.value as MemberLevel })} aria-label="Trình độ">
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {LEVEL_LABEL[l]}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="p-btn" disabled={!add.dev}>
-            Thêm
-          </button>
+
+      {manage && (
+        <div className="sec">
+          <span className="sect">Link mời đang hiệu lực</span>
+          {invites?.length ? (
+            invites.map((i) => (
+              <div key={i.id} className="irow">
+                <Link2 size={16} />
+                <div>
+                  {ACCESS_LABEL[i.access]} · đã dùng {i.uses}
+                  {i.max_uses ? `/${i.max_uses}` : ""} lượt
+                  <small>
+                    tạo bởi {i.created_by} · hết hạn {day(i.expires_at)}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  className="p-btn sm quiet"
+                  onClick={async () => (await run(() => api.invites.revoke(id, i.id), "Đã thu hồi link mời")) && reloadInvites()}
+                >
+                  Thu hồi
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="muted">Không có link nào. Link đã thu hồi hoặc hết hạn không vào được nữa.</p>
+          )}
+          <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>
+            Link mời chỉ hiện một lần, lúc tạo. Mất link thì thu hồi rồi tạo link mới.
+          </p>
         </div>
-        <p className="faint" style={{ marginTop: 6 }}>
-          {can("admin") ? (
+      )}
+
+      <div className="sec">
+        <span className="sect">Rời project</span>
+        <div className="hrow">
+          <p className="muted grow" style={{ maxWidth: "60ch" }}>
+            {iAmLastManager
+              ? "Bạn là Quản lý duy nhất. Nâng một người khác lên Quản lý trước khi rời."
+              : "Rời project thì bạn thôi thấy project này, và máy của bạn thôi làm việc ở đây. Việc đã làm vẫn giữ tên bạn."}
+          </p>
+          {leaving ? (
             <>
-              Người mới chưa có tài khoản? <Link to="/people">Tạo tài khoản ở trang Người</Link>.
+              <button
+                type="button"
+                className="p-btn danger"
+                onClick={async () => {
+                  if (await run(() => api.members.remove(id, me!.name), `Đã rời ${detail.name}`)) {
+                    await refresh();
+                    void reloadOverview();
+                    navigate("/");
+                  }
+                }}
+              >
+                Rời {detail.name}
+              </button>
+              <button type="button" className="p-btn quiet" onClick={() => setLeaving(false)}>
+                Huỷ
+              </button>
             </>
           ) : (
-            "Người mới chưa có tài khoản: nhờ quản trị tạo, rồi thêm ở đây."
+            <button type="button" className="p-btn danger" disabled={iAmLastManager || me?.kind !== "user"} onClick={() => setLeaving(true)}>
+              Rời project
+            </button>
           )}
-        </p>
-      </form>
+        </div>
+      </div>
+      {modal === "invite" && <InviteModal onClose={() => setModal(undefined)} onMade={() => void reloadInvites()} />}
+      {modal === "add" && <AddNameModal onClose={() => setModal(undefined)} onAdded={after} />}
     </>
   );
 }

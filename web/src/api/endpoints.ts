@@ -1,6 +1,6 @@
 // One function per server endpoint, grouped by area. Pages only talk to the server through here.
 
-import { del, get, patch, post, put } from "./client";
+import { del, get, patch, post, put, request } from "./client";
 import type {
   ActivityEvent,
   AiSummary,
@@ -37,14 +37,19 @@ import type {
   BoardView,
   Charter,
   Me,
-  Member,
   MemberLevel,
+  MemberView,
   ProjectAccess,
   Device,
   Role,
-  Session,
   ShareLink,
   User,
+  AuthConfig,
+  Login,
+  LoginSession,
+  Invite,
+  InviteInfo,
+  Registration,
 } from "./types";
 
 const p = (id: string) => `/v1/p/${encodeURIComponent(id)}`;
@@ -65,13 +70,26 @@ export const api = {
   overview: () => get<Overview>("/api/overview"),
 
   auth: {
+    config: () => get<AuthConfig>("/api/auth/config"),
     me: () => get<Me>("/api/me"),
-    login: (name: string, password: string) => post<Session>("/api/login", { name, password }),
-    logout: () => post<{ ok: boolean }>("/api/logout"),
-    activation: (code: string) => get<{ user: string; kind: "activate" | "reset" }>(`/api/activate/${encodeURIComponent(code)}`),
-    activate: (code: string, password: string) => post<Session>(`/api/activate/${encodeURIComponent(code)}`, { password }),
-    changePassword: (current: string, password: string) => put<Session>("/api/me/password", { current, password }),
+    setup: (input: { name: string; display_name: string; password: string; admin_token?: string }) => post<Login>("/api/auth/setup", input),
+    signup: (input: { name: string; display_name: string; password: string; invite?: string }) =>
+      post<Login & { project: { id: string; access: ProjectAccess } | null }>("/api/auth/signup", input),
+    login: (name: string, password: string) => post<Login>("/api/auth/login", { name, password }),
+    logout: () => post<{ ok: boolean }>("/api/auth/logout"),
+    resetInfo: (code: string) => get<{ user: string; display_name: string; expires_at: string }>(`/api/auth/reset/${encodeURIComponent(code)}`),
+    reset: (code: string, password: string) => post<Login>(`/api/auth/reset/${encodeURIComponent(code)}`, { password }),
+  },
+
+  account: {
+    update: (display_name: string) => patch<Login>("/api/me", { display_name }),
+    changePassword: (current: string, password: string) => put<{ ok: boolean }>("/api/me/password", { current, password }),
+    remove: (password: string) => request<{ ok: boolean }>("DELETE", "/api/me", { password }),
+    sessions: () => get<LoginSession[]>("/api/me/sessions"),
+    endSession: (id: string) => del<{ ok: boolean }>(`/api/me/sessions/${encodeURIComponent(id)}`),
+    endOtherSessions: () => del<{ ok: boolean }>("/api/me/sessions"),
     devices: () => get<Device[]>("/api/me/devices"),
+    renameDevice: (deviceId: string, name: string) => patch<{ ok: boolean }>(`/api/me/devices/${encodeURIComponent(deviceId)}`, { name }),
     revokeDevice: (deviceId: string) => del<{ ok: boolean }>(`/api/me/devices/${encodeURIComponent(deviceId)}`),
   },
 
@@ -80,21 +98,27 @@ export const api = {
     decide: (code: string, action: "approve" | "deny") => post<{ ok: boolean }>(`/api/connect/${encodeURIComponent(code)}/${action}`),
   },
 
-  people: () => get<{ name: string }[]>("/api/people"),
+  invites: {
+    info: (code: string) => get<InviteInfo>(`/api/invites/${encodeURIComponent(code)}`),
+    accept: (code: string) =>
+      post<{ project: { id: string; name: string }; access: ProjectAccess; already_member: boolean }>(`/api/invites/${encodeURIComponent(code)}/accept`),
+    list: (id: string) => get<Invite[]>(`${a(id)}/invites`),
+    create: (id: string, input: { access: "developer" | "viewer"; days: number; max_uses: number | null }) =>
+      post<Invite & { code: string; url: string }>(`${a(id)}/invites`, input),
+    revoke: (id: string, inviteId: string) => del<{ ok: boolean }>(`${a(id)}/invites/${encodeURIComponent(inviteId)}`),
+  },
 
-  users: {
-    list: () => get<User[]>("/api/users"),
-    create: (input: { name: string; role: Role; projects: { id: string; access: ProjectAccess }[] }) =>
-      post<{ user: User; activation_url: string; expires_at: string }>("/api/users", input),
-    setRole: (name: string, role: Role) => patch<User>(`/api/users/${encodeURIComponent(name)}`, { role }),
-    remove: (name: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}`),
-    activation: (name: string) => post<{ activation_url: string; expires_at: string }>(`/api/users/${encodeURIComponent(name)}/activation`),
-    devices: (name: string) => get<Device[]>(`/api/users/${encodeURIComponent(name)}/devices`),
-    revokeDevice: (name: string, deviceId: string) => del<{ ok: boolean }>(`/api/users/${encodeURIComponent(name)}/devices/${encodeURIComponent(deviceId)}`),
+  admin: {
+    users: () => get<User[]>("/api/admin/users"),
+    update: (name: string, patch_: { role?: Role; disabled?: boolean }) => patch<User>(`/api/admin/users/${encodeURIComponent(name)}`, patch_),
+    reset: (name: string) => post<{ reset_url: string; expires_at: string }>(`/api/admin/users/${encodeURIComponent(name)}/reset`),
+    remove: (name: string) => del<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(name)}`),
+    settings: () => get<{ registration: Registration }>("/api/admin/settings"),
+    setRegistration: (registration: Registration) => put<{ registration: Registration }>("/api/admin/settings", { registration }),
   },
 
   board: {
-    list: (id: string, scope: "open" | "all" = "all") => get<BoardView[]>(`${p(id)}/board?scope=${scope}`),
+    list: (id: string, scope: "open" | "all" | "mine" = "all") => get<BoardView[]>(`${p(id)}/board?scope=${scope}`),
     get: (id: string, taskId: string) => get<BoardDetail>(`${p(id)}/board/${encodeURIComponent(taskId)}`),
     create: (id: string, input: BoardInput) => post<BoardTask>(`${p(id)}/board`, input),
     update: (id: string, taskId: string, input: BoardInput) => patch<BoardTask>(`${p(id)}/board/${encodeURIComponent(taskId)}`, input),
@@ -103,9 +127,10 @@ export const api = {
   },
 
   members: {
-    list: (id: string) => get<Member[]>(`${a(id)}/members`),
+    list: (id: string) => get<MemberView[]>(`${a(id)}/members`),
+    add: (id: string, user: string, access: ProjectAccess) => post<MemberView>(`${a(id)}/members`, { user, access }),
     save: (id: string, dev: string, input: { role?: string; level?: MemberLevel; note?: string; access?: ProjectAccess }) =>
-      put<Member>(`${a(id)}/members/${encodeURIComponent(dev)}`, input),
+      patch<MemberView>(`${a(id)}/members/${encodeURIComponent(dev)}`, input),
     remove: (id: string, dev: string) => del<{ ok: boolean }>(`${a(id)}/members/${encodeURIComponent(dev)}`),
   },
 
@@ -117,6 +142,7 @@ export const api = {
 
   projects: {
     create: (input: ProjectInput) => post<ProjectSummary>("/api/projects", input),
+    checkRepo: (repo_url: string) => post<{ ok: true; default_branch: string | null } | { ok: false; error: string }>("/api/projects/check-repo", { repo_url }),
     detail: (id: string) => get<ProjectDetail>(a(id)),
     update: (id: string, input: Partial<ProjectInput>) => patch<ProjectRecord>(a(id), input),
     archive: (id: string) => del<{ ok: boolean }>(a(id)),
@@ -154,6 +180,8 @@ export const api = {
 
   tickets: {
     list: (id: string) => get<Ticket[]>(`${p(id)}/tickets`),
+    /** Questions waiting for my answer. */
+    forMe: (id: string) => get<Ticket[]>(`${p(id)}/tickets?scope=for_me`),
     reply: (id: string, ticketId: string, answer: string) => post<Ticket>(`${p(id)}/tickets/${encodeURIComponent(ticketId)}/reply`, { answer }),
   },
 

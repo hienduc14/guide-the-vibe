@@ -412,28 +412,57 @@ export type ProjectAccess = "manager" | "developer" | "viewer";
 
 export interface Me {
   name: string;
+  display_name: string;
   role: Role;
   kind: "admin_token" | "user" | "share" | "open";
   project: string | null;
   open_mode: boolean;
-  has_users: boolean;
   projects: { id: string; name: string; access: ProjectAccess }[];
 }
 
+export type Registration = "open" | "invite" | "closed";
+
+/** GET /api/auth/config: what the gate pages need before anyone logs in. */
+export interface AuthConfig {
+  setup_needed: boolean;
+  registration: Registration;
+  needs_admin_token: boolean;
+}
+
+/** Every login answer (the session itself is an httpOnly cookie). */
+export interface Login {
+  name: string;
+  display_name: string;
+  role: Role;
+}
+
+/** A browser logged in to this account. */
+export interface LoginSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  last_used: string | null;
+  user_agent: string | null;
+  ip: string | null;
+  current: boolean;
+}
+
+/** An account as the server admin sees it. */
 export interface User {
   name: string;
+  display_name: string;
   role: Role;
-  activated: boolean;
   created_at: string;
-  created_by: string | null;
   last_login: string | null;
+  disabled_at: string | null;
+  disabled: boolean;
+  projects: number;
+  devices: number;
   /** Latest time one of their computers talked to the server. */
   last_seen: string | null;
-  devices: number;
-  projects: { id: string; name: string; access: ProjectAccess }[];
 }
 
-/** A computer connected to an account (gtv login). */
+/** A computer connected to an account (gtv login), with what its daemon reported. */
 export interface Device {
   id: string;
   user: string;
@@ -441,14 +470,48 @@ export interface Device {
   platform: string;
   created_at: string;
   last_seen: string | null;
+  online: boolean;
+  gtv_version: string | null;
+  agents: { kind: string; version: string | null }[];
+  /** null: an older gtv that never reported agents and repos. */
+  reported_at: string | null;
+  repos: {
+    path: string;
+    project: string;
+    project_name: string | null;
+    agents: string[];
+    updated_at: string;
+    sessions: { id: string; agent: string; status: SessionStatus }[];
+  }[];
+  sessions: { id: string; project: string; project_name: string; agent: string; status: SessionStatus; cwd: string | null; last_seen: string }[];
 }
 
-export interface Session {
-  token: string;
-  name: string;
-  role: Role;
+/** An invite link (the URL is only in the answer that created it). */
+export interface Invite {
+  id: string;
+  project: string;
+  access: "developer" | "viewer";
+  created_by: string;
+  created_at: string;
   expires_at: string;
+  max_uses: number | null;
+  uses: number;
+  revoked_at: string | null;
 }
+
+/** GET /api/invites/:code */
+export type InviteInfo =
+  | { valid: false }
+  | {
+      valid: true;
+      project_name: string;
+      access: "developer" | "viewer";
+      invited_by: string;
+      invited_by_name: string;
+      expires_at: string;
+      member: boolean;
+      project_id?: string;
+    };
 
 export interface ShareLink {
   id: string;
@@ -473,6 +536,14 @@ export interface Member {
   note?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** GET /api/projects/:id/members: a member with how they joined and their computers (names only). */
+export interface MemberView extends Member {
+  display_name: string;
+  joined_at: string | null;
+  invited_by: string | null;
+  devices: { id: string; name: string; online: boolean; last_seen: string | null }[];
 }
 
 // ---- project charter --------------------------------------------------------------------

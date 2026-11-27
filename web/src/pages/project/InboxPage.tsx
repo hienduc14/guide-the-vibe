@@ -27,6 +27,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useProject } from "./ProjectLayout";
 import { Av, Blank, Seg, usePc } from "../../components/pj";
 import { Loading } from "../../components/Empty";
+import { Modal } from "../../components/ui";
 import { incidentDone, incidentPlain, incidentTitle, isHot, LEVEL_VI } from "../../lib/incident";
 import { KIND_VI, shortSubject } from "../../components/Message";
 import { ago, clock } from "../../lib/format";
@@ -403,8 +404,7 @@ export function InboxPage() {
 
   const people = [...new Set([...detail.members.map((m) => m.dev)])];
   const total = groups.hot.length + groups.questions.length + groups.others.length;
-  const allRefs = [...groups.hot.map((i) => i.id), ...groups.questions.map((a) => a.ref), ...groups.others.map((a) => a.ref), ...groups.low.map((i) => i.id)];
-  const current = sel ?? allRefs[0] ?? null;
+  const current = sel;
 
   const incRow = (i: Incident): Row => ({
     key: i.id,
@@ -436,7 +436,7 @@ export function InboxPage() {
   const curItem = att.data?.find((a) => a.ref === current);
 
   return (
-    <div className="page-col">
+    <div className="page-col narrow">
       <div className="head">
         <div>
           <h1>Cần xử lý</h1>
@@ -452,7 +452,7 @@ export function InboxPage() {
           />
         </div>
       </div>
-      <div className="p-split">
+      <div>
         <section className="panel list">
           {loading ? (
             <Loading />
@@ -555,20 +555,22 @@ export function InboxPage() {
             </>
           )}
         </section>
-        <section className="panel detail">
-          {curInc ? (
-            <IncidentDetail inc={curInc} state={state.data} onChanged={refresh} />
-          ) : curTicket ? (
-            <QuestionDetail t={curTicket} item={curItem} onChanged={refresh} />
-          ) : curItem ? (
-            <OtherDetail a={curItem} onChanged={refresh} />
-          ) : loading ? (
-            <Loading />
-          ) : (
-            <Blank title={sel ? "Mục này không còn trong danh sách" : "Không có gì để xem"}>{sel ? "Có thể nó đã được xử lý." : null}</Blank>
-          )}
-        </section>
       </div>
+      {current && !loading && (
+        <Modal wide title={curInc ? "Vụ đụng nhau" : curTicket ? "Câu hỏi của agent" : curItem ? "Việc cần để ý" : "Cần xử lý"} onClose={() => set("i", null)}>
+          <div className="detail">
+            {curInc ? (
+              <IncidentDetail inc={curInc} state={state.data} onChanged={refresh} />
+            ) : curTicket ? (
+              <QuestionDetail t={curTicket} item={curItem} onChanged={refresh} />
+            ) : curItem ? (
+              <OtherDetail a={curItem} onChanged={refresh} />
+            ) : (
+              <Blank title="Mục này không còn trong danh sách">Có thể nó đã được xử lý.</Blank>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

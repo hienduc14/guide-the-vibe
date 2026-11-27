@@ -196,7 +196,7 @@ export function TalkPage() {
                       đụng nhau
                     </span>
                   )}
-                  <span>{c.msgs.length} tin</span>
+                  <span className="count">{c.msgs.length} tin</span>
                 </span>
               </button>
             ))

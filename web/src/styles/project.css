@@ -2014,7 +2014,7 @@
 /* ---------- screen 4: conversations ---------- */
 .pj .talk {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -3254,4 +3254,34 @@
 }
 .pj .page-col .doc :is(.presets, .layers, .formgrid, .doclist, .p-charter) {
   max-width: none;
+}
+.pj .page-col.narrow {
+  max-width: 920px;
+}
+/* Cần xử lý: one item's details in a big popup over the list */
+.pj-overlay .modal.wide {
+  width: min(1100px, 92vw);
+}
+.pj-overlay .modal .detail {
+  padding: 0;
+  min-height: 0;
+}
+
+/* Trao đổi list: the tags and the message count share one line under the title and time */
+.pj .talk .p-row .s {
+  grid-column: 2 / -1;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.pj .talk .p-row .s .p-chip {
+  white-space: nowrap;
+}
+.pj .talk .p-row .s .count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+/* the avatar slot has one width, so titles line up whether a thread has one person or three */
+.pj .talk .p-row > span:first-child {
+  width: 56px;
+  display: flex;
 }

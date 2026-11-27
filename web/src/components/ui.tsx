@@ -17,12 +17,15 @@ export function Modal({
   children,
   foot,
   onClose,
+  wide,
 }: {
   title: ReactNode;
   sub?: ReactNode;
   children: ReactNode;
   foot?: ReactNode;
   onClose: () => void;
+  /** a big popup for reading and acting on one item (most of the screen), instead of a small form */
+  wide?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -33,7 +36,7 @@ export function Modal({
   return createPortal(
     <div className="pj pj-portal">
       <div className="pj-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+        <div className={`modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="m-title">
           <div className="m-head">
             <div>
               <h2 id="m-title">{title}</h2>

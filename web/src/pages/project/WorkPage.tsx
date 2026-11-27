@@ -1,8 +1,25 @@
-// Việc: the board (five columns, blocked work says why) and its progress, with a task's details in a drawer.
+// Việc: the board (five columns, blocked work says why) and its progress. A card opens in place to change its status,
+// person, priority and due date; right-click gives Diễn biến (a popup), Xem trao đổi and Xoá việc.
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowUp, Ban, CalendarDays, Check, Circle, CircleHelp, Flame, GitMerge, Inbox, MessagesSquare, PlayCircle, Plus, Trash2, X, Zap } from "lucide-react";
+import {
+  ArrowUp,
+  Ban,
+  CalendarDays,
+  Check,
+  Circle,
+  CircleHelp,
+  Flame,
+  GitMerge,
+  History,
+  Inbox,
+  MessagesSquare,
+  PlayCircle,
+  Plus,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { BoardDetail, BoardInput, BoardStatus, BoardView, Priority } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
@@ -13,7 +30,7 @@ import { Av, Seg, State } from "../../components/pj";
 import { Loading } from "../../components/Empty";
 import { PRIORITIES, PRIORITY_INFO, STATUS_INFO } from "../../components/Task";
 import { NOTE_TAG } from "../../components/Message";
-import { ConfirmButton } from "../../components/ConfirmButton";
+import { Modal } from "../../components/ui";
 import { ago } from "../../lib/format";
 import { daysUntil } from "../../lib/charter";
 import { ProgressView } from "./Progress";
@@ -40,11 +57,44 @@ function reasons(t: BoardView): { text: string; q: boolean }[] {
 
 const shortDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
-function Card({ t, sel, onOpen }: { t: BoardView; sel: boolean; onOpen: () => void }) {
+function Card({
+  t,
+  open,
+  onToggle,
+  onMenu,
+  onChanged,
+}: {
+  t: BoardView;
+  open: boolean;
+  onToggle: () => void;
+  onMenu: (x: number, y: number) => void;
+  onChanged: () => void;
+}) {
   const live = t.work.find((w) => w.dev === t.assignee && w.session_status && w.session_status !== "ended");
   const why = columnOf(t) === "blocked" ? reasons(t) : [];
   return (
-    <button type="button" className={`p-card${sel ? " sel" : ""}`} onClick={onOpen}>
+    <div
+      className={`p-card${open ? " sel" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          onMenu(r.left + 16, r.top + 24);
+        }
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(e.clientX, e.clientY);
+      }}
+    >
       {why.map((w) => (
         <span key={w.text} className={`why${w.q ? " q" : ""}`}>
           {w.q ? <CircleHelp /> : <Zap />}
@@ -77,7 +127,146 @@ function Card({ t, sel, onOpen }: { t: BoardView; sel: boolean; onOpen: () => vo
           )}
         </span>
       </span>
-    </button>
+      {open && <QuickEdit t={t} onChanged={onChanged} />}
+    </div>
+  );
+}
+
+/** The four things people change most, right inside the card; the rest is under right-click › Diễn biến. */
+function QuickEdit({ t, onChanged }: { t: BoardView; onChanged: () => void }) {
+  const { id, detail, manage, access } = useProject();
+  const { me } = useAuth();
+  const run = useAction();
+  const update = async (patch: BoardInput, msg = "Đã lưu") => {
+    if ((await run(() => api.board.update(id, t.id, patch), msg)) !== undefined) onChanged();
+  };
+  const why = columnOf(t) === "blocked" ? reasons(t) : [];
+  // A developer updates the tasks assigned to them (status); the rest needs a manager.
+  const own = manage || (access === "developer" && !!me && t.assignee === me.name);
+  return (
+    // clicks and keys inside the editor must not fold the card
+    <div className="cx" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <dl className="p-kv">
+        <dt>Trạng thái</dt>
+        <dd>
+          {own ? (
+            <select className="p-input sm" value={t.status} onChange={(e) => void update({ status: e.target.value as BoardStatus })} aria-label="Trạng thái">
+              {STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {STATUS_INFO[st].label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            STATUS_INFO[columnOf(t)].label
+          )}
+          {why.length > 0 && <span className="faint"> · {why.map((w) => w.text.toLowerCase()).join(", ")}</span>}
+        </dd>
+        <dt>Người làm</dt>
+        <dd>
+          {manage ? (
+            <select
+              className="p-input sm"
+              value={t.assignee ?? ""}
+              onChange={(e) => void update({ assignee: e.target.value || null }, "Đã giao việc")}
+              aria-label="Người làm"
+            >
+              <option value="">chưa giao</option>
+              {detail.members.map((m) => (
+                <option key={m.dev} value={m.dev}>
+                  {m.dev}
+                </option>
+              ))}
+              {t.assignee && !detail.members.some((m) => m.dev === t.assignee) && <option value={t.assignee}>{t.assignee}</option>}
+            </select>
+          ) : (
+            (t.assignee ?? "chưa giao")
+          )}
+        </dd>
+        <dt>Ưu tiên</dt>
+        <dd>
+          {manage ? (
+            <select className="p-input sm" value={t.priority} onChange={(e) => void update({ priority: e.target.value as Priority })} aria-label="Ưu tiên">
+              {PRIORITIES.map((pr) => (
+                <option key={pr} value={pr}>
+                  {PRIORITY_INFO[pr].label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            PRIORITY_INFO[t.priority].label
+          )}
+        </dd>
+        <dt>Hạn</dt>
+        <dd>
+          {manage ? (
+            <input
+              className="p-input sm"
+              type="date"
+              value={t.due_date ?? ""}
+              onChange={(e) => void update({ due_date: e.target.value || null })}
+              aria-label="Hạn"
+            />
+          ) : (
+            (t.due_date ?? "chưa đặt")
+          )}
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
+/** Right-click on a card: Diễn biến, Xem trao đổi, Xoá việc. */
+function CardMenu({
+  x,
+  y,
+  t,
+  onClose,
+  onLog,
+  onDelete,
+}: {
+  x: number;
+  y: number;
+  t: BoardView;
+  onClose: () => void;
+  onLog: () => void;
+  onDelete?: () => void;
+}) {
+  const { id } = useProject();
+  useEffect(() => {
+    const down = (e: MouseEvent) => !(e.target as HTMLElement).closest(".ctx-menu") && onClose();
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("mousedown", down);
+    window.addEventListener("keydown", key);
+    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", onClose);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [onClose]);
+  // keep the menu on screen near the edges
+  const left = Math.min(x, window.innerWidth - 220);
+  const top = Math.min(y, window.innerHeight - (onDelete ? 150 : 110));
+  return (
+    <div className="ctx-menu" role="menu" aria-label={t.title} style={{ left, top }}>
+      <button type="button" role="menuitem" autoFocus onClick={onLog}>
+        <History />
+        Diễn biến
+      </button>
+      <Link role="menuitem" to={`/p/${id}/talk?t=${t.id}`} onClick={onClose}>
+        <MessagesSquare />
+        Xem trao đổi
+      </Link>
+      {onDelete && (
+        <button type="button" role="menuitem" className="danger" onClick={onDelete}>
+          <Trash2 />
+          Xoá việc
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -160,99 +349,29 @@ function AddTask({ onDone }: { onDone: () => void }) {
 
 const TAG_CHIP: Record<string, string> = { blocker: "clash", question: "warn", done: "ok" };
 
-function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
-  const { id, detail, manage, access } = useProject();
+/** Diễn biến: what the task is for, what the agent registered, its notes, and where it came from. */
+function TaskLog({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const { id, manage, access } = useProject();
   const { me } = useAuth();
   const run = useAction();
   const { data: t, reload } = usePoll<BoardDetail>(() => api.board.get(id, taskId), [id, taskId], 5000);
   const [note, setNote] = useState("");
   const [desc, setDesc] = useState<string>();
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
   if (!t)
     return (
-      <aside className="panel drawer">
+      <Modal title="Diễn biến" onClose={onClose}>
         <Loading />
-      </aside>
+      </Modal>
     );
   const update = async (patch: BoardInput, msg = "Đã lưu") => {
     await run(() => api.board.update(id, taskId, patch), msg);
     void reload();
   };
   const why = columnOf(t) === "blocked" ? reasons(t) : [];
-  const live = t.work.find((w) => w.dev === t.assignee);
   // A developer updates the tasks assigned to them (status, goal, notes); the rest needs a manager.
   const own = manage || (access === "developer" && !!me && t.assignee === me.name);
   return (
-    <aside className="panel drawer" aria-label={t.title}>
-      <div className="dhead">
-        <h2>{t.title}</h2>
-        <button type="button" className="iconbtn x" onClick={onClose} aria-label="Đóng">
-          <X />
-        </button>
-      </div>
-      <dl className="p-kv">
-        <dt>Trạng thái</dt>
-        <dd>
-          {own ? (
-            <select className="p-input sm" value={t.status} onChange={(e) => void update({ status: e.target.value as BoardStatus })}>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_INFO[s].label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            STATUS_INFO[columnOf(t)].label
-          )}
-          {why.length > 0 && <span className="faint"> · {why.map((w) => w.text.toLowerCase()).join(", ")}</span>}
-        </dd>
-        <dt>Người làm</dt>
-        <dd>
-          {manage ? (
-            <select className="p-input sm" value={t.assignee ?? ""} onChange={(e) => void update({ assignee: e.target.value || null }, "Đã giao việc")}>
-              <option value="">chưa giao</option>
-              {detail.members.map((m) => (
-                <option key={m.dev} value={m.dev}>
-                  {m.dev}
-                </option>
-              ))}
-              {t.assignee && !detail.members.some((m) => m.dev === t.assignee) && <option value={t.assignee}>{t.assignee}</option>}
-            </select>
-          ) : (
-            (t.assignee ?? "chưa giao")
-          )}
-          {live?.session_status && <State status={live.session_status} />}
-        </dd>
-        <dt>Ưu tiên</dt>
-        <dd>
-          {manage ? (
-            <select className="p-input sm" value={t.priority} onChange={(e) => void update({ priority: e.target.value as Priority })}>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_INFO[p].label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            PRIORITY_INFO[t.priority].label
-          )}
-        </dd>
-        <dt>Hạn</dt>
-        <dd>
-          {manage ? (
-            <input className="p-input sm" type="date" value={t.due_date ?? ""} onChange={(e) => void update({ due_date: e.target.value || null })} />
-          ) : (
-            (t.due_date ?? "chưa đặt")
-          )}
-          {t.overdue && <span className="p-chip clash">quá hạn</span>}
-        </dd>
-        <dt>Nguồn</dt>
-        <dd>{t.source === "agent" ? "agent tự đăng ký khi bắt đầu làm" : `${t.created_by} thêm trên bảng`}</dd>
-      </dl>
+    <Modal title={t.title} onClose={onClose}>
       {why.length > 0 && (
         <div className="acts">
           <Link className="p-btn primary" to={`/p/${id}/inbox`}>
@@ -361,29 +480,13 @@ function Drawer({ taskId, onClose }: { taskId: string; onClose: () => void }) {
           </form>
         )}
       </div>
-      <div className="acts">
-        <Link className="p-btn quiet" to={`/p/${id}/talk?t=${t.id}`}>
-          <MessagesSquare />
-          Xem trao đổi
-        </Link>
-        <span className="faint" style={{ marginLeft: "auto", alignSelf: "center" }}>
-          Tạo {ago(t.created_at)}
-          {t.started_at ? ` · bắt đầu ${ago(t.started_at)}` : ""}
-          {t.done_at ? ` · xong ${ago(t.done_at)}` : ""}
-          {t.estimate_h ? ` · ước lượng ${t.estimate_h} giờ` : ""}
-        </span>
-        {manage && (
-          <ConfirmButton
-            onConfirm={async () => {
-              await run(() => api.board.remove(id, taskId), "Đã xoá việc");
-              onClose();
-            }}
-          >
-            <Trash2 size={14} /> Xoá việc
-          </ConfirmButton>
-        )}
-      </div>
-    </aside>
+      <p className="faint" style={{ marginTop: 14 }}>
+        {t.source === "agent" ? "Agent tự đăng ký khi bắt đầu làm" : `${t.created_by} thêm trên bảng`} · tạo {ago(t.created_at)}
+        {t.started_at ? ` · bắt đầu ${ago(t.started_at)}` : ""}
+        {t.done_at ? ` · xong ${ago(t.done_at)}` : ""}
+        {t.estimate_h ? ` · ước lượng ${t.estimate_h} giờ` : ""}
+      </p>
+    </Modal>
   );
 }
 
@@ -393,6 +496,10 @@ export function WorkPage() {
   const { me } = useAuth();
   const [params, setParams] = useSearchParams();
   const [adding, setAdding] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; t: BoardView }>();
+  const [log, setLog] = useState<string>();
+  const [removing, setRemoving] = useState<BoardView>();
+  const run = useAction();
   // "Mine" is where a developer starts; it follows the logged-in person.
   const [who, setWho] = useState(access === "developer" ? "@me" : "");
   const board = usePoll(() => api.board.list(id, "all"), [id], 5000);
@@ -465,7 +572,7 @@ export function WorkPage() {
       ) : !board.data ? (
         <Loading />
       ) : (
-        <div className={`withdrawer${task ? " open" : ""}`}>
+        <>
           <div className="board">
             {COLS.map((c) => {
               const list = shown.filter((t) => columnOf(t) === c.key).slice(0, c.key === "done" ? 15 : undefined);
@@ -477,7 +584,16 @@ export function WorkPage() {
                     <span className="n">{shown.filter((t) => columnOf(t) === c.key).length}</span>
                   </h3>
                   {list.length ? (
-                    list.map((t) => <Card key={t.id} t={t} sel={task === t.id} onOpen={() => set("task", task === t.id ? null : t.id)} />)
+                    list.map((t) => (
+                      <Card
+                        key={t.id}
+                        t={t}
+                        open={task === t.id}
+                        onToggle={() => set("task", task === t.id ? null : t.id)}
+                        onMenu={(x, y) => setMenu({ x, y, t })}
+                        onChanged={() => void board.reload()}
+                      />
+                    ))
                   ) : (
                     <p className="p-hint">Trống</p>
                   )}
@@ -485,8 +601,47 @@ export function WorkPage() {
               );
             })}
           </div>
-          {task && <Drawer taskId={task} onClose={() => set("task", null)} />}
-        </div>
+          {menu && (
+            <CardMenu
+              {...menu}
+              onClose={() => setMenu(undefined)}
+              onLog={() => (setLog(menu.t.id), setMenu(undefined))}
+              onDelete={manage ? () => (setRemoving(menu.t), setMenu(undefined)) : undefined}
+            />
+          )}
+          {log && <TaskLog taskId={log} onClose={() => setLog(undefined)} />}
+          {removing && (
+            <Modal
+              title="Xoá việc?"
+              onClose={() => setRemoving(undefined)}
+              foot={
+                <>
+                  <button type="button" className="p-btn quiet" onClick={() => setRemoving(undefined)}>
+                    Huỷ
+                  </button>
+                  <button
+                    type="button"
+                    className="p-btn danger"
+                    onClick={async () => {
+                      if ((await run(() => api.board.remove(id, removing.id), "Đã xoá việc")) !== undefined) {
+                        if (task === removing.id) set("task", null);
+                        void board.reload();
+                      }
+                      setRemoving(undefined);
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    Xoá việc
+                  </button>
+                </>
+              }
+            >
+              <p>
+                <b>{removing.title}</b> sẽ biến khỏi bảng. Ghi chú và diễn biến của việc này cũng mất.
+              </p>
+            </Modal>
+          )}
+        </>
       )}
     </>
   );

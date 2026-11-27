@@ -3291,3 +3291,66 @@
   width: 56px;
   display: flex;
 }
+
+/* Việc: a card opens in place (status, person, priority, due date); right-click opens its menu */
+.pj .p-card {
+  cursor: pointer;
+}
+.pj .p-card .ct {
+  display: block;
+}
+.pj .p-card .cx {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  cursor: default;
+}
+.pj .p-card .cx .p-kv {
+  align-items: center;
+}
+.pj .p-card .cx dd > :is(select, input) {
+  flex: 1;
+  min-width: 0;
+}
+.pj .ctx-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 200px;
+  padding: 5px;
+  display: grid;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.18);
+}
+.pj .ctx-menu :is(button, a) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pj .ctx-menu :is(button, a):is(:hover, :focus-visible) {
+  background: var(--accent-soft);
+  outline: none;
+}
+.pj .ctx-menu svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.pj .ctx-menu .danger,
+.pj .ctx-menu .danger svg {
+  color: var(--high);
+}
+.pj .ctx-menu .danger:is(:hover, :focus-visible) {
+  background: var(--high-soft);
+}

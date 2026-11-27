@@ -67,11 +67,16 @@ export function incidents(engine: Engine, scope: "active" | "all" = "active"): I
     groups.set(id, [...(groups.get(id) ?? []), c]);
   }
   const guides = guidesById(engine);
-  const lastReopen = new Map<string, string>();
-  for (const e of db.all<{ ts: string; payload: string }>(`SELECT ts, payload FROM event_log WHERE type = 'incident_reopen' ORDER BY id DESC LIMIT 500`)) {
-    const id = parseJson<{ id?: string }>(e.payload, {}).id;
-    if (id && !lastReopen.has(id)) lastReopen.set(id, e.ts);
-  }
+  const lastEvent = (type: string) => {
+    const out = new Map<string, string>();
+    for (const e of db.all<{ ts: string; payload: string }>(`SELECT ts, payload FROM event_log WHERE type = ? ORDER BY id DESC LIMIT 500`, type)) {
+      const id = parseJson<{ id?: string }>(e.payload, {}).id;
+      if (id && !out.has(id)) out.set(id, e.ts);
+    }
+    return out;
+  };
+  const lastReopen = lastEvent("incident_reopen");
+  const lastAck = lastEvent("incident_ack"); // a person on the dashboard; agents ack single conflicts
   const state = store.teamState();
   const regs = db.all<{ workspace_id: string; board_id: string | null; resources: string }>(
     `SELECT workspace_id, board_id, resources FROM tasks WHERE status IN ('registered','active','pr_open')`,
@@ -105,7 +110,17 @@ export function incidents(engine: Engine, scope: "active" | "all" = "active"): I
     const guide = guides.get(id);
     const reopened = lastReopen.get(id);
     const freshGuide = guide && (!reopened || guide.at >= reopened) ? guide : undefined;
-    const status: IncidentStatus = !live.length ? "closed" : live.some((c) => c.status === "open") ? "open" : freshGuide ? "guided" : "acked";
+    const ack = lastAck.get(id);
+    const personHandled = !!freshGuide || (!!ack && (!reopened || ack >= reopened));
+    // Agents saying "seen" does not merge the code: a merge Git already refuses stays for a person until it is gone.
+    const mergeFails = live.some((c) => c.layer === "L1" && LEVEL_RANK[c.level] >= LEVEL_RANK.high);
+    const status: IncidentStatus = !live.length
+      ? "closed"
+      : live.some((c) => c.status === "open") || (mergeFails && !personHandled)
+        ? "open"
+        : freshGuide
+          ? "guided"
+          : "acked";
     out.push({
       id,
       workspace_a: top.workspace_a,

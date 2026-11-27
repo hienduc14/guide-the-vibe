@@ -63,7 +63,7 @@ gtv on                    # inside a project repo: hooks, MCP server and skill f
 \`\`\`
 
 Daily: \`gtv status\`, \`gtv open\`, \`gtv answer <id> "…"\`. Something off: \`gtv doctor\`. Remove: \`gtv off\`, \`gtv logout\`.
-Your account comes from your team's admin (an activation link). Needs Node.js 20 or newer and git.
+No account yet? Sign up on your gtv server (or open the invite link you got). Needs Node.js 20 or newer and git.
 Guide: https://github.com/hienduc14/guide-the-vibe/blob/main/docs/cli.md
 `,
 );

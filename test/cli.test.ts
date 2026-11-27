@@ -5,8 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { EXCLUDED, matchProject, serverCandidates, withExcludeBlock, withoutExcludeBlock, type MyProject } from "../src/daemon/setup.ts";
-import { installClaude, installCodex, setupState, stripCodexToml, stripHooks, uninstallClaude, uninstallCodex } from "../src/daemon/install.ts";
+import { EXCLUDED, matchProject, notMineMessage, serverCandidates, withExcludeBlock, withoutExcludeBlock, type MyProject } from "../src/daemon/setup.ts";
+import { installClaude, installCodex, parseVersion, setupState, stripCodexToml, stripHooks, uninstallClaude, uninstallCodex } from "../src/daemon/install.ts";
 import { tempDir } from "./helpers.ts";
 
 test("server addresses: with or without https://, trailing slash, http only for this machine", () => {
@@ -85,4 +85,23 @@ test("stripping helpers keep other hooks and tables", () => {
   assert.deepEqual(stripHooks({ Stop: [gtv, other], SessionStart: [gtv] }), { Stop: [other] });
   assert.equal(stripHooks({ Stop: [gtv] }), undefined);
   assert.equal(stripCodexToml('a = 1\n[mcp_servers.gtv]\ncommand = "node"\n[x]\ny = 2\n'), "a = 1\n[x]\ny = 2\n");
+});
+
+test("gtv on outside my projects: ask for an invite, or create the project; never a project's name", () => {
+  assert.equal(
+    notMineMessage("https://gtv.example.com", "git@github.com:Org/Shop.git", true),
+    "This repo belongs to a project you are not in. Ask a manager for an invite link.",
+  );
+  assert.match(
+    notMineMessage("https://gtv.example.com", "git@github.com:Org/Shop.git", false),
+    /^No project uses this repo yet\. Create one: https:\/\/gtv\.example\.com\/new\?repo=org\/shop\n/,
+  );
+  assert.match(notMineMessage("https://gtv.example.com", undefined, false), /no git remote/);
+});
+
+test("agent versions are read from --version output", () => {
+  assert.equal(parseVersion("2.4.1 (Claude Code)\n"), "2.4.1");
+  assert.equal(parseVersion("codex-cli 0.99.0-alpha.3"), "0.99.0-alpha.3");
+  assert.equal(parseVersion("codex 0.99"), "0.99");
+  assert.equal(parseVersion("command not found"), null);
 });

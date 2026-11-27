@@ -15,7 +15,7 @@ import {
   unlinkSync,
   lstatSync,
 } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +45,22 @@ function ensureBin(): void {
   mkdirSync(dirname(GTV_BIN), { recursive: true });
   const self = fileURLToPath(import.meta.url);
   if (resolve(self) !== resolve(GTV_BIN)) copyFileSync(self, GTV_BIN);
+}
+
+/** "2.4.1 (Claude Code)", "codex-cli 0.99.0" → the version number; null when there is none. */
+export const parseVersion = (out: string) => /\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?/.exec(out)?.[0] ?? null;
+
+/** Agents installed on this computer with their versions (`<cmd> --version`, 3 s each); missing or failing ones are left out. */
+export async function agentVersions(): Promise<{ kind: "claude" | "codex"; version: string | null }[]> {
+  const probe = (cmd: string) =>
+    new Promise<string | null>((resolve) =>
+      // Windows installs claude/codex as .cmd shims, which only a shell runs.
+      execFile(cmd, ["--version"], { timeout: 3000, windowsHide: true, shell: process.platform === "win32" }, (err, stdout) =>
+        resolve(err ? null : String(stdout)),
+      ),
+    );
+  const found = await Promise.all((["claude", "codex"] as const).map(async (kind) => ({ kind, out: await probe(kind) })));
+  return found.flatMap(({ kind, out }) => (out === null ? [] : [{ kind, version: parseVersion(out) }]));
 }
 
 export const onPath = (cmd: string) => spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" }).status === 0;

@@ -87,6 +87,17 @@ export function matchProject(projects: MyProject[], linked: string | undefined, 
   return projects.find((p) => p.repos.includes(key));
 }
 
+/**
+ * What gtv on says about a repo that is not in one of my projects. The server only tells whether some project uses
+ * it, never which one.
+ */
+export function notMineMessage(server: string, remote: string | undefined, exists: boolean): string {
+  if (exists) return "This repo belongs to a project you are not in. Ask a manager for an invite link.";
+  if (!remote)
+    return "This repo has no git remote, so gtv cannot tell its project. Add one (git remote add origin <url>), or link it by hand: gtv link <project>";
+  return `No project uses this repo yet. Create one: ${server}/new?repo=${repoKey(remote)}\n  A fork of a project's repo? Link it by hand: gtv link <project>`;
+}
+
 /** What `gtv on` keeps out of git, in .git/info/exclude. */
 export const EXCLUDED = [".mcp.json", ".claude/settings.local.json", ".claude/skills/gtv/", ".claude/skills/gtv-*/", ".codex/"];
 const BLOCK_START = "# gtv (managed)";
@@ -148,18 +159,18 @@ async function projectOf(cfg: DaemonConfig, me: Me, top: string): Promise<MyProj
   const remote = await remoteUrl(top, cfg.remote);
   const mine = matchProject(me.projects, linked, remote);
   if (mine) return mine;
-  // Not among mine: does it belong to a project I am not a member of?
-  const client = new ServerClient(cfg);
-  const other = linked
-    ? ((await client.call<{ id: string; name: string }[]>("GET", "/v1/projects").catch(() => [])).find((p) => p.id === linked) ?? { id: linked, name: linked })
-    : remote
-      ? await client.call<{ id: string; name: string }>("GET", `/v1/resolve?remote=${encodeURIComponent(remote)}`).catch(() => undefined)
-      : undefined;
-  if (other) throw new CliError(`You are not a member of project ${other.name}. Ask a project manager to add you.`);
-  throw new CliError(
-    `This repo is not part of any project on ${hostOf(cfg.server)}.\n  Its remote is ${remote ?? "(none)"}: check it with git remote -v. ` +
-      "A fork of a project's repo? Link it by hand: gtv link <project>",
-  );
+  // Linked by hand to a project that is not mine, or a remote that some project uses (the server does not say which).
+  const exists =
+    !!linked ||
+    (!!remote &&
+      (await new ServerClient(cfg).call("GET", `/v1/resolve?remote=${encodeURIComponent(remote)}`).then(
+        () => true,
+        (e: Error & { status?: number }) => {
+          if (e.status === 404) return false;
+          throw new CliError(`Cannot reach ${cfg.server} (${e.message}). Check your network, or run: gtv doctor`);
+        },
+      )));
+  throw new CliError(notMineMessage(cfg.server, remote, exists));
 }
 
 const accessWords = { manager: "a manager", developer: "a developer", viewer: "a viewer" } as const;
@@ -206,7 +217,7 @@ export async function login(arg?: string): Promise<void> {
     platform: process.platform,
   });
   const url = `${server}/connect?code=${start.user_code}`;
-  console.log(`\nOpen this page to approve this computer:\n  ${url}\nCode: ${start.user_code}\n`);
+  console.log(`\nOpen this page to approve this computer:\n  ${url}\nCode: ${start.user_code}\nNo account yet? Sign up on the page that opens.\n`);
   openBrowser(url);
   console.log("Waiting for approval… (Ctrl+C to cancel)");
   let got: { user: string; token: string; device_id: string } | undefined;
@@ -265,6 +276,9 @@ async function tracked(top: string, path: string): Promise<boolean> {
   return !!r.stdout.trim();
 }
 
+/** Asks the running daemon to tell the server this computer's repos again (My computers); skipped when it is not running. */
+const reportDevice = (daemon: string) => fetch(`${daemon}/device`, { method: "POST", signal: AbortSignal.timeout(10_000) }).catch(() => undefined);
+
 function upsertRepo(path: string, project: string | undefined): void {
   const repos = loadRepos().filter((r) => r.path !== path);
   saveRepos(project ? [...repos, { path, project }] : repos);
@@ -313,8 +327,10 @@ export async function on(dir = process.cwd()): Promise<void> {
   ok("Kept out of git (.git/info/exclude)");
 
   upsertRepo(top, p.id);
-  if (await ensureDaemon(daemon)) ok("Background service running");
-  else warn(`The background service did not start. See why: gtv daemon (log: ${tilde(CONFIG_DIR)}/daemon.log)`);
+  if (await ensureDaemon(daemon)) {
+    ok("Background service running");
+    await reportDevice(daemon);
+  } else warn(`The background service did not start. See why: gtv daemon (log: ${tilde(CONFIG_DIR)}/daemon.log)`);
   console.log("\nDone. Start a new agent session and gtv takes it from there.");
 }
 
@@ -338,6 +354,7 @@ export async function off(dir = process.cwd()): Promise<void> {
   }
   if (!removed.length) return console.log("Nothing of gtv's is set up in this repo.");
   for (const r of removed) ok(`Removed ${r}`);
+  await reportDevice(daemonUrl());
   console.log("\ngtv is off in this repo. Turn it back on with: gtv on");
 }
 
@@ -367,7 +384,7 @@ export async function status(): Promise<void> {
     return;
   }
   const p = me.projects.find((x) => x.id === here.project);
-  if (!p) return bad(`You are not a member of project ${here.project} any more. Ask a project manager to add you.`);
+  if (!p) return bad(`You are not a member of project ${here.project} any more. Ask a manager for an invite link.`);
   console.log(`${p.name} (${p.access})`);
   const client = new ServerClient(cfg);
   const base = `/v1/p/${encodeURIComponent(p.id)}`;
@@ -426,7 +443,7 @@ export async function doctor(): Promise<void> {
       continue;
     }
     const p = me.projects.find((x) => x.id === r.project);
-    if (!p) fail(`${name}: you are not a member of project ${r.project} any more. Ask a project manager to add you.`);
+    if (!p) fail(`${name}: you are not a member of project ${r.project} any more. Ask a manager for an invite link.`);
     else if (p.access === "viewer") fail(`${name}: ${viewerError(p).message}`);
     for (const agent of ["claude", "codex"] as const) {
       const label = agent === "claude" ? "Claude Code" : "Codex";

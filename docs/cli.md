@@ -35,6 +35,7 @@ $ gtv login
 Open this page to approve this computer:
   https://gtv.tenantry.site/connect?code=KQ7M-2XPD
 Code: KQ7M-2XPD
+No account yet? Sign up on the page that opens.
 
 Waiting for approval… (Ctrl+C to cancel)
 ✔ This computer (thaihoc-laptop) is connected as hoc
@@ -69,8 +70,11 @@ Done. Start a new agent session and gtv takes it from there.
 
 - gtv tìm project theo `remote` của repo (so dạng `owner/repo`, kể cả các alias của project). Repo là bản fork hay có
   remote khác: `gtv link <project id>` rồi `gtv on`.
-- Phải là **Developer** hoặc **Quản lý** của project. Người xem hay người ngoài project nhận lời nhắn rõ ràng:
-  `You are not a member of project Realworld API. Ask a project manager to add you.`
+- Phải là **Developer** hoặc **Quản lý** của project. Người xem nhận
+  `You are a viewer in project Realworld API; agents need developer access. Ask a project manager to change it.`
+- Repo thuộc project bạn chưa ở trong (server không nói tên project với người ngoài):
+  `This repo belongs to a project you are not in. Ask a manager for an invite link.`
+- Chưa project nào dùng repo này: `No project uses this repo yet. Create one: https://…/new?repo=owner/repo`.
 - Trả lời `n` ở câu hỏi agent thì gtv hỏi từng agent. Không tìm thấy agent nào trên máy thì gtv cài cho cả hai, sẵn
   cho lúc bạn cài agent sau.
 - Chạy lại `gtv on` không tạo gì trùng; dùng nó để sửa một bản cài hỏng.
@@ -149,17 +153,17 @@ All good.
 Nó kiểm tra: tới được server; khoá của máy còn hiệu lực; dịch vụ nền chạy đúng tài khoản; với mỗi repo đã bật: còn tồn
 tại, hook không bị trùng, hook từ bản cũ thì cài lại, bạn vẫn là thành viên; agent nào có trên máy mà repo chưa bật.
 
-| Triệu chứng                                         | Lệnh                                                                                 |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `gtv: command not found` sau khi cài                | mở terminal mới; vẫn không được thì chạy `npx guide-the-vibe` và làm theo dòng nó in |
-| `✘ Not logged in. Run: gtv login`                   | `gtv login`                                                                          |
-| `✘ This computer's key is no longer valid…`         | máy bị thu hồi hoặc tài khoản bị xoá: `gtv login`                                    |
-| `✘ This repo is not part of any project…`           | kiểm tra `git remote -v`; bản fork: `gtv link <project>` rồi `gtv on`                |
-| `✘ You are not a member of project …`               | nhờ người quản lý project thêm bạn (Thiết lập › Thành viên), rồi `gtv on`            |
-| Agent báo `[gtv] You are not a member of project …` | như trên; agent vẫn làm việc, chỉ không được gtv điều phối                           |
-| Agent không nhận briefing, statusline "daemon off"  | `gtv doctor`                                                                         |
-| Hook chạy hai lần, cảnh báo lặp                     | `gtv doctor` (gỡ bản thừa) hoặc `gtv on` lại                                         |
-| Xem log dịch vụ nền                                 | `gtv daemon` (chạy trong terminal, in log), hoặc `~/.gtv/daemon.log`                 |
+| Triệu chứng                                         | Lệnh                                                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `gtv: command not found` sau khi cài                | mở terminal mới; vẫn không được thì chạy `npx guide-the-vibe` và làm theo dòng nó in   |
+| `✘ Not logged in. Run: gtv login`                   | `gtv login`                                                                            |
+| `✘ This computer's key is no longer valid…`         | máy bị thu hồi hoặc tài khoản bị xoá: `gtv login`                                      |
+| `✘ No project uses this repo yet…`                  | tạo project ở link gtv in ra; kiểm tra `git remote -v`; bản fork: `gtv link <project>` |
+| `✘ This repo belongs to a project you are not in…`  | xin người quản lý project một link mời, mở nó, rồi `gtv on`                            |
+| Agent báo `[gtv] You are not a member of project …` | như trên; agent vẫn làm việc, chỉ không được gtv điều phối                             |
+| Agent không nhận briefing, statusline "daemon off"  | `gtv doctor`                                                                           |
+| Hook chạy hai lần, cảnh báo lặp                     | `gtv doctor` (gỡ bản thừa) hoặc `gtv on` lại                                           |
+| Xem log dịch vụ nền                                 | `gtv daemon` (chạy trong terminal, in log), hoặc `~/.gtv/daemon.log`                   |
 
 ## 6. Gỡ
 

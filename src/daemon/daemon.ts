@@ -4,7 +4,8 @@
 
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { tokenFingerprint, type DaemonConfig } from "./config.ts";
+import { daemonUrl, loadRepos, tokenFingerprint, type DaemonConfig } from "./config.ts";
+import { GTV_VERSION, agentVersions, setupState } from "./install.ts";
 import { ServerClient } from "./client.ts";
 import { normalize, toRepoPaths, formatOutput, type NormalizedHook } from "./hooks.ts";
 import { decidePreEdit, messagesFor, statusline, type LocalSession } from "./decide.ts";
@@ -37,6 +38,7 @@ export class Daemon {
   private waitTokens = new Map<string, symbol>();
   private sendChain: Promise<unknown> = Promise.resolve();
   private healthTimer?: NodeJS.Timeout;
+  private reportTimer?: NodeJS.Timeout;
   /** Agent sessions the server refused (not a member): told once, then left alone. */
   private refused = new Set<string>();
   private server?: ReturnType<typeof serve>;
@@ -72,10 +74,24 @@ export class Daemon {
       this.server = serve({ fetch: app.fetch, port: this.cfg.port, hostname: "127.0.0.1" }, () => resolve());
     });
     log("daemon", `gtv daemon for ${this.cfg.dev} on 127.0.0.1:${this.cfg.port} → ${this.cfg.server}`);
+    void this.reportDevice();
+    this.reportTimer = setInterval(() => void this.reportDevice(), 6 * 3600_000);
+    this.reportTimer.unref();
+  }
+
+  /** Tells the server what this computer has (My computers): gtv version, agents, and the repos where gtv is on. */
+  async reportDevice(): Promise<void> {
+    if (!this.cfg.token) return;
+    const daemon = daemonUrl(this.cfg);
+    const repos = loadRepos().map((r) => ({ ...r, agents: (["claude", "codex"] as const).filter((a) => setupState(r.path, a, daemon) !== "missing") }));
+    await this.client
+      .call("POST", "/v1/me/device", { gtv_version: GTV_VERSION, agents: await agentVersions(), repos })
+      .catch((e: Error) => log("daemon", `computer report failed: ${e.message}`));
   }
 
   async stop(): Promise<void> {
     clearInterval(this.healthTimer);
+    clearInterval(this.reportTimer);
     for (const p of this.projects.values()) p.stop();
     for (const t of this.snapshotTimers.values()) clearTimeout(t);
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
@@ -358,6 +374,11 @@ export class Daemon {
       return c.text(describeStatus(this.stateOf(ws.project), this.cfg.server, this.cfg.dev, ws));
     });
     app.get("/human-inbox", (c) => c.json([...this.humanInbox.values()]));
+    /** gtv on / off changed the repos: report them now. */
+    app.post("/device", async (c) => {
+      await this.reportDevice();
+      return c.json({ ok: true });
+    });
     app.post("/snapshot", async (c) => {
       const { cwd } = (await c.req.json()) as { cwd: string };
       const ws = await this.workspaces.get(cwd);

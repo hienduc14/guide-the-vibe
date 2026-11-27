@@ -178,11 +178,14 @@ const viewerError = (p: MyProject) => new CliError(`You are a viewer in project 
 
 // ---- npx guide-the-vibe ---------------------------------------------------------------------------
 
-export function install(): void {
+export async function install(): Promise<void> {
   const r = installSelf();
   ok(`Installed gtv ${GTV_VERSION} → ${tilde(r.bin)}`);
   if (/^Added|on your PATH$/.test(r.path)) ok(r.path);
   else warn(r.path);
+  // An update: the running background service still has the old code loaded.
+  const h = await daemonHealth();
+  if (h && h.version !== GTV_VERSION && (await ensureDaemon())) ok(`Background service restarted on ${GTV_VERSION}`);
   console.log("\nNext: gtv login");
 }
 
@@ -429,8 +432,15 @@ export async function doctor(): Promise<void> {
 
   const daemon = daemonUrl(cfg);
   const h = await daemonHealth(daemon);
-  if (h && h.dev === cfg.dev && h.server === cfg.server) ok(`Background service running (port ${cfg.port})`);
-  else if (await ensureDaemon(daemon)) warn(h ? "Background service was running for another account: restarted" : "Background service was stopped: started");
+  if (h && h.dev === cfg.dev && h.server === cfg.server && h.version === GTV_VERSION) ok(`Background service running (port ${cfg.port})`);
+  else if (await ensureDaemon(daemon))
+    warn(
+      !h
+        ? "Background service was stopped: started"
+        : h.version !== GTV_VERSION
+          ? `Background service was running gtv ${h.version ?? "older"}: restarted on ${GTV_VERSION}`
+          : "Background service was running for another account: restarted",
+    );
   else fail(`The background service does not start. See why: gtv daemon (log: ${tilde(CONFIG_DIR)}/daemon.log)`);
 
   const agents = detectAgents();

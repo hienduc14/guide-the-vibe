@@ -420,6 +420,7 @@ export class Daemon {
       c.json({
         ok: true,
         pid: process.pid,
+        version: GTV_VERSION,
         token: tokenFingerprint(this.cfg.token),
         dev: this.cfg.dev,
         server: this.cfg.server,

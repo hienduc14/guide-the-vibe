@@ -129,6 +129,8 @@ const lstatExists = (p: string) => {
 
 export interface DaemonHealth {
   pid?: number;
+  /** gtv version of the running daemon (missing before 0.2.2). */
+  version?: string;
   dev: string;
   server: string;
   token?: string | null;
@@ -169,7 +171,8 @@ export async function ensureDaemon(daemon = daemonUrl()): Promise<boolean> {
   const health = () => daemonHealth(daemon);
   const h = await health();
   // A new invite rotates the token: a daemon still holding the old one would get 401s, so restart it.
-  if (h && h.dev === cfg.dev && h.server === cfg.server && h.token === tokenFingerprint(cfg.token)) return true;
+  // After an update the old daemon keeps running the old code from memory: restart it too.
+  if (h && h.dev === cfg.dev && h.server === cfg.server && h.token === tokenFingerprint(cfg.token) && h.version === GTV_VERSION) return true;
   if (h && !(await stopDaemon(daemon))) return false; // someone else's daemon on this port
   ensureBin();
   mkdirSync(CONFIG_DIR, { recursive: true });

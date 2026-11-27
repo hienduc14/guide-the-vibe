@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { LayoutGrid, Laptop, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, ShieldCheck, Sun, User } from "lucide-react";
 import { useOverview } from "../hooks/useOverview";
 import { displayName, useAuth } from "../hooks/useAuth";
@@ -34,10 +34,10 @@ function Sidebar({ open, wide, onToggle, onMenu }: { open: boolean; wide: boolea
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
   return (
     <aside className={`sidebar${open ? " open" : ""}`}>
-      <div className="brand" title={data?.commit ? `Bản đang chạy ${data.commit.slice(0, 7)}` : "Guide the Vibe"}>
+      <Link to="/" className="brand" title={data?.commit ? `Project của tôi · bản đang chạy ${data.commit.slice(0, 7)}` : "Project của tôi"}>
         <BrandMark />
         <span className="nav-label">Guide the Vibe</span>
-      </div>
+      </Link>
 
       <nav className="nav">
         <NavLink to="/" end className={link} title="Project của tôi">

@@ -2,7 +2,7 @@
 // unmerged change side by side (or merged into one column), with the clashing spots boxed.
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Code2, FileText, GitMerge, Inbox, Link2, Sparkles, X, Zap } from "lucide-react";
+import { Check, Code2, FileText, GitMerge, Link2, Sparkles, X, Zap } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { FileDetail, Incident } from "../../api/types";
 import { usePoll } from "../../hooks/usePoll";
@@ -14,7 +14,7 @@ import { alignDiffs, counts, type Segment } from "../../lib/diff";
 import { fileIncident, incidentDone, incidentPlain, incidentTitle, isHot } from "../../lib/incident";
 import { KIND_VI, shortSubject } from "../../components/Message";
 import { ago, clock, shortSha } from "../../lib/format";
-import { FixBox, FixBar } from "./FixBox";
+import { FixBox } from "./FixBox";
 
 const KEYWORDS =
   /(\/\/.*$)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(const|let|var|export|default|async|await|if|else|throw|new|return|function|import|from|class|extends|public|private|readonly|constructor|super|this|def|for|while|in|of|try|catch|type|interface)\b/g;
@@ -202,7 +202,7 @@ function CodeView({ detail, mode, segs, cols }: { detail: FileDetail; mode: "spl
 const TOUCH_LABEL = (w: Ws) =>
   w.footprint ? (Date.now() - Date.parse(w.footprint.last_at) < 30 * 60_000 ? "đang sửa" : "đã sửa trước đó") : "mới khai báo, chưa sửa";
 
-export function FileSheet({ path, onClose, onOpenIncident }: { path: string; onClose: () => void; onOpenIncident: (id: string) => void }) {
+export function FileSheet({ path, onClose }: { path: string; onClose: () => void }) {
   const { id, detail: project } = useProject();
   const colorOf = useColorOf();
   const ref = useRef<HTMLDialogElement>(null);
@@ -269,6 +269,12 @@ export function FileSheet({ path, onClose, onOpenIncident }: { path: string; onC
               ["merge", "Gộp thử"],
             ]}
           />
+        )}
+        {inc?.status === "open" && !fixOpen && (
+          <button type="button" className="p-btn primary" onClick={() => setFixOpen(true)}>
+            <Sparkles />
+            Xử lý
+          </button>
         )}
         <button type="button" className="iconbtn" onClick={() => ref.current?.close()} aria-label="Đóng">
           <X />
@@ -385,12 +391,6 @@ export function FileSheet({ path, onClose, onOpenIncident }: { path: string; onC
                     </li>
                   ))}
                 </ul>
-                <div className="acts">
-                  <button type="button" className="p-btn quiet sm" onClick={() => onOpenIncident(inc.id)}>
-                    <Inbox />
-                    Mở vụ này ở Cần xử lý
-                  </button>
-                </div>
               </div>
             )}
             {bases.size > 1 && (
@@ -413,13 +413,10 @@ export function FileSheet({ path, onClose, onOpenIncident }: { path: string; onC
           </section>
         </div>
       )}
-      {inc && (
+      {/* the fix box only when asked for (Xử lý), so the code keeps the room; a closed incident shows its outcome */}
+      {inc && (inc.status !== "open" || fixOpen) && (
         <footer className="sh-foot">
-          {inc.status !== "open" || fixOpen ? (
-            <FixBox projectId={id} inc={inc} onChanged={() => void incs.reload()} onCollapse={inc.status === "open" ? () => setFixOpen(false) : undefined} />
-          ) : (
-            <FixBar projectId={id} inc={inc} onOpen={() => setFixOpen(true)} />
-          )}
+          <FixBox projectId={id} inc={inc} onChanged={() => void incs.reload()} onCollapse={inc.status === "open" ? () => setFixOpen(false) : undefined} />
         </footer>
       )}
     </dialog>

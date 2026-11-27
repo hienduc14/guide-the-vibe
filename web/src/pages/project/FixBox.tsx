@@ -2,7 +2,7 @@
 // words, chooses who receives it and sends it; or marks the incident handled without sending; or closes it.
 
 import { useEffect, useState } from "react";
-import { Check, RotateCcw, Send, Sparkles } from "lucide-react";
+import { Check, ChevronDown, RotateCcw, Send, Sparkles } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { Incident, Plan } from "../../api/types";
 import { useAction } from "../../hooks/useToast";
@@ -44,23 +44,6 @@ function usePlans(projectId: string, inc: Incident): { plans: Plan[]; waiting: b
     };
   }, [projectId, inc.id, inc.status, brainOff]);
   return { plans, waiting };
-}
-
-export function FixBar({ projectId, inc, onOpen }: { projectId: string; inc: Incident; onOpen: () => void }) {
-  const { plans } = usePlans(projectId, inc);
-  const text = drafts.get(inc.id)?.text || plans[0]?.text || "Chọn cách xử lý vụ đụng nhau này.";
-  return (
-    <div className="fixbar">
-      <b>
-        <Sparkles />
-        Hướng xử lý
-      </b>
-      <span className="muted">{text}</span>
-      <button type="button" className="p-btn primary" onClick={onOpen}>
-        Xử lý vụ này
-      </button>
-    </div>
-  );
 }
 
 export function FixBox({ projectId, inc, onChanged, onCollapse }: { projectId: string; inc: Incident; onChanged: () => void; onCollapse?: () => void }) {
@@ -140,18 +123,16 @@ export function FixBox({ projectId, inc, onChanged, onCollapse }: { projectId: s
     <section className="fix">
       <div className="fix-draft">
         <div className="fix-h">
-          <b>
-            <Sparkles />
-            Hướng xử lý
-          </b>
-          <span className="faint">
-            {plans.length ? "AI soạn sẵn. Chọn phương án, sửa lời, rồi gửi." : waiting ? "AI đang soạn phương án…" : "Viết điều bạn muốn hai agent làm."}
-          </span>
           {onCollapse && (
-            <button type="button" className="p-btn quiet sm" style={{ marginLeft: "auto" }} onClick={onCollapse}>
+            <button type="button" className="p-btn quiet sm" onClick={onCollapse}>
+              <ChevronDown />
               Thu gọn
             </button>
           )}
+          <Sparkles className="spark" />
+          <span className="faint">
+            {plans.length ? "AI soạn sẵn. Chọn phương án, sửa lời, rồi gửi." : waiting ? "AI đang soạn phương án…" : "Viết điều bạn muốn hai agent làm."}
+          </span>
         </div>
         {plans.length > 0 && (
           <div className="plans" role="group" aria-label="Phương án">

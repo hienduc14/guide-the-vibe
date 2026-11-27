@@ -1219,3 +1219,11 @@
     grid-row: 1;
   }
 }
+/* the logo goes home (Project của tôi) */
+.sidebar a.brand {
+  text-decoration: none;
+  border-radius: 10px;
+}
+.sidebar a.brand:hover {
+  opacity: 0.85;
+}

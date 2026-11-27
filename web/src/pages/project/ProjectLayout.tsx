@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useParams, useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronDown, GitBranch, Inbox, MessagesSquare, Moon, SlidersHorizontal, Activity, SquareKanban, Sun } from "lucide-react";
 import { api } from "../../api/endpoints";
 import type { ProjectAccess, ProjectDetail } from "../../api/types";
@@ -98,7 +98,6 @@ function ThemeButton() {
 export function ProjectLayout() {
   const { id = "" } = useParams();
   const { shared } = useAuth();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { data, error, reload } = usePoll(() => api.projects.detail(id), [id], 5000);
   if (error && !data) return <ErrorNotice error={error} />;
@@ -172,7 +171,7 @@ export function ProjectLayout() {
           <main className="screen">
             <Outlet />
           </main>
-          {file && <FileSheet path={file} onClose={closeFile} onOpenIncident={(iid) => navigate(`/p/${id}/inbox?i=${iid}`)} />}
+          {file && <FileSheet path={file} onClose={closeFile} />}
         </div>
       </PeopleProvider>
     </Ctx.Provider>

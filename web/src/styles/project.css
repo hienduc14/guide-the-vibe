@@ -1321,8 +1321,14 @@
 .pj .fix-h {
   display: flex;
   gap: 10px;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
+}
+.pj .fix-h .spark {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex: none;
 }
 .pj .fix-h b {
   display: inline-flex;

@@ -584,7 +584,11 @@ export class Engine {
     const leftover = this.store.footprints().some((f) => f.workspace_id === ws.id);
     if (!leftover) return; // nothing edited here: a clean checkout of a newer main is a pull, not a merge
     for (const t of tasks) this.store.updateTask(t.id, { status: "done" });
-    this.board.onMerged(tasks, parent);
+    // Work the agent already reported finished waits on the board ("Chờ merge") for exactly this moment.
+    const finished = committedAt
+      ? this.db.all<Task>(`SELECT * FROM tasks WHERE workspace_id = ? AND status = 'done' AND board_id IS NOT NULL AND created_at <= ?`, ws.id, committedAt)
+      : [];
+    this.board.onMerged([...tasks, ...finished], parent);
     this.tasksClosed(tasks.map((t) => t.id));
     this.store.clearFootprints(ws.id);
     this.graph.clearLayer(ws.id);

@@ -11,7 +11,7 @@ import { KnowledgeBase } from "../src/server/knowledge/kb.ts";
 import { NullBrain } from "../src/server/brain/types.ts";
 import { git, patternsOverlap } from "../src/shared/util.ts";
 import { toRepoPaths } from "../src/daemon/hooks.ts";
-import { mkdirSync, readFileSync, symlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { commitAndPush, makeOrigin, tempDir } from "./helpers.ts";
 
 process.env.GTV_QUIET = "1";
@@ -71,6 +71,48 @@ test("pulling a newer main without local edits does not close the puller's task"
     await git(bob, ["push", "-q", "origin", `${snap}:refs/gtv/alice/ws_a`]);
     await engine.onSnapshot("ws_a", snap);
     assert.notEqual(engine.store.task(task.id)?.status, "done");
+  } finally {
+    origin.cleanup();
+  }
+});
+
+test("work an agent already finished moves from Chờ merge to Xong when it reaches main", async () => {
+  const origin = await makeOrigin({ "src/auth/login.ts": "export const login = 1;\n" });
+  try {
+    const repo = new Repo(join(origin.root, "mirror.git"), origin.bare);
+    await repo.ensure();
+    const engine = new Engine({
+      db: new Db(":memory:", PROJECT_SCHEMA),
+      repo,
+      brain: new NullBrain(),
+      cfg: { featureDefaults: {}, registrationWaitMs: 100, l3DailyBudget: 10 },
+    });
+    await engine.pollRepo();
+    const started = (await engine.handle("alice", {
+      type: "session_start",
+      session: { dev: "alice", agent: "claude", workspace_id: "ws_a", workspace_label: "a" },
+    } as never)) as { session: never };
+    const { task } = await engine.register(started.session, { title: "login fix", resources: [{ kind: "path", value: "src/auth/**" }] } as never);
+    await new Promise((r) => setTimeout(r, 1100)); // commit times have 1 s resolution
+
+    // Alice commits on a branch (her snapshot is clean on top of it) and her agent reports the task finished.
+    const alice = await origin.clone("alice");
+    await git(alice, ["checkout", "-q", "-b", "fix/login"]);
+    writeFileSync(join(alice, "src/auth/login.ts"), "export const login = 2;\n");
+    await git(alice, ["-c", "user.name=a", "-c", "user.email=a@x", "commit", "-qam", "login fix"]);
+    const head = (await git(alice, ["rev-parse", "HEAD"])).stdout.trim();
+    const tree = (await git(alice, ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+    const snap = (await git(alice, ["-c", "user.name=gtv", "-c", "user.email=g@l", "commit-tree", tree, "-p", head, "-m", "gtv wip snapshot"])).stdout.trim();
+    await git(alice, ["push", "-q", "origin", `${snap}:refs/gtv/alice/ws_a`]);
+    await engine.onSnapshot("ws_a", snap);
+    engine.store.updateTask(task.id, { status: "done" } as never);
+    engine.board.onRegistrationClosed(task, "done");
+    assert.equal(engine.board.get(task.board_id!)!.status, "review");
+
+    // The branch is merged into main.
+    await git(alice, ["push", "-q", "origin", "HEAD:main"]);
+    await engine.pollRepo();
+    assert.equal(engine.board.get(task.board_id!)!.status, "done");
   } finally {
     origin.cleanup();
   }

@@ -66,12 +66,25 @@ export function buildMap(s: TeamState, incidents: Incident[], now = Date.now()) 
       ws: t.workspace_id,
       dev: t.dev,
       agent: sess?.agent ?? null,
-      status: sess?.status ?? null,
+      status: sess?.status ?? "ended", // open work whose agent session has closed
       last_seen: sess?.last_seen ?? null,
       branch: wsOf.get(t.workspace_id)?.branch ?? null,
     };
     if (!cur.task || t.updated_at > cur.task.updated_at) cur.task = t;
     agents.set(t.workspace_id, cur);
+  }
+  // Everyone whose edits are on the map gets a card, even after their session closed (shown "đã thoát", grey threads):
+  // a file badge with no card and no thread reads as a bug.
+  for (const fp of s.footprints) {
+    if (agents.has(fp.workspace_id)) continue;
+    agents.set(fp.workspace_id, {
+      ws: fp.workspace_id,
+      dev: fp.dev,
+      agent: null,
+      status: "ended",
+      last_seen: fp.last_at,
+      branch: wsOf.get(fp.workspace_id)?.branch ?? null,
+    });
   }
   for (const t of s.recent_done ?? []) {
     const a = agents.get(t.workspace_id);
@@ -90,7 +103,6 @@ export function buildMap(s: TeamState, incidents: Incident[], now = Date.now()) 
     for (const r of t.resources)
       if (r.kind === "path" && isFile(r.value)) touch(r.value, t.workspace_id, t.dev, agents.get(t.workspace_id)?.agent ?? null, "declared", 0, null);
   for (const fp of s.footprints) {
-    // A workspace with edits but no live session or open work shows on the file only (no card, no thread).
     touch(
       fp.path,
       fp.workspace_id,
